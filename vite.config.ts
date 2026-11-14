@@ -10,8 +10,9 @@ function agentApi(env: Record<string, string>): Plugin {
     name: 'agent-api',
     configureServer(server) {
       for (const k of ['GEMINI_API_KEY', 'GEMINI_MODELS', 'AGENT_PROVIDER', 'ANTHROPIC_API_KEY', 'AGENT_TOKEN']) if (env[k] && !process.env[k]) process.env[k] = env[k];
-      /* /api/agent reads one uploaded or linked record; /api/records finds and reads the newest records in the city archive */
-      for (const name of ['agent', 'records']) server.middlewares.use('/api/' + name, async (req, res) => {
+      /* /api/agent reads one uploaded or linked record; /api/records finds and reads the newest records in the city archive;
+         /api/sites has Gemini pick the best of the measured sites */
+      for (const name of ['agent', 'records', 'sites']) server.middlewares.use('/api/' + name, async (req, res) => {
         if (req.method !== 'POST') { res.statusCode = 405; res.end(); return; }
         const chunks: Buffer[] = [];
         for await (const c of req) chunks.push(c as Buffer);

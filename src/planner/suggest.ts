@@ -95,6 +95,22 @@ export function screen(A: Atlas, kind: GhostKind, pos: XZ, shown: SegResult[]) {
   return { score: sc, km, access };
 }
 
+/* What the AI site review is told about a site, besides its routed traffic: the main street it reaches, whether it
+   is a parking lot (redevelopment) rather than open land, and the known projects within 1.5 km */
+export function siteFacts(A: Atlas, pos: XZ) {
+  const L = land(A);
+  let street = '', access = 99;
+  for (const i of nearSegs(L, pos, 3)) {
+    const s = A.SEGS[i]; if (s.road.cls === 'local') continue;
+    const d = Math.hypot(s.mid[0] - pos[0], s.mid[1] - pos[1]) * 0.2;  /* 1 scene unit = 200 m */
+    if (d < access) { access = d; street = s.road.name || 'unnamed main street'; }
+  }
+  const onLot = L.polys.some(P => P.lot && pos[0] >= P.box[0] && pos[0] <= P.box[1] && pos[1] >= P.box[2] && pos[1] <= P.box[3] && inPoly(pos, P.pts));
+  const near = A.PROJECTS.filter(p => p.pos).map(p => ({ name: p.name, type: p.type, km: Math.round(Math.hypot(p.pos![0] - pos[0], p.pos![1] - pos[1]) * 0.2 * 10) / 10 }))
+    .filter(p => p.km <= 1.5).sort((a, b) => a.km - b.km).slice(0, 4);
+  return { mainStreet: street, kmToMainStreet: Math.round(access * 100) / 100, onParkingLot: onLot, nearbyProjects: near };
+}
+
 export type SuggestState = { busy: string | null; msg: string | null };
 /* Hook: suggest(kind, n, year) screens open land, routes the year with each of the best 8 sites, and adds the
    n that add the least delay as Suggested ghosts. Uses its own 'judge' worker request so other panels can't drop it. */

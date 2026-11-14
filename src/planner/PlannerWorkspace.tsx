@@ -10,7 +10,7 @@ import type { Computed } from '../components/Panels';
 import { send, useWorkerMessages } from '../hooks/useTraffic';
 import { CCOL, TODAY_I, fmt, hourLabel, pct } from '../ui';
 import './planner.css';
-import { candidates, screen, snapSite, type SuggestState } from './suggest';
+import { candidates, screen, siteFacts, snapSite, type SuggestState } from './suggest';
 import type { Highlight } from './ghostLayer';
 import { GHOST_TYPES, KINDS, YEARS, ghostActive, ghostPlans, ghostSupply, newGhost, type Ghost, type GhostKind, type GhostRoad } from './ghosts';
 
@@ -181,10 +181,16 @@ function Trade({ r }: { r: { worst?: { vc: number; name: string } | null; jump?:
 }
 
 /* ---------- Step 3: your spot against the best open sites, all routed for the same year and hour ---------- */
-/* ---------- AI recommendation: screen open land, route the year with each site, then walk the planner through the best ones ---------- */
+/* ---------- AI recommendation: screen open land, route the year with each site, then Gemini weighs the measured facts
+   (added delay, worst street, distance to campus, what is next door) and picks the best; the planner walks through its top 5.
+   If the AI review can't run, the sites are ranked by added delay alone and the dialog says so. ---------- */
 function AiRec({ A, c, sc, kind, year, hour, ghosts, dispatch, fly, mark, onPlace, onClose }: { A: Atlas; c: Computed; sc: Scenario; kind: GhostKind; year: number; hour: number; ghosts: Ghost[]; dispatch: Dispatch<Action>; fly: (p: XZ) => void; mark: (p: XZ | null, l?: string) => void; onPlace: (p: XZ) => void; onClose: () => void }) {
-  type Row = { pos: XZ; km: number; dv: number; worst?: { vc: number; name: string } | null; jump?: { pts: number; name: string; vc: number } | null };
+  type Row = { pos: XZ; km: number; dv: number; worst?: { vc: number; name: string } | null; jump?: { pts: number; name: string; vc: number } | null; note?: string };
   const [rows, setRows] = useState<Row[] | null>(null), [i, setI] = useState(0), [msg, setMsg] = useState('Switching the map to fall ' + year + '…');
+  const [ai, setAi] = useState<{ why: string; model: string } | { error: string } | null>(null);
+  /* what each step of the search did, for the "See how it decided" card */
+  type Trace = { open: number; passed: number; all: (Row & { site: number })[]; base: number; rank: number[] };
+  const [trace, setTrace] = useState<Trace | null>(null), [flow, setFlow] = useState(false), counts = useRef({ open: 0, passed: 0 });
   const job = useRef<{ key: string; picks: { pos: XZ; km: number }[] } | null>(null), started = useRef(false);
   const ty = GHOST_TYPES[kind], ready = yearOf(c.t) === year;
   useEffect(() => { if (!ready) dispatch({ type: 'view', patch: { ti: tiOfYear(year), sel: null } }); }, []);
@@ -192,16 +198,39 @@ function AiRec({ A, c, sc, kind, year, hour, ghosts, dispatch, fly, mark, onPlac
   useWorkerMessages(m => {
     const j = job.current; if (m.type !== 'judge' || !j || m.key !== j.key) return;
     job.current = null;
-    const r = m.options.map(o => ({ pos: j.picks[+o.id].pos, km: j.picks[+o.id].km, dv: o.vht - m.base, worst: o.worst, jump: o.jump })).sort((a, b) => a.dv - b.dv).slice(0, 5);
-    setRows(r); setI(0);
+    const all: Row[] = m.options.map(o => ({ pos: j.picks[+o.id].pos, km: j.picks[+o.id].km, dv: o.vht - m.base, worst: o.worst, jump: o.jump })).sort((a, b) => a.dv - b.dv);
+    setTrace({ ...counts.current, all: all.map((r, k) => ({ ...r, site: k + 1 })), base: m.base, rank: [] });
+    review(all);
   });
+  /* hand the measured sites to Gemini; it returns its pick, a top 5 and a note per site */
+  const review = async (all: Row[]) => {
+    setMsg('Gemini is comparing the ' + all.length + ' sites…');
+    const sites = all.map((r, k) => ({ site: k + 1, addedDelayVehHours: Math.round(r.dv * 10) / 10, kmToCampus: Math.round(r.km * 100) / 100,
+      worstStreetNearby: r.worst ? { name: r.worst.name || 'unnamed street', percentOfCapacity: Math.round(r.worst.vc * 100) } : null,
+      biggestJump: r.jump ? { name: r.jump.name, points: Math.round(r.jump.pts * 100) } : null, ...siteFacts(A, r.pos) }));
+    try {
+      let pass = ''; try { pass = sessionStorage.getItem('agent-pass') || ''; } catch {}
+      const res = await fetch('/api/sites', { method: 'POST', headers: { 'content-type': 'application/json', ...(pass ? { 'x-agent-token': pass } : {}) },
+        body: JSON.stringify({ project: { type: ty.label, size: ty.size, note: ty.note }, year, hour: hourLabel(hour), sites }) });
+      const d = await res.json().catch(() => ({ error: 'HTTP ' + res.status }));
+      if (!res.ok || !d.pick) throw new Error(d.error || 'HTTP ' + res.status);
+      const note = new Map<number, string>((d.pick.notes || []).map((n: { site: number; note: string }) => [n.site, n.note]));
+      setRows((d.pick.ranking as number[]).slice(0, 5).map(n => ({ ...all[n - 1], note: note.get(n) })));
+      setTrace(t => t && { ...t, rank: d.pick.ranking, all: t.all.map(r => ({ ...r, note: note.get(r.site) })) });
+      setAi({ why: d.pick.why, model: d.model });
+    } catch (e) {
+      setRows(all.slice(0, 5)); setAi({ error: String(e instanceof Error ? e.message : e).slice(0, 140) });
+    }
+    setI(0);
+  };
   useEffect(() => {  /* run once the map shows the year it opens, so the screen and the routing use that year's traffic */
     if (!ready || started.current) return; started.current = true;
     setMsg('Screening open land…');
     setTimeout(() => {
       const avoid = ghosts.map(g => g.pos);
-      const scored = candidates(A, kind).filter(q => !avoid.some(v => Math.hypot(v[0] - q[0], v[1] - q[1]) < 3))
-        .map(q => ({ pos: q, s: screen(A, kind, q, c.shown) })).filter(x => x.s).sort((a, b) => a.s!.score - b.s!.score);
+      const open = candidates(A, kind).filter(q => !avoid.some(v => Math.hypot(v[0] - q[0], v[1] - q[1]) < 3));
+      const scored = open.map(q => ({ pos: q, s: screen(A, kind, q, c.shown) })).filter(x => x.s).sort((a, b) => a.s!.score - b.s!.score);
+      counts.current = { open: open.length, passed: scored.length };
       const picks: { pos: XZ; km: number }[] = [];
       for (const x of scored) { if (picks.length >= 8) break; if (!picks.some(v => Math.hypot(v.pos[0] - x.pos[0], v.pos[1] - x.pos[1]) < 4)) picks.push({ pos: x.pos, km: x.s!.km }); }
       if (!picks.length) { setRows([]); return; }
@@ -214,16 +243,22 @@ function AiRec({ A, c, sc, kind, year, hour, ghosts, dispatch, fly, mark, onPlac
   }, [ready]);
   const r = rows && rows[i];
   useEffect(() => { if (r) { fly(r.pos); mark(r.pos, 'AI recommendation ' + (i + 1)); } }, [r]);
-  const best = rows && rows.length ? rows[0].dv : 0, worstDv = rows && rows.length ? rows[rows.length - 1].dv : 0;
-  return createPortal(<div className="airec" role="dialog" aria-label="AI recommendation">
+  const best = rows && rows.length ? rows[0].dv : 0, least = trace ? Math.min(...trace.all.map(x => x.dv)) : best;
+  const vs = (d: number, what: string) => Math.abs(d) < 0.05 ? 'same as ' + what : (d > 0 ? '+' + d.toFixed(1) + ' more than ' : d.toFixed(1).slice(1) + ' less than ') + what;
+  const show = (x: Row & { site: number }) => { fly(x.pos); mark(x.pos, 'Site ' + x.site); };
+  const usedAi = !!ai && 'why' in ai;
+  return createPortal(<div className="airec-stack"><div className="airec" role="dialog" aria-label="AI recommendation">
     <div className="airec-head"><b>✦ AI recommendation</b><small>{ty.label} · opens fall {year}</small>
       <button className="airec-x" aria-label="Close" onClick={onClose}>✕</button></div>
     {!rows ? <p className="note" style={{ margin: 0 }}>{msg}</p>
       : !r ? <p className="note" style={{ margin: 0 }}>No open site near a main street was found for this project type.</p>
       : <>
-        <div className="airec-pick"><b>AI recommendation {i + 1} of {rows.length}</b><small>{i === 0 ? 'least added delay of the sites tested' : 'ranked by added delay'}</small></div>
+        <div className="airec-pick"><b>{ai && 'why' in ai ? 'AI recommendation' : 'Site'} {i + 1} of {rows.length}</b><small>{ai && 'why' in ai ? (i === 0 ? "Gemini's pick" : "Gemini's no. " + (i + 1)) : i === 0 ? 'least added delay of the sites tested' : 'ranked by added delay'}</small></div>
+        {ai && 'why' in ai && i === 0 && <p className="airec-why">{ai.why}</p>}
+        {r.note && <p className="airec-note">{r.note}</p>}
+        {ai && 'error' in ai && i === 0 && <p className="note warn" style={{ margin: 0 }}>AI review unavailable ({ai.error}). Ranked by the traffic model's added delay only.</p>}
         <div className="airec-nums">
-          <div><small>Added delay, {hourLabel(hour)}</small><b>+{r.dv.toFixed(1)} veh-h</b>{i > 0 && <small>+{(r.dv - best).toFixed(1)} vs no. 1</small>}{i === 0 && rows.length > 1 && <small>{(worstDv - best).toFixed(1)} less than no. {rows.length}</small>}</div>
+          <div><small>Added delay, {hourLabel(hour)}</small><b>+{r.dv.toFixed(1)} veh-h</b>{i > 0 ? <small>{vs(r.dv - best, 'no. 1')}</small> : rows.length > 1 && <small>{r.dv - least < 0.05 ? 'least of the sites tested' : vs(r.dv - least, 'the lowest-delay site')}</small>}</div>
           {r.worst && <div><small>Worst street nearby</small><b style={{ color: CCOL[A.level(r.worst.vc).key] }}>{pct(r.worst.vc)}</b>{r.worst.name && <small>{r.worst.name}</small>}</div>}
           {r.jump && <div><small>Biggest jump</small><b className={r.jump.pts >= 0.2 ? 'warn' : ''}>+{Math.round(r.jump.pts * 100)} pts</b><small>{r.jump.name}</small></div>}
           <div><small>To campus</small><b>{r.km.toFixed(1)} km</b></div>
@@ -233,8 +268,28 @@ function AiRec({ A, c, sc, kind, year, hour, ghosts, dispatch, fly, mark, onPlac
           <button className="mini" disabled={i >= rows.length - 1} onClick={() => setI(i + 1)}>Next ›</button>
           <button className="mini act" onClick={() => onPlace(r.pos)}>Place it here</button>
         </div>
-        <p className="note" style={{ margin: '6px 0 0' }}>Traffic only: zoning, ownership and cost are not checked. You decide.</p>
+        {trace && <button className="back airec-how" aria-expanded={flow} onClick={() => setFlow(!flow)}>{flow ? 'Hide how it decided' : 'See how it decided'}</button>}
       </>}
+  </div>
+  {flow && trace && rows && <div className="airec airec-flow" role="region" aria-label="How it decided">
+    <div className="airec-head"><b>How it decided</b><small>{ty.label} · fall {year} · {hourLabel(hour)}</small>
+      <button className="airec-x" aria-label="Close" onClick={() => setFlow(false)}>✕</button></div>
+    <ol className="flow">
+      <li><b>{fmt(trace.open)} open spots</b><small>Map points where the footprint fits with no building, park, water or street under it. Parking lots count as redevelopment sites.</small></li>
+      <li><b>{fmt(trace.passed)} pass the quick screen</b><small>Within 1.2 km of a main street, scored on access, how full nearby main streets already are{kind === 'student' ? ' and walking distance to campus' : kind === 'homes' || kind === 'grocery' ? ' and distance from the blocks next to campus' : ''}.</small></li>
+      <li><b>{trace.all.length} sites tested</b><small>The best-scoring spots at least 800 m apart, so the choices are really different places.</small></li>
+      <li><b>Traffic model routes every trip</b><small>For each site, every trip in town is sent through the street network with the project there. Town-wide delay without it: {trace.base.toFixed(1)} veh-h.</small>
+        <div className="flow-table"><table><thead><tr><th>Site</th><th>Added delay</th><th>Campus</th><th>Worst street</th>{usedAi && <th>AI</th>}</tr></thead><tbody>
+          {trace.all.map(x => { const k = trace.rank.indexOf(x.site); return <tr key={x.site} className={usedAi && k === 0 ? 'win' : ''} onClick={() => show(x)} title={x.note || 'Show on the map'}>
+            <td>{x.site}</td><td className="num">+{x.dv.toFixed(1)}</td><td className="num">{x.km.toFixed(1)} km</td>
+            <td>{x.worst ? <><span style={{ color: CCOL[A.level(x.worst.vc).key] }}>{pct(x.worst.vc)}</span> {x.worst.name}</> : '–'}</td>
+            {usedAi && <td>{k >= 0 ? (k === 0 ? '★ 1' : k + 1) : '–'}</td>}</tr>; })}
+        </tbody></table></div><small>Tap a row to see it on the map.</small></li>
+      <li><b>{usedAi ? 'Gemini picks site ' + trace.rank[0] : 'Ranked by added delay'}</b>
+        <small>{usedAi ? 'Gemini (' + (ai as { model: string }).model + ") read the numbers above plus each site's main street, whether it is a parking lot and the known projects within 1.5 km, then weighed them for a " + ty.label.toLowerCase() + '.' : 'The AI review could not run (' + (ai && 'error' in ai ? ai.error : 'no answer') + '), so the sites are ordered by the delay they add.'}</small>
+        {usedAi && <p className="airec-why">{(ai as { why: string }).why}</p>}</li>
+    </ol>
+  </div>}
   </div>, document.body);
 }
 
