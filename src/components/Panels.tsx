@@ -3,7 +3,7 @@ import type { Dispatch, ReactNode } from 'react';
 import type { Atlas, PopSeries } from '../model/atlas';
 import type { Project, SegResult } from '../model/types';
 import type { Action, State } from '../state';
-import { CCOL, FIXES, fmt, hourLabel, pct, pStatus, qLabel, when } from '../ui';
+import { CCOL, fmt, hourLabel, pct, pStatus, qLabel, when } from '../ui';
 
 export type Computed = { t: number; tp: number; pop: PopSeries; shown: SegResult[]; base: SegResult[]; withP: SegResult[]; routed: boolean };
 type P = { A: Atlas; s: State; c: Computed; dispatch: Dispatch<Action>; select: (id: string | null) => void; extra?: ReactNode };
@@ -43,47 +43,20 @@ export function residentSub(A: Atlas, c: Computed) {
   return qLabel(c.t) + ': ' + nA + ' under way, ' + nF + ' not started, ' + (sts.length - nA - nF) + ' finished since 2024.';
 }
 
-function Spark({ fn, c }: { fn: (t: number) => number; c: Computed }) {
-  const ys: number[] = []; let lo = 0.88, hi = 1.06;
-  for (let y = 2026; y <= 2034; y++) { const v = fn(y + 0.875); ys.push(v); lo = Math.min(lo, v - 0.02); hi = Math.max(hi, v + 0.02); }
-  const X = (i: number) => 4 + i * (192 / 8), Y = (v: number) => 30 - (v - lo) / (hi - lo) * 26;
-  const pts = ys.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' '), ci = c.t - 2026.875;
-  return <svg className="spark" viewBox="0 0 200 34" preserveAspectRatio="none" role="img" aria-label="Trend from 2026 to 2034">
-    <line x1="4" x2="196" y1={Y(1).toFixed(1)} y2={Y(1).toFixed(1)} stroke="#9aa8a3" strokeDasharray="3 3" strokeWidth="1" />
-    <polyline points={pts} fill="none" stroke="#0d6767" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-    {ci >= 0 && ci <= 8 && <circle cx={X(ci).toFixed(1)} cy={Y(fn(c.t)).toFixed(1)} r="3.2" fill="#1c2a2d" />}</svg>;
-}
-function GapRow({ title, g, unit, fn, c }: { title: ReactNode; g: { ratio: number; supply: number; need: number; short: number }; unit: string; fn: (t: number) => number; c: Computed }) {
-  const col = g.ratio >= 1 ? '#0e8a79' : (g.ratio >= 0.95 ? '#e29a3c' : '#d0532e');
-  return <div className="gap"><div className="row"><b>{title}</b><span className="big">{pct(g.ratio)}</span></div>
-    <div className="meter"><i style={{ width: (Math.min(g.ratio, 1.2) / 1.2 * 100).toFixed(1) + '%', background: col }}></i><u style={{ left: '83.3%' }}></u></div>
-    <small>{fmt(g.supply)} {unit} for a need of {fmt(g.need)}{g.short > 0 ? ' · short by ' + fmt(g.short) : ' · covered'}</small><Spark fn={fn} c={c} /></div>;
-}
 function Slider({ label, min, max, step, val, show, note, onChange }: { label: string; min: number; max: number; step: number; val: number; show: (v: number) => string; note?: string; onChange: (v: number) => void }) {
   return <div className="slider"><label><span>{label}</span><span className="num">{show(val)}</span></label>
     <input type="range" min={min} max={max} step={step} value={val} onChange={e => onChange(+e.target.value)} />{note && <small>{note}</small>}</div>;
 }
 
-export function PlannerPanel({ A, s, c, dispatch, select, extra }: P) {
-  const g = A.gaps(c.t, s.prm, c.pop), over = A.roadShareOver(c.shown, 0.85);
+export function PlannerPanel({ A, s, c, dispatch, select }: P) {
+  const g = A.gaps(c.t, s.prm, c.pop);
   const prm = (key: keyof State['prm'], scale: number) => (v: number) => dispatch({ type: 'prm', key, value: v * scale });
   const sign = (v: number) => (v > 0 ? '+' : '') + (+v).toFixed(1) + '%';
-  const hs = A.hotspots(c.shown, c.base, 5);
   return <>
     <div><p className="sec">Population in the model</p><div className="row">
       <div><div className="num" style={{ fontSize: 18 }}>{fmt(g.pop.S)}</div><small style={{ color: 'var(--muted)' }}>students in town</small></div>
       <div><div className="num" style={{ fontSize: 18 }}>{fmt(g.pop.R)}</div><small style={{ color: 'var(--muted)' }}>other residents</small></div>
       <div><div className="num" style={{ fontSize: 18 }}>{fmt(g.pop.total)}</div><small style={{ color: 'var(--muted)' }}>total</small></div></div></div>
-    {extra}
-    <div><p className="sec">Supply against need</p>
-      <GapRow title="Student beds" g={g.beds} unit="beds" fn={t => A.gaps(t, s.prm, c.pop).beds.ratio} c={c} />
-      <GapRow title="Homes for residents" g={g.homes} unit="homes" fn={t => A.gaps(t, s.prm, c.pop).homes.ratio} c={c} />
-      {g.parking && <><GapRow title={<>Campus-area parking <span className="conf" data-c="low">rough</span></>} g={g.parking} unit="spaces" fn={t => A.gaps(t, s.prm, c.pop).parking!.ratio} c={c} />
-        <div className="note" style={{ margin: '-2px 0 6px' }}>Three parking numbers, kept apart: <b>official</b> per-lot counts from BYU-Idaho Parking Services (not published; ask Parking Services), <b>counted</b> stalls from aerial photos (none yet), and the <b>rough</b> lot-area estimate above. New housing shows its code-minimum parking in each project's details.</div></>}
-      <div className="gap"><div className="row"><b>Main streets at 85% of capacity or more</b><span className="big">{pct(over)}</span></div><small>Share of modeled street length, {hourLabel(s.hour)}</small></div>
-      {c.pop.capYear ? <p className="note warn">With these settings, student beds run out and cap enrollment from fall {c.pop.capYear}. Growth past that point depends on new beds, not demand.</p>
-        : <p className="note">With these settings, beds keep pace with enrollment through 2035.</p>}
-    </div>
     <div><p className="sec">Assumptions you can change</p>
       <Slider label="Enrollment growth per year" min={-2} max={6} step={0.5} val={s.prm.enroll * 100} show={sign} note="Fall 2025 grew 6.7%. Fall 2026 fell 1.4%." onChange={prm('enroll', 0.01)} />
       <Slider label="Leaving students who stay in town" min={0} max={20} step={1} val={s.prm.stay * 100} show={v => Math.round(v) + '%'} note="No local figure found. Treat as low, medium, high." onChange={prm('stay', 0.01)} />
@@ -91,29 +64,6 @@ export function PlannerPanel({ A, s, c, dispatch, select, extra }: P) {
       {A.CITY.collegeTown && <Slider label="Students who bring a car" min={20} max={90} step={5} val={s.prm.carShare * 100} show={v => Math.round(v) + '%'} note={'Assumed. Spaces are estimated from ' + A.CITY.parkLots + ' mapped lots in the walk district, including church and business lots.'} onChange={prm('carShare', 0.01)} />}
       <Slider label="New homes per year beyond known projects" min={0} max={400} step={20} val={s.prm.unitsPerYear} show={fmt} onChange={prm('unitsPerYear', 1)} />
       <label className="check"><input type="checkbox" checked={s.spring} onChange={e => dispatch({ type: 'spring', on: e.target.checked })} />Spring semester (about 72% of fall students)</label></div>
-    <div><p className="sec">Pressure points · {hourLabel(s.hour)}</p><div className="tablewrap"><table><thead><tr><th>Street</th><th>Load</th><th>Basis</th><th>Test a fix</th></tr></thead><tbody>
-      {hs.map(h => {
-        const lv = A.level(h.vc), d = s.withProjects ? h.delta : 0, name = h.seg.road.name + ' near ' + h.seg.near;
-        const cur = s.fixes.find(f => f.road === h.seg.road.name);
-        return <tr key={h.seg.road.name}><td><b>{h.seg.road.name}</b><br /><small style={{ color: 'var(--muted)' }}>near {h.seg.near}</small></td>
-          <td><span className="num">{pct(h.vc)}</span><br /><small style={{ color: CCOL[Math.max(lv.key, 2)], fontWeight: 600 }}>{lv.label}</small>{d > 0.004 && <><br /><small>projects +{Math.round(d * 100)} pts</small></>}</td>
-          <td><small title={h.seg.adtBasis}>{c.routed ? 'Routed trips' : h.seg.counted ? 'City count ' + ((h.seg.adtBasis.match(/\d{4}/) || [''])[0]) : 'Assumed traffic'}<br />{h.seg.road.lanes}{h.seg.road.oneway ? ' lanes one way' : ' lanes'}</small></td>
-          <td><select aria-label={'Test a fix on ' + h.seg.road.name} value={cur ? FIXES.find(f => cur.label.startsWith(f.l))?.k ?? '' : ''} onChange={e => {
-            const f = FIXES.find(x => x.k === e.target.value); if (!f) return;
-            dispatch({ type: 'fix', fix: { road: h.seg.road.name, at: h.seg.mid, factor: f.f, label: f.l + ', ' + name } });
-          }}><option value="">Choose</option>{FIXES.map(f => <option key={f.k} value={f.k}>{f.l}</option>)}</select></td></tr>;
-      })}</tbody></table></div>
-      {s.fixes.length > 0 && <p style={{ margin: '8px 0 4px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>{s.fixes.map((f, i) =>
-        <span className="fixchip" key={i}>{f.label}<button aria-label="Remove test" onClick={() => dispatch({ type: 'unfix', index: i })}>×</button></span>)}</p>}
-      <p className="note">Fixes are preset capacity changes, so results are relative. Cost, land, utilities and safety standards are outside the model.</p></div>
-    <div><p className="sec">Developer-led widenings the city lists with no date</p>
-      <p className="note" style={{ margin: '0 0 6px' }}>Tick one to assume it is built (+80% capacity on those streets) and see the effect at {hourLabel(s.hour)}, {qLabel(c.t)}.</p>
-      {A.WIDEN.filter(w => w.segs.length).map(w => {
-        let mx = 0; w.segs.forEach(i => { mx = Math.max(mx, c.shown[i].vc); });
-        return <label className="check" style={{ alignItems: 'flex-start' }} key={w.id}><input type="checkbox" checked={s.widen.includes(w.id)} onChange={e => dispatch({ type: 'widen', id: w.id, on: e.target.checked })} />
-          <span>{w.name}<br /><small style={{ color: 'var(--muted)' }}>{w.desc} · busiest part now at {pct(mx)} of capacity</small></span></label>;
-      })}
-      <p style={{ margin: '4px 0 0', fontSize: 12 }}><a href={A.WIDEN_SRC.url} target="_blank" rel="noopener">{A.WIDEN_SRC.label}</a></p></div>
     <div><p className="sec">Project register</p><div className="tablewrap"><table><thead><tr><th>Project</th><th>Status</th><th>Confidence</th><th>Source</th></tr></thead><tbody>
       {A.PROJECTS.map(p => {
         const st = pStatus(A, p, c.tp);

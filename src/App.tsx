@@ -18,9 +18,8 @@ import { TimeDock } from './components/TimeDock';
 import { PlannerPanel, ProjectDetail, ResidentPanel, residentSub, type Computed } from './components/Panels';
 import type { View } from './scene/view';
 import { useTraffic } from './hooks/useTraffic';
-import { AccuracyPanel, type CalibFile } from './components/AccuracyPanel';
+import type { CalibFile } from './components/AccuracyPanel';
 import { ProblemCards } from './components/ProblemCards';
-import { DemoViews, Placement } from './components/Placement';
 import { GhostTools } from './planner/PlannerWorkspace';
 import { GHOST_TYPES, ghostActive, ghostCounts, ghostPlans, ghostRoads, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
 import { snapSite, useSuggest } from './planner/suggest';
@@ -219,19 +218,8 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
       <AgentPanel A={A} confirmed={confirmed} pick={cb => view.current?.pick(cb)} flyTo={fly} highlight={l => view.current?.setHighlight(l)}
         onConfirm={p => saveConfirmed(confirmed.filter(x => x.id !== p.id).concat([p]))}
         onRemove={id => { if (s.sel === id) dispatch({ type: 'select', id: null }); saveConfirmed(confirmed.filter(x => x.id !== id)); }} /></More>
-    {routing && <More title="Problems the city already has" sub="Overloaded streets and housing gaps, with fixes to test">
-      <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner added={ghostSupply(ghosts, c.t, ghostSel)}
-        onApply={o => dispatch({ type: 'view', patch: { fixes: o.fixes, widen: o.widen } })}
-        onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); showBuild(true); }} /></More>}
-    <More title="Numbers and assumptions" sub="Population, supply against need, growth settings, pressure points">
+    <More title="Numbers and assumptions" sub="Population, growth settings, project register">
       <PlannerPanel {...props} /></More>
-    <More title="How the numbers are made" sub="Traffic method, accuracy against city counts, demo views">
-      <div><p className="sec">Traffic method</p><div className="seg" role="group" aria-label="Traffic method" style={{ marginBottom: 6 }}>
-        <button aria-pressed={s.method === 'routed'} onClick={() => dispatch({ type: 'view', patch: { method: 'routed' } })} disabled={!zones}>Routed trips</button>
-        <button aria-pressed={s.method === 'counts'} onClick={() => dispatch({ type: 'view', patch: { method: 'counts' } })}>Count-based</button></div>{methodNote}</div>
-      {routing && cal && <AccuracyPanel cal={cal} />}
-      {routing && zones && <Placement A={A} sc={sc} zones={zones} />}
-      <DemoViews dispatch={dispatch} /></More>
   </>;
   const ghostTools = routing ? <GhostTools A={A} s={s} c={c} sc={scAll} dispatch={dispatch} ghosts={ghosts} setGhosts={setGhosts} selId={ghostSel} setSel={setGhostSel}
     pick={cb => view.current?.pick(cb)} flyTo={fly} flyClose={pos => view.current?.flyTo(pos, 4)} target={() => view.current ? view.current.target() : null}

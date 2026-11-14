@@ -1,4 +1,4 @@
-/* Problem cards (plan Phase 4.1): streets at 90% of capacity or more, with when it starts, what causes it and how sure the model is;
+/* Problem cards (plan Phase 4.1): streets at 90% of capacity or more, with when it starts and what causes it;
    plus housing and parking gaps. Fix comparisons (4.2) run in the routing worker on demand. */
 import { useEffect, useMemo, useState } from 'react';
 import type { Atlas } from '../model/atlas';
@@ -42,12 +42,6 @@ export function ProblemCards({ A, s, c, sc, tti, cal, n, onFly, planner, onApply
     return null;
   }
   function today(p: Prob) { if (!yr) return null; let m = 0; p.segs.forEach(i => { m = Math.max(m, yr[0].vc[i]); }); return m; }
-  function confidence(p: Prob) {
-    const pts = (cal?.points || []).filter(q => A.SEGS[q.seg] && A.SEGS[q.seg].road.name === p.road);
-    if (!pts.length) return { c: 'low', why: 'no city count on this street' };
-    const ok = pts.filter(q => q.geh < 5).length;
-    return ok ? { c: 'medium', why: ok + ' of ' + pts.length + ' counts here match the model' } : { c: 'low', why: 'the model is off from the city count here' };
-  }
 
   /* Fix comparison for one problem street */
   const [cmp, setCmp] = useState<{ key: string; road: string; base: number; scs: Record<string, Scenario>; options: { id: string; vht: number; vol: Float64Array }[] } | null>(null);
@@ -74,7 +68,7 @@ export function ProblemCards({ A, s, c, sc, tti, cal, n, onFly, planner, onApply
   return <div><p className="sec">Problems · {hourLabel(s.hour)}{c.routed ? '' : ' · routing…'}</p>
     {probs.length === 0 && <p className="note">No main street reaches 90% of its capacity at {hourLabel(s.hour)} in this scenario.</p>}
     {probs.map(p => {
-      const lv = A.level(p.vc), sy = startYear(p), td = today(p), cf = confidence(p);
+      const lv = A.level(p.vc), sy = startYear(p), td = today(p);
       const growth = td != null ? p.vc - p.delta - td : null;
       const open = cmp && cmp.road === p.road ? cmp : null;
       return <div className="hot" key={p.road} style={{ gridTemplateColumns: '10px 1fr' }}><span className="stripe" style={{ background: CCOL[lv.key] }}></span>
@@ -83,7 +77,6 @@ export function ProblemCards({ A, s, c, sc, tti, cal, n, onFly, planner, onApply
           <small>near {p.near} · {p.tti > 1.05 ? 'trips take ' + pct(p.tti - 1) + ' longer than on an empty road' : 'little delay yet'}</small>
           <small><b>When:</b> {sy == null ? (yr ? 'not over 90% at this hour before 2035' : 'checking…') : sy <= 2026 ? 'already at this level today' : 'from about ' + sy}</small>
           <small><b>Why:</b> {growth != null ? (growth > 0.01 ? 'growth adds ' + Math.round(growth * 100) + ' points since today' : 'already busy today') : '…'}{s.withProjects && p.delta > 0.01 ? '; new projects add ' + Math.round(p.delta * 100) : ''}</small>
-          <small><b>How sure:</b> <span className="conf" data-c={cf.c}>{cf.c}</span> {cf.why}</small>
           {planner && <div style={{ marginTop: 6 }}>
             {!open && <button className="mini" onClick={() => compare(p)}>Compare fixes</button>}
             {open && (open.options.length ? <table style={{ marginTop: 4 }}><thead><tr><th>Option</th><th>Delay saved</th><th>This street</th>{onApply && <th></th>}</tr></thead><tbody>
