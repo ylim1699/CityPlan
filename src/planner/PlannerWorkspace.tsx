@@ -1,15 +1,16 @@
 /* Planner workspace: Now ↔ year toggle with a year slider, a counter strip for the chosen year,
    and ghost projects tied to a year. Ghost traffic comes from the routing worker (scenario.extra). */
 import { useEffect, useMemo, useRef, useState, type Dispatch } from 'react';
+import { createPortal } from 'react-dom';
 import type { Atlas } from '../model/atlas';
 import type { Scenario } from '../model/routing';
-import type { XZ } from '../model/types';
+import type { SegResult, XZ } from '../model/types';
 import type { Action, State } from '../state';
 import type { Computed } from '../components/Panels';
 import { send, useWorkerMessages } from '../hooks/useTraffic';
 import { CCOL, TODAY_I, fmt, hourLabel, pct } from '../ui';
 import './planner.css';
-import { snapSite, type SuggestState } from './suggest';
+import { candidates, screen, snapSite, type SuggestState } from './suggest';
 import type { Highlight } from './ghostLayer';
 import { GHOST_TYPES, KINDS, YEARS, ghostActive, ghostPlans, ghostSupply, newGhost, type Ghost, type GhostKind, type GhostRoad } from './ghosts';
 
@@ -62,26 +63,31 @@ function Counter({ k, v, tone, rough, title }: { k: string; v: string; tone?: st
   return <div className="ys-c" data-tone={tone} title={title}><b className="num">{v}</b><small>{k}{rough && <> <span className="conf" data-c="low">rough</span></>}</small></div>;
 }
 
-/* ---------- Ghost tools (right panel, Planner) ---------- */
+/* ---------- Planner flow (right panel): 1 Place → 2 Impact → 3 Better spot or road fix → 4 Decide ---------- */
 type ToolsProps = {
   A: Atlas; s: State; c: Computed; sc: Scenario; dispatch: Dispatch<Action>;
   ghosts: Ghost[]; setGhosts: (g: Ghost[]) => void; selId: string | null; setSel: (id: string | null) => void;
   pick: (cb: ((pos: XZ) => void) | null) => void; flyTo: (pos: XZ) => void; target: () => XZ | null;
+  flyClose?: (pos: XZ) => void;
   suggest: (kind: GhostKind, n: number, year: number) => void; suggestSt: SuggestState;
-  highlight: (list: Highlight[]) => void;
+  highlight: (list: Highlight[]) => void; mark: (pos: XZ | null, label?: string) => void; select: (id: string) => void;
 };
-export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, setSel, pick, flyTo, target, suggest, suggestSt, highlight }: ToolsProps) {
-  const [kind, setKind] = useState<GhostKind>(A.CITY.collegeTown ? 'student' : 'homes');
+export function GhostTools(p: ToolsProps) {
+  const { A, s, c, dispatch, ghosts, setGhosts, selId, setSel, pick, flyTo, target, highlight } = p;
+  /* the grocery store is the default: its traffic depends a lot on where it goes, which is what the tool is for */
+  const [kind, setKind] = useState<GhostKind>('grocery');
   const [picking, setPicking] = useState(false);
   const shownYear = s.ti === TODAY_I ? 2030 : Math.max(2027, yearOf(c.t));
   const [year, setYear] = useState(shownYear);
   useEffect(() => { setYear(shownYear); }, [shownYear]);
   const kinds = KINDS.filter(k => A.CITY.collegeTown || (k !== 'student' && k !== 'parking'));
   const ty = GHOST_TYPES[kind];
-  const patch = (id: string, p: Partial<Ghost>) => setGhosts(ghosts.map(g => g.id === id ? { ...g, ...p } : g));
-  const add = (pos: XZ) => {  /* placement rules: snap to the nearest legal spot */
-    const pl = snapSite(A, kind, pos, ghosts), g = { ...newGhost(kind, pl.pos, year), place: { moved: pl.moved, ok: pl.ok, lot: pl.lot } };
+  const patch = (id: string, q: Partial<Ghost>) => setGhosts(ghosts.map(g => g.id === id ? { ...g, ...q } : g));
+  const add = (pos: XZ) => {  /* placement rules: snap to the nearest legal spot; it starts as a draft */
+    const pl = snapSite(A, kind, pos, ghosts), g: Ghost = { ...newGhost(kind, pl.pos, year), draft: true, place: { moved: pl.moved, ok: pl.ok, lot: pl.lot } };
     setGhosts(ghosts.concat([g])); setSel(g.id);
+    if (!s.withNew) dispatch({ type: 'scenario', withNew: true });  /* you're placing one: count new projects again */
+    dispatch({ type: 'view', patch: { ti: tiOfYear(year), sel: null } });  /* show the year it opens, so the impact runs right away */
     if (pl.moved > 200) flyTo(pl.pos);  /* you're already looking here; follow it only if the rules moved it far */
   };
   const startPick = () => {
@@ -91,43 +97,230 @@ export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, se
   };
   useEffect(() => () => pick(null), []);
   const sel = ghosts.find(g => g.id === selId) || null;
-  return <div className="ghosttools">
-    <div className="zoning-banner" role="status"><b>ZONING DATA NOT LOADED</b> · placements follow generic rules only (no buildings, parks or water; parking lots count as redevelopment; 30 m from your other projects; a street within 400 m). Zoning and ownership are not checked.</div>
-    <p className="sec">Plan a project for a year</p>
-    <div className="seg wrap" role="group" aria-label="Project type">
-      {kinds.map(k => <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{GHOST_TYPES[k].label}</button>)}
+  const act = !!sel && sel.status === 'planned' && ghostActive(sel, c.t);
+  const mine = ghosts.filter(g => g.status === 'planned'), sugg = ghosts.filter(g => g.status === 'suggested');
+  const [zOpen, setZOpen] = useState(false);
+  const [rec, setRec] = useState<{ kind: GhostKind; year: number; n: number } | null>(null);
+  return <div className="ghosttools flow">
+    <YearLine A={A} s={s} c={c} ghosts={ghosts} selId={selId} />
+    <div className="zoning-banner" role="status"><b>ZONING NOT CHECKED</b> · generic placement rules only.{' '}
+      <button className="linkbtn" onClick={() => setZOpen(!zOpen)}>{zOpen ? 'Less' : 'What is checked?'}</button>
+      {zOpen && <><br />Checked: no buildings, parks or water under it (parking lots count as redevelopment), 30 m from your other projects, a street within 400 m. Not checked: zoning, ownership, utilities, cost.</>}</div>
+
+    <Step n={1} title="Place a project" done={!!sel}>
+      <div className="seg wrap" role="group" aria-label="Project type">
+        {kinds.map(k => <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{GHOST_TYPES[k].label}</button>)}
+      </div>
+      <p className="note" style={{ margin: '6px 0' }}>{ty.size}. {ty.note}.</p>
+      <div className="row" style={{ gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+        <label className="mini" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Opens fall
+          <select value={year} onChange={e => setYear(+e.target.value)} aria-label="Year the project opens">{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select></label>
+        <button className="mini act" onClick={startPick} aria-pressed={picking}>{picking ? 'Click the map… (cancel)' : '+ Place on map'}</button>
+        <button className="mini" onClick={() => { const q = target(); if (q) add(q); }}>+ Place in view</button>
+        {kind !== 'parking' && <button className="mini ai" onClick={() => { pick(null); setPicking(false); setRec({ kind, year, n: Date.now() }); }}>✦ AI recommendation</button>}
+      </div>
+      {rec && <AiRec key={rec.n} A={A} c={c} sc={p.sc} kind={rec.kind} year={rec.year} hour={s.hour} ghosts={ghosts} dispatch={dispatch}
+        fly={p.flyClose || flyTo} mark={p.mark} onPlace={q => { setRec(null); add(q); }} onClose={() => setRec(null)} />}
+      {picking && <p className="note" style={{ margin: '6px 0 0' }}>Click where it would go. It snaps to the nearest open land.</p>}
+    </Step>
+
+    <Step n={2} title="See what it does to nearby streets" done={false} off={!sel}>
+      {!sel ? <p className="note" style={{ margin: 0 }}>Place a project, or click one on the map.</p>
+        : <Impact A={A} s={s} c={c} sc={p.sc} g={sel} ghosts={ghosts} dispatch={dispatch} highlight={highlight} select={p.select} />}
+    </Step>
+
+    <Step n={3} title="Try a better spot or a road fix" done={false} off={!act}>
+      {!sel ? <p className="note" style={{ margin: 0 }}>Comes after step 2.</p>
+        : !act ? <p className="note" style={{ margin: 0 }}>Show the year it opens first (step 2).</p>
+        : <><BetterSpot A={A} sc={p.sc} shown={c.shown} g={sel} ghosts={ghosts} setGhosts={setGhosts} flyTo={flyTo} mark={p.mark} hour={s.hour} />
+          {sel.kind !== 'parking' && <AccessRoads s={s} sc={p.sc} g={sel} ghosts={ghosts} setGhosts={setGhosts} />}</>}
+    </Step>
+
+    <Step n={4} title="Decide" done={!!sel && !sel.draft} off={!sel}>
+      {!sel ? <p className="note" style={{ margin: 0 }}>You decide; nothing enters the plan until you add it.</p>
+        : sel.status === 'suggested' ? <div className="row" style={{ gap: 6, justifyContent: 'flex-start' }}>
+            <button className="mini act" onClick={() => patch(sel.id, { status: 'planned', draft: false, place: sel.place || { moved: 0, ok: true } })}>Add to plan</button>
+            <button className="mini" onClick={() => { setSel(null); setGhosts(ghosts.filter(x => x.id !== sel.id)); }}>Dismiss</button></div>
+        : sel.draft ? <div className="row" style={{ gap: 6, justifyContent: 'flex-start' }}>
+            <button className="mini act" onClick={() => patch(sel.id, { draft: false })}>Add to plan</button>
+            <button className="mini" onClick={() => { setSel(null); setGhosts(ghosts.filter(x => x.id !== sel.id)); }}>Discard</button>
+            <small style={{ color: 'var(--muted)' }}>Drafts count only while you test them.</small></div>
+        : <div className="row" style={{ gap: 6, justifyContent: 'flex-start' }}><b className="inplan">✓ In the plan</b>
+            <button className="mini" onClick={() => patch(sel.id, { draft: true })}>Take out</button></div>}
+    </Step>
+
+    <div className="plan-list">
+      <div className="row"><p className="sec" style={{ margin: 0 }}>Your plan · {mine.filter(g => !g.draft).length} in, {mine.filter(g => g.draft).length} draft{sugg.length ? ', ' + sugg.length + ' suggested' : ''}</p>
+        {ghosts.length > 0 && <button className="mini" onClick={() => { setSel(null); setGhosts([]); p.mark(null); }}>Clear all</button>}</div>
+      {ghosts.length === 0 && <p className="note" style={{ margin: '4px 0 0' }}>Nothing yet.</p>}
+      {ghosts.map(g => {
+        const t = GHOST_TYPES[g.kind], st = g.status === 'suggested' ? 'Suggested' : g.draft ? 'Draft' : 'In plan';
+        return <div key={g.id} className={'planrow' + (selId === g.id ? ' on' : '')} onClick={() => { setSel(g.id); flyTo(g.pos); }}>
+          <span className="tag" data-s={st}>{st}</span><span>{t.label} · fall {g.year}{g.place && !g.place.ok ? ' · ⚠ check site' : ''}</span>
+          <button className="mini" aria-label="Remove" onClick={e => { e.stopPropagation(); if (selId === g.id) setSel(null); setGhosts(ghosts.filter(x => x.id !== g.id)); }}>×</button></div>;
+      })}
+      {ghosts.length > 0 && <p className="note" style={{ margin: '6px 0 0' }}>Double-click a project on the map to pick it up, then click where it should go.</p>}
     </div>
-    <p className="note" style={{ margin: '6px 0' }}>{ty.size}. {ty.note}.</p>
-    <div className="row" style={{ gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-      <label className="mini" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>For
-        <select value={year} onChange={e => setYear(+e.target.value)} aria-label="Year the project opens">{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select></label>
-      <button className="mini act" onClick={startPick} aria-pressed={picking}>{picking ? 'Click the map… (cancel)' : '+ Place on map'}</button>
-      <button className="mini" onClick={() => { const p = target(); if (p) add(p); }}>+ Place in view</button>
-      <button className="mini act" disabled={!!suggestSt.busy} onClick={() => suggest(kind, 3, year)}>Suggest best spots</button>
-    </div>
-    {(suggestSt.busy || suggestSt.msg) && <p className="note" style={{ margin: 0 }}>{suggestSt.busy || suggestSt.msg}</p>}
-    {ghosts.length > 0 && <div className="list" style={{ marginTop: 8 }}>{ghosts.map(g => {
-      const t = GHOST_TYPES[g.kind], act = ghostActive(g, c.t);
-      return <div key={g.id} className={'hot ghostrow' + (selId === g.id ? ' on' : '')} onClick={() => setSel(g.id)}>
-        <span className="stripe" style={{ background: g.status === 'suggested' ? '#ffcf7a' : '#f0a03a' }}></span>
-        <div><b>{t.label} · {t.size}</b>
-          <small>{g.status === 'suggested' ? 'Suggested' + (g.why ? ': ' + g.why : '') : act ? 'Counted in this year' : 'Ghost until fall ' + g.year + ', not counted yet'}</small>
-          <small className={g.place && !g.place.ok ? 'warnline' : undefined}>{!g.place ? (g.status === 'suggested' ? 'Placement: on open land' : 'Placement: not checked') : !g.place.ok ? 'Placement: no open land within 1 km. Check this site' : (g.place.moved ? 'Placement: moved ' + g.place.moved + ' m to ' : 'Placement: on ') + (g.place.lot ? 'a parking lot (redevelopment)' : 'open land')} · zoning not checked</small></div>
-        <span style={{ display: 'grid', gap: 4 }}>
-          <select className="mini" value={g.year} aria-label="Opening year" onClick={e => e.stopPropagation()} onChange={e => patch(g.id, { year: +e.target.value })}>{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select>
-          {g.status === 'suggested' && <button className="mini" onClick={e => { e.stopPropagation(); patch(g.id, { status: 'planned', place: g.place || { moved: 0, ok: true } }); }}>Accept</button>}
-          <button className="mini" onClick={e => { e.stopPropagation(); setSel(g.id); flyTo(g.pos); }}>Find</button>
-          <button className="mini" onClick={e => { e.stopPropagation(); if (selId === g.id) setSel(null); setGhosts(ghosts.filter(x => x.id !== g.id)); }}>Remove</button>
-        </span></div>;
-    })}</div>}
-    {ghosts.length > 0 && <p className="note" style={{ marginTop: 6 }}>Double-click a ghost on the map to pick it up, then click where it should go.</p>}
-    {sel ? <Impact A={A} s={s} c={c} sc={sc} g={sel} ghosts={ghosts} dispatch={dispatch} setGhosts={setGhosts} highlight={highlight} /> : <ClearHl highlight={highlight} />}
+    {!sel && <ClearHl highlight={highlight} />}
+  </div>;
+}
+function Step({ n, title, done, off, children }: { n: number; title: string; done: boolean; off?: boolean; children: React.ReactNode }) {
+  return <section className={'step' + (off ? ' off' : '') + (done ? ' done' : '')}><h3><i>{done ? '✓' : n}</i>{title}</h3><div className="step-body">{children}</div></section>;
+}
+/* one line for the year on the map: is the city keeping up, and how many main streets are over capacity */
+function YearLine({ A, s, c, ghosts, selId }: { A: Atlas; s: State; c: Computed; ghosts: Ghost[]; selId: string | null }) {
+  const g = A.gaps(c.t, s.prm, c.pop), sup = ghostSupply(ghosts, c.t, selId);
+  const beds = (g.beds.supply + sup.beds) / g.beds.need, homes = (g.homes.supply + sup.units) / g.homes.need;
+  const over = useMemo(() => { const n = new Set<string>(); c.shown.forEach((r, i) => { const sg = A.SEGS[i]; if (r.vc >= 1 && sg.road.cls !== 'local' && sg.road.name) n.add(sg.road.name); }); return n.size; }, [A, c.shown]);
+  const tone = (r: number) => r >= 1 ? 'ok' : r >= 0.95 ? 'warn' : 'bad';
+  return <div className="yearline"><b>{s.ti === TODAY_I ? 'Today' : 'Fall ' + yearOf(c.t)} · {hourLabel(s.hour)}</b>
+    <span data-tone={tone(beds)}>Beds {pct(beds)}</span><span data-tone={tone(homes)}>Homes {pct(homes)}</span>
+    <span data-tone={over ? 'bad' : 'ok'}>{over} main street{over === 1 ? '' : 's'} over capacity</span></div>;
+}
+
+/* the trade-off under each site: the worst main street near it and the biggest jump any one main street takes */
+function Trade({ r }: { r: { worst?: { vc: number; name: string } | null; jump?: { pts: number; name: string; vc: number } | null } }) {
+  const j = r.jump && r.jump.pts >= 0.01 ? r.jump : null;
+  return <>{r.worst && r.worst.name && <small>Worst street nearby: {pct(r.worst.vc)}, {r.worst.name}</small>}
+    {j && <small className={j.pts >= 0.2 ? 'warnline' : undefined}>Biggest jump: +{Math.round(j.pts * 100)} pts on {j.name}{j.vc >= 1 ? ' (over capacity)' : ''}</small>}</>;
+}
+
+/* ---------- Step 3: your spot against the best open sites, all routed for the same year and hour ---------- */
+/* ---------- AI recommendation: screen open land, route the year with each site, then walk the planner through the best ones ---------- */
+function AiRec({ A, c, sc, kind, year, hour, ghosts, dispatch, fly, mark, onPlace, onClose }: { A: Atlas; c: Computed; sc: Scenario; kind: GhostKind; year: number; hour: number; ghosts: Ghost[]; dispatch: Dispatch<Action>; fly: (p: XZ) => void; mark: (p: XZ | null, l?: string) => void; onPlace: (p: XZ) => void; onClose: () => void }) {
+  type Row = { pos: XZ; km: number; dv: number; worst?: { vc: number; name: string } | null; jump?: { pts: number; name: string; vc: number } | null };
+  const [rows, setRows] = useState<Row[] | null>(null), [i, setI] = useState(0), [msg, setMsg] = useState('Switching the map to fall ' + year + '…');
+  const job = useRef<{ key: string; picks: { pos: XZ; km: number }[] } | null>(null), started = useRef(false);
+  const ty = GHOST_TYPES[kind], ready = yearOf(c.t) === year;
+  useEffect(() => { if (!ready) dispatch({ type: 'view', patch: { ti: tiOfYear(year), sel: null } }); }, []);
+  useEffect(() => { document.body.classList.add('rec-open'); return () => { document.body.classList.remove('rec-open'); mark(null); }; }, []);
+  useWorkerMessages(m => {
+    const j = job.current; if (m.type !== 'judge' || !j || m.key !== j.key) return;
+    job.current = null;
+    const r = m.options.map(o => ({ pos: j.picks[+o.id].pos, km: j.picks[+o.id].km, dv: o.vht - m.base, worst: o.worst, jump: o.jump })).sort((a, b) => a.dv - b.dv).slice(0, 5);
+    setRows(r); setI(0);
+  });
+  useEffect(() => {  /* run once the map shows the year it opens, so the screen and the routing use that year's traffic */
+    if (!ready || started.current) return; started.current = true;
+    setMsg('Screening open land…');
+    setTimeout(() => {
+      const avoid = ghosts.map(g => g.pos);
+      const scored = candidates(A, kind).filter(q => !avoid.some(v => Math.hypot(v[0] - q[0], v[1] - q[1]) < 3))
+        .map(q => ({ pos: q, s: screen(A, kind, q, c.shown) })).filter(x => x.s).sort((a, b) => a.s!.score - b.s!.score);
+      const picks: { pos: XZ; km: number }[] = [];
+      for (const x of scored) { if (picks.length >= 8) break; if (!picks.some(v => Math.hypot(v.pos[0] - x.pos[0], v.pos[1] - x.pos[1]) < 4)) picks.push({ pos: x.pos, km: x.s!.km }); }
+      if (!picks.length) { setRows([]); return; }
+      const base: Scenario = { ...sc }, rest = ghostPlans(ghosts, sc.t);  /* your plan without drafts */
+      if (rest.length) base.plans = rest; else delete base.plans;
+      const key = 'judge:airec:' + Date.now(); job.current = { key, picks };
+      setMsg('Routing every trip in town with each of ' + picks.length + ' open sites…');
+      send({ type: 'judge', key, sc: base, options: picks.map((q, k) => ({ id: String(k), pos: q.pos, sc: { ...base, plans: (base.plans || []).concat([{ id: 'cand', pos: q.pos, beds: ty.beds || 0, units: ty.units || 0, attract: ty.trips || 0 }]) } })) });
+    }, 30);
+  }, [ready]);
+  const r = rows && rows[i];
+  useEffect(() => { if (r) { fly(r.pos); mark(r.pos, 'AI pick ' + (i + 1)); } }, [r]);
+  const best = rows && rows.length ? rows[0].dv : 0, worstDv = rows && rows.length ? rows[rows.length - 1].dv : 0;
+  return createPortal(<div className="airec" role="dialog" aria-label="AI recommendation">
+    <div className="airec-head"><b>✦ AI recommendation</b><small>{ty.label} · opens fall {year}</small>
+      <button className="airec-x" aria-label="Close" onClick={onClose}>✕</button></div>
+    {!rows ? <p className="note" style={{ margin: 0 }}>{msg}</p>
+      : !r ? <p className="note" style={{ margin: 0 }}>No open site near a main street was found for this project type.</p>
+      : <>
+        <div className="airec-pick"><b>Spot {i + 1} of {rows.length}</b><small>{i === 0 ? 'least added delay of the sites tested' : 'ranked by added delay'}</small></div>
+        <div className="airec-nums">
+          <div><small>Added delay, {hourLabel(hour)}</small><b>+{r.dv.toFixed(1)} veh-h</b>{i > 0 && <small>+{(r.dv - best).toFixed(1)} vs spot 1</small>}{i === 0 && rows.length > 1 && <small>{(worstDv - best).toFixed(1)} less than spot {rows.length}</small>}</div>
+          {r.worst && <div><small>Worst street nearby</small><b style={{ color: CCOL[A.level(r.worst.vc).key] }}>{pct(r.worst.vc)}</b>{r.worst.name && <small>{r.worst.name}</small>}</div>}
+          {r.jump && <div><small>Biggest jump</small><b className={r.jump.pts >= 0.2 ? 'warn' : ''}>+{Math.round(r.jump.pts * 100)} pts</b><small>{r.jump.name}</small></div>}
+          <div><small>To campus</small><b>{r.km.toFixed(1)} km</b></div>
+        </div>
+        <div className="airec-btns">
+          <button className="mini" disabled={i === 0} onClick={() => setI(i - 1)}>‹ Back</button>
+          <button className="mini" disabled={i >= rows.length - 1} onClick={() => setI(i + 1)}>Next ›</button>
+          <button className="mini act" onClick={() => onPlace(r.pos)}>Place it here</button>
+        </div>
+        <p className="note" style={{ margin: '6px 0 0' }}>Traffic only: zoning, ownership and cost are not checked. You decide.</p>
+      </>}
+  </div>, document.body);
+}
+
+function BetterSpot({ A, sc, shown, g, ghosts, setGhosts, flyTo, mark, hour }: { A: Atlas; sc: Scenario; shown: SegResult[]; g: Ghost; ghosts: Ghost[]; setGhosts: (g: Ghost[]) => void; flyTo: (p: XZ) => void; mark: (p: XZ | null, l?: string) => void; hour: number }) {
+  type Row = { id: string; pos: XZ; km: number; dv: number; worst?: { vc: number; name: string } | null; jump?: { pts: number; name: string; vc: number } | null };
+  const [now, setNow] = useState<{ where: string; dv: Record<string, number> } | null>(null);
+  const where = g.pos[0].toFixed(2) + ',' + g.pos[1].toFixed(2) + ':' + g.kind + ':' + sc.t + ':' + hour;
+  const [res, setRes] = useState<{ where: string; mine: Row; opts: Row[]; n: number } | null>(null), [busy, setBusy] = useState<string | null>(null);
+  const job = useRef<{ key: string; where: string; picks: { pos: XZ; km: number }[] } | null>(null), nowJob = useRef<{ key: string; where: string } | null>(null);
+  useWorkerMessages(m => {
+    const nj = nowJob.current;
+    if (m.type === 'judge' && nj && m.key === nj.key) { nowJob.current = null; const dv: Record<string, number> = {}; m.options.forEach(o => { dv[o.id] = o.vht - m.base; }); setNow({ where: nj.where, dv }); return; }
+    const j = job.current; if (m.type !== 'judge' || !j || m.key !== j.key) return;
+    job.current = null; setBusy(null);
+    const rows: Row[] = m.options.map(o => ({ id: o.id, pos: j.picks[+o.id].pos, km: j.picks[+o.id].km, dv: o.vht - m.base, worst: o.worst, jump: o.jump }));
+    const me = rows[0], opts = rows.slice(1).sort((a, b) => a.dv - b.dv).slice(0, 3);  /* the 3 best other sites, better or not, so you can see where yours ranks */
+    setRes({ where: j.where, mine: me, opts, n: rows.length - 1 });
+  });
+  useEffect(() => () => mark(null), []);
+  const camp = A.M(A.OSM.places.campus), kmOf = (q: XZ) => Math.hypot(q[0] - camp[0], q[1] - camp[1]) * 0.2;
+  const run = () => {
+    setBusy('Screening open land…'); setRes(null); mark(null);
+    setTimeout(() => {
+      const others = ghosts.filter(x => x.id !== g.id), avoid = others.map(x => x.pos);
+      const scored = candidates(A, g.kind).filter(q => !avoid.some(v => Math.hypot(v[0] - q[0], v[1] - q[1]) < 3) && Math.hypot(g.pos[0] - q[0], g.pos[1] - q[1]) > 2)
+        .map(q => ({ pos: q, s: screen(A, g.kind, q, shown) })).filter(x => x.s).sort((a, b) => a.s!.score - b.s!.score);
+      const picks: { pos: XZ; km: number }[] = [{ pos: g.pos, km: kmOf(g.pos) }];
+      for (const x of scored) { if (picks.length >= 9) break; if (!picks.slice(1).some(v => Math.hypot(v.pos[0] - x.pos[0], v.pos[1] - x.pos[1]) < 4)) picks.push({ pos: x.pos, km: x.s!.km }); }
+      if (picks.length < 2) { setBusy(null); setRes({ where, mine: { id: '0', pos: g.pos, km: kmOf(g.pos), dv: 0, worst: null, jump: null }, opts: [], n: 0 }); return; }
+      const base: Scenario = { ...sc }, rest = ghostPlans(others, sc.t);
+      if (rest.length) base.plans = rest; else delete base.plans;
+      const ty = GHOST_TYPES[g.kind], key = 'judge:spot:' + Date.now();
+      job.current = { key, where, picks };
+      setBusy('Routing every trip in town with your spot and ' + (picks.length - 1) + ' open sites…');
+      send({ type: 'judge', key, sc: base, options: picks.map((q, i) => ({ id: String(i), pos: q.pos, sc: { ...base, plans: (base.plans || []).concat([{ id: 'cand', pos: q.pos, beds: ty.beds || 0, units: ty.units || 0, attract: ty.trips || 0 }]) } })) });
+      /* the same sites on today's streets, alone: what it would do if it opened now */
+      const today: Scenario = { ...sc, t: A.TODAY }; delete today.plans; delete today.roads;
+      const nk = 'judge:spotnow:' + Date.now(); nowJob.current = { key: nk, where }; setNow(null);
+      send({ type: 'judge', key: nk, sc: today, options: picks.map((q, i) => ({ id: String(i), sc: { ...today, plans: [{ id: 'cand', pos: q.pos, beds: ty.beds || 0, units: ty.units || 0, attract: ty.trips || 0 }] } })) });
+    }, 30);
+  };
+  const use = (r: Row) => { mark(null); setGhosts(ghosts.map(x => x.id === g.id ? { ...x, pos: r.pos, place: { moved: 0, ok: true }, roads: undefined } : x)); flyTo(r.pos); };
+  const cur = res && res.where === where ? res : null;
+  const L = 'ABC';
+  const nw = now && now.where === where ? now.dv : null;
+  const nowOf = (r: Row) => nw && nw[r.id] != null ? <small className="now">today alone +{nw[r.id].toFixed(1)}</small> : <small className="now">today: routing…</small>;
+  const best = !cur ? -1 : cur.opts.reduce((b, r, i) => r.dv < (b < 0 ? cur.mine.dv : cur.opts[b].dv) ? i : b, -1);  /* -1 = your spot */
+  /* cycle the map through the options (and back to your spot); -1 = your spot */
+  const [at, setAt] = useState(-1);
+  const go = (i: number) => { if (!cur) return; setAt(i); const r = i < 0 ? cur.mine : cur.opts[i]; flyTo(r.pos); mark(r.pos, i < 0 ? 'Your spot' : 'Site ' + L[i]); };
+  useEffect(() => { if (cur && cur.opts.length) go(0); else setAt(-1); }, [res]);
+  const step = (d: number) => { if (!cur) return; const n = cur.opts.length + 1; go(((at + 1 + d) % n + n) % n - 1); };
+  if (g.kind === 'parking') return <p className="note" style={{ margin: 0 }}>Parking adds no trips of its own, so the router can't rank parking sites. Judge it by walking distance to campus.</p>;
+  return <div className="better">
+    {!cur && !busy && <button className="mini act" onClick={run}>Compare your spot with other sites</button>}
+    {busy && <small>{busy}</small>}
+    {cur && <>
+      {cur.opts.length > 0 && <div className="cycle">
+        <button className="mini" aria-label="Previous" onClick={() => step(-1)}>‹</button>
+        <span><b>{at < 0 ? 'Your spot' : 'Site ' + L[at]}{best === at && ' ★'}</b><small>{at < 0 ? 'where you placed it' : (cur.opts[at].dv < cur.mine.dv ? 'saves ' + Math.round((1 - cur.opts[at].dv / Math.max(cur.mine.dv, 0.01)) * 100) + '%' : 'adds more than yours') + ' · ' + (at + 1) + ' of ' + cur.opts.length}</small></span>
+        <button className="mini" aria-label="Next" onClick={() => step(1)}>›</button>
+        {at >= 0 && <button className="mini act" onClick={() => use(cur.opts[at])}>Place here</button>}
+      </div>}
+      <div className="cmp head"><span>Site</span><span>Added delay, {hourLabel(hour)}<small>fall {Math.floor(sc.t)} with other plans · today alone</small></span><span></span></div>
+      <div className={'cmp mine' + (at < 0 ? ' on' : '')} onClick={() => go(-1)}><span><b>Your spot</b><small>{cur.mine.km.toFixed(1)} km to campus</small><Trade r={cur.mine} /></span><span className="num">+{cur.mine.dv.toFixed(1)} veh-h{nowOf(cur.mine)}{best === -1 && <small className="best">★ best</small>}</span><span></span></div>
+      {cur.opts.map((r, i) => <div className={'cmp' + (at === i ? ' on' : '')} key={r.id} onClick={() => go(i)}>
+        <span><b>Site {L[i]}</b><small>{r.km.toFixed(1)} km to campus · open land</small><Trade r={r} /></span>
+        <span className="num">+{r.dv.toFixed(1)} veh-h{nowOf(r)}{r.dv < cur.mine.dv ? <small className="save">saves {(cur.mine.dv - r.dv).toFixed(1)} ({Math.round((1 - r.dv / Math.max(cur.mine.dv, 0.01)) * 100)}%)</small> : <small className="more">+{(r.dv - cur.mine.dv).toFixed(1)} more than yours</small>}{best === i && <small className="best">★ best</small>}</span>
+        <span><button className="mini act" onClick={e => { e.stopPropagation(); use(r); }}>Place here</button></span></div>)}
+      <p className="note" style={{ margin: '6px 0 0' }}>{!cur.n ? 'No other open site near a main street was found.'
+        : best === -1 ? 'Your spot adds the least delay of ' + (cur.n + 1) + ' sites tested.' + (cur.mine.jump && cur.mine.jump.pts >= 0.2 ? ' It still pushes ' + cur.mine.jump.name + ' up ' + Math.round(cur.mine.jump.pts * 100) + ' points: try a road fix below.' : '')
+        : 'Site ' + L[best] + ' adds the least delay of ' + (cur.n + 1) + ' sites tested. Less total delay can still overload one street: check the biggest jump.'}
+        {' '}Ranked by fall {Math.floor(sc.t)}, with everything else planned by then.{' '}
+        <button className="linkbtn" onClick={run}>Run again</button></p>
+    </>}
   </div>;
 }
 
 /* ---------- Before → after for one ghost: route the year with and without it ---------- */
 function ClearHl({ highlight }: { highlight: (l: Highlight[]) => void }) { useEffect(() => { highlight([]); }, []); return null; }
-function Impact({ A, s, c, sc, g, ghosts, dispatch, setGhosts, highlight }: { A: Atlas; s: State; c: Computed; sc: Scenario; g: Ghost; ghosts: Ghost[]; dispatch: Dispatch<Action>; setGhosts: (g: Ghost[]) => void; highlight: (l: Highlight[]) => void }) {
+function Impact({ A, s, c, sc, g, ghosts, dispatch, highlight, select }: { A: Atlas; s: State; c: Computed; sc: Scenario; g: Ghost; ghosts: Ghost[]; dispatch: Dispatch<Action>; highlight: (l: Highlight[]) => void; select: (id: string) => void }) {
   const act = g.status === 'planned' && ghostActive(g, c.t);
   const without = useMemo<Scenario>(() => { const rest = ghostPlans(ghosts.filter(x => x.id !== g.id), sc.t), o: Scenario = { ...sc }; if (rest.length) o.plans = rest; else delete o.plans; return o; }, [sc, ghosts, g.id]);
   const key = JSON.stringify({ k: 'ghost-impact', sc, without: without.plans || [] });
@@ -155,11 +348,10 @@ function Impact({ A, s, c, sc, g, ghosts, dispatch, setGhosts, highlight }: { A:
   }, [res, key, act, c.shown]);
   useEffect(() => () => highlight([]), []);
   const t = GHOST_TYPES[g.kind];
-  if (g.status === 'suggested') return <p className="note" style={{ marginTop: 8 }}>Suggested projects are not counted. Accept it to see its effect.</p>;
-  if (!act) return <div className="impact"><p className="sec">Before → after</p>
-    <p className="note" style={{ margin: 0 }}>This {t.label.toLowerCase()} counts from fall {g.year}. <button className="mini" onClick={() => dispatch({ type: 'view', patch: { ti: tiOfYear(g.year), withProjects: true } })}>Show {g.year}</button></p></div>;
+  if (g.status === 'suggested') return <p className="note" style={{ margin: 0 }}>Suggested projects are not counted. Add it to the plan (step 4) to see its effect.</p>;
+  if (!act) return <div className="impact"><p className="note" style={{ margin: 0 }}>This {t.label.toLowerCase()} opens in fall {g.year}; the map shows an earlier time. <button className="mini act" onClick={() => dispatch({ type: 'view', patch: { ti: tiOfYear(g.year) } })}>Show fall {g.year}</button></p></div>;
   const cur = res && res.key === key ? res : null;
-  if (!cur) return <div className="impact"><p className="sec">Before → after</p><small>Routing the year with and without it…</small></div>;
+  if (!cur) return <div className="impact"><small>Routing every trip in town for fall {yearOf(c.t)}, with and without it…</small></div>;
   /* per street: biggest load change on main streets near enough to matter */
   const best: Record<string, { n: string; b: number; a: number }> = {};
   c.shown.forEach((r, i) => {
@@ -170,23 +362,23 @@ function Impact({ A, s, c, sc, g, ghosts, dispatch, setGhosts, highlight }: { A:
   });
   const rows = Object.values(best).sort((x, y) => (y.a - y.b) - (x.a - x.b)).slice(0, 5);
   const dv = cur.w.vht - cur.wo.vht;
-  return <div className="impact"><p className="sec">Before → after · fall {yearOf(c.t)}, {hourLabel(s.hour)}</p>
+  return <div className="impact"><p className="sec" style={{ marginTop: 0 }}>Before → after · fall {yearOf(c.t)}, {hourLabel(s.hour)}</p>
     <div className="tiles">
       <div className="tile"><small>Delay on the network</small><b>{dv >= 0 ? '+' : ''}{fmt(dv)} veh-h</b><small>{cur.wo.vht ? (dv >= 0 ? '+' : '') + (dv / cur.wo.vht * 100).toFixed(1) + '%' : ''} in this hour</small></div>
       {cur.w.worst && cur.wo.worst && <div className="tile"><small>Worst main street within 2 km</small><b style={{ color: CCOL[A.level(cur.w.worst.vc).key] }}>{pct(cur.wo.worst.vc)} → {pct(cur.w.worst.vc)}</b><small>{cur.w.worst.name}</small></div>}
-      {(() => { const i = ghostPlans(ghosts, sc.t).findIndex(p => p.id === g.id), n = i >= 0 && cur.w.planTrips ? cur.w.planTrips[i] : null;
+      {(() => { const i = ghostPlans(ghosts, sc.t, g.id).findIndex(p => p.id === g.id), n = i >= 0 && cur.w.planTrips ? cur.w.planTrips[i] : null;
         return n != null ? <div className="tile"><small>Car trips to and from it</small><b>{fmt(n)} a day</b><small>routed from its own site</small></div> : null; })()}
     </div>
     {rows.length ? <><p className="sec" style={{ marginTop: 8 }}>Streets it loads up</p>{rows.map(x =>
       <div className="chg" key={x.n}><span>{x.n}</span><span className="num">{pct(x.b)} → <b style={{ color: CCOL[A.level(x.a).key] }}>{pct(x.a)}</b> <small>+{Math.round((x.a - x.b) * 100)} pts</small></span></div>)}</>
       : <p className="note">No main street gains a full point at {hourLabel(s.hour)}.{s.hour === 17 ? ' Try 8 am.' : s.hour === 8 ? ' Try 5 pm.' : ' Try 8 am or 5 pm.'}</p>}
-    {g.kind !== 'parking' && <AccessRoads s={s} sc={sc} g={g} ghosts={ghosts} setGhosts={setGhosts} trips={(() => { const i = ghostPlans(ghosts, sc.t).findIndex(p => p.id === g.id); return i >= 0 && cur.w.planTrips ? cur.w.planTrips[i] : null; })()} />}
+    <Coming A={A} g={g} t={c.t} select={select} />
     <p className="note" style={{ marginTop: 6 }}>Both runs route every trip in town through the street network for this hour; only this project differs. Its trips start at the site and reach the nearest street by a driveway. Screening, not a site study.</p>
   </div>;
 }
 
 /* ---------- Access roads for one project: slime-mold search proposes, the router judges ---------- */
-function AccessRoads({ s, sc, g, ghosts, setGhosts, trips }: { s: State; sc: Scenario; g: Ghost; ghosts: Ghost[]; setGhosts: (g: Ghost[]) => void; trips: number | null }) {
+function AccessRoads({ s, sc, g, ghosts, setGhosts, trips = null }: { s: State; sc: Scenario; g: Ghost; ghosts: Ghost[]; setGhosts: (g: Ghost[]) => void; trips?: number | null }) {
   const [busy, setBusy] = useState<string | null>(null), [msg, setMsg] = useState<string | null>(null);
   const job = useRef<{ slime?: string; judge?: string; cands: { to: number; toName: string; pts: XZ[]; lenM: number }[] } | null>(null);
   const roads = g.roads || [];
@@ -216,7 +408,7 @@ function AccessRoads({ s, sc, g, ghosts, setGhosts, trips }: { s: State; sc: Sce
   };
   const sug = roads.filter(r => r.status === 'suggested'), mine = roads.filter(r => r.status === 'planned');
   const line = (r: GhostRoad) => 'to ' + (r.toName || 'a local street') + ', ' + fmt(r.lenM) + ' m' + (r.dvht != null ? ' · Router: ' + (r.dvht < 0 ? '−' : '+') + Math.abs(r.dvht).toFixed(1) + ' veh-h at ' + hourLabel(s.hour) : '') + (r.vol ? ' · ' + fmt(r.vol) + ' cars an hour' : '');
-  return <div style={{ marginTop: 8 }}><p className="sec">Access roads</p>
+  return <div style={{ marginTop: 10 }}><p className="sec">Or a road fix: new access road</p>
     {trips != null && !mine.length && <small style={{ display: 'block', color: 'var(--muted)' }}>{trips >= 1200 ? 'One driveway carries ' : 'Its driveway carries '}{fmt(trips)} car trips a day.</small>}
     {mine.map(r => <div className="chg" key={r.id}><span><b>Your road</b> {line(r)}</span><button className="mini" onClick={() => setRoads(roads.filter(x => x.id !== r.id))}>Remove</button></div>)}
     {sug.map(r => <div className="chg" key={r.id}><span><b>Option {roads.indexOf(r) + 1}</b> {line(r)}{Math.abs(r.dvht || 0) > 20 ? <><br /><small className="warnline">Large saving: it probably becomes a shortcut for through traffic. Check before accepting.</small></> : null}</span>
@@ -225,5 +417,17 @@ function AccessRoads({ s, sc, g, ghosts, setGhosts, trips }: { s: State; sc: Sce
     {busy ? <small>{busy}</small> : <button className="mini act" style={{ marginTop: 4 }} onClick={run}>{sug.length || mine.length ? 'Search again' : 'Suggest access roads'}</button>}
     {msg && !busy && <p className="note" style={{ margin: '6px 0 0' }}>{msg}</p>}
     <p className="note" style={{ margin: '6px 0 0' }}>The slime-mold search only proposes roads; the router keeps the ones that cut total driving time in this hour. New roads are modeled as two-lane collectors. Cost, right-of-way and grades are not checked.</p>
+  </div>;
+}
+
+/* ---------- City records as evidence: approved and planned projects already coming near this site by its year ---------- */
+function Coming({ A, g, t, select }: { A: Atlas; g: Ghost; t: number; select: (id: string) => void }) {
+  const list = useMemo(() => A.PROJECTS.filter(p => p.pos && !/road|utility|sewer|water/i.test(p.type) && p.end > A.TODAY && p.end <= t + 0.01 && Math.hypot(p.pos[0] - g.pos[0], p.pos[1] - g.pos[1]) <= 10)
+    .map(p => ({ p, d: Math.hypot(p.pos![0] - g.pos[0], p.pos![1] - g.pos[1]) * 0.2 })).sort((a, b) => a.d - b.d), [A, g.pos, t]);
+  return <div className="coming"><p className="sec">Already coming nearby by fall {Math.floor(t)} · city records</p>
+    {list.length ? <>{list.slice(0, 3).map(({ p, d }) => <div className="chg" key={p.id}>
+      <button className="back" onClick={() => select(p.id)}>{p.name}</button><small>{p.status} · {d.toFixed(1)} km · {p.source?.label || 'city records'}</small></div>)}
+      <p className="note" style={{ margin: '4px 0 0' }}>{list.length > 3 ? '+' + (list.length - 3) + ' more. ' : ''}These are in both runs above, so the change shown is this project on top of what the city has approved.</p></>
+      : <p className="note" style={{ margin: 0 }}>No approved or planned projects from city records within 2 km open by then.</p>}
   </div>;
 }

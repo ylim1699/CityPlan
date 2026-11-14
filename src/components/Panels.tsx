@@ -13,7 +13,7 @@ function Hot({ A, s, c, n, plain }: { A: Atlas; s: State; c: Computed; n: number
     const lv = A.level(h.vc), d = s.withProjects ? h.delta : 0;
     return <div className="hot" key={h.seg.road.name}><span className="stripe" style={{ background: CCOL[lv.key] }}></span>
       <div><b>{h.seg.road.name}</b><small>near {h.seg.near} · {plain ? 'about ' : ''}{pct(h.vc)} of capacity{d > 0.015 ? ' · projects add ' + Math.round(d * 100) + ' points' : ''}</small></div>
-      <span className="lv" style={{ background: CCOL[lv.key], color: lv.key === 2 ? '#2a2306' : undefined }}>{lv.label}</span></div>;
+      <span className="lv" style={{ background: CCOL[lv.key], color: lv.key <= 1 ? '#2a2306' : undefined }}>{lv.label}</span></div>;
   })}</div>;
 }
 function ProjCard({ A, p, c, select }: { A: Atlas; p: Project; c: Computed; select: (id: string) => void }) {

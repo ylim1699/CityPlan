@@ -26,8 +26,8 @@ export function StartScreen({ rec, onEnter, onReview }: { rec: Records; onEnter:
         <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" /><path d="M8 24h16M11 24V15h4v9M18 24V9h4v15" /></svg>
         <span><small>Rexburg</small>Growth Atlas</span>
       </div>
-      <h1 id="start-title">What is being built in Rexburg, and what it does to traffic.</h1>
-      <p className="start-lede">Approved projects from city council and planning records, placed on a 3D model of the city with routed traffic for every hour and year.</p>
+      <h1 id="start-title">See what a project does to traffic before you approve it.</h1>
+      <p className="start-lede">Place a project for a future year, see which streets it overloads, and compare better spots, with traffic routed through Rexburg's real streets. Everything the city has already approved in council and P&amp;Z records is on the map too.</p>
 
       <section className="start-rec" aria-label="City records">
         <div className="start-rec-head"><b>City records</b><small>{rec.checked ? 'Last checked ' + day(rec.checked) : 'Not checked from this browser yet'}</small></div>
@@ -45,7 +45,7 @@ export function StartScreen({ rec, onEnter, onReview }: { rec: Records; onEnter:
         {rec.phase === 'done' && rec.foundCount > 0
           ? <button className="start-btn ghost" onClick={onReview}>Review {rec.foundCount} new in Planner</button>
           : <button className="start-btn ghost" onClick={rec.check} disabled={busy}>{busy ? 'Checking…' : rec.phase === 'idle' ? 'Check for new records' : 'Check again'}</button>}
-        <button className="start-btn" onClick={onEnter} autoFocus>Enter the city <span aria-hidden="true">→</span></button>
+        <button className="start-btn" onClick={onEnter} autoFocus>Start planning <span aria-hidden="true">→</span></button>
       </div>
       <p className="start-foot">Reads the public archive at laserfiche.rexburg.org. {busy ? 'You can enter the city now; reading continues. ' : ''}Nothing reaches the map until a person confirms it.</p>
     </div>

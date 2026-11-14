@@ -1,4 +1,4 @@
-import { useState, type Dispatch } from 'react';
+import { useState, type Dispatch, type ReactNode } from 'react';
 import type { Action, Layers, State } from '../state';
 import { DENSITY } from '../scene/blockLayer';
 import { CloseButton } from './CloseButton';
@@ -10,12 +10,12 @@ import { fmt } from '../ui';
 
 type Tab = 'traffic' | 'places' | 'people' | 'shopping';
 type Props = { s: State; dispatch: Dispatch<Action>; onFold: () => void; hasBlocks?: boolean; hasZones?: boolean;
-  zones?: ZonesFile | null; blocks?: BlockGroup[] | null; flows?: ShopFlows | null; S?: number };
+  zones?: ZonesFile | null; blocks?: BlockGroup[] | null; flows?: ShopFlows | null; S?: number; mix?: ReactNode };
 const TABS: [Tab, string][] = [['traffic', 'Traffic'], ['places', 'Places'], ['people', 'People'], ['shopping', 'Shopping']];
 function loadTab(): Tab { try { const t = localStorage.getItem('atlas-filter-tab'); if (t && TABS.some(x => x[0] === t)) return t as Tab; } catch (e) {} return 'traffic'; }
 
 /* Filter panel: what the map shows and how, in tabs of related settings. Time (year and hour) lives in the bottom dock. */
-export function LeftControls({ s, dispatch, onFold, hasBlocks = false, hasZones = false, zones = null, blocks = null, flows = null, S = 1 }: Props) {
+export function LeftControls({ s, dispatch, onFold, hasBlocks = false, hasZones = false, zones = null, blocks = null, flows = null, S = 1, mix = null }: Props) {
   const [tab, setTabRaw] = useState<Tab>(loadTab);
   const setTab = (t: Tab) => { setTabRaw(t); try { localStorage.setItem('atlas-filter-tab', t); } catch (e) {} };
   const check = (k: keyof Layers, l: string, on = !!s.layers[k]) =>
@@ -27,11 +27,13 @@ export function LeftControls({ s, dispatch, onFold, hasBlocks = false, hasZones 
     </div>
 
     {tab === 'traffic' && <>
-      <div><p className="sec">Compare</p>
-        <div className="seg" role="group" aria-label="Scenario">
-          <button aria-pressed={s.withProjects} onClick={() => dispatch({ type: 'scenario', withProjects: true })}>With projects</button>
-          <button aria-pressed={!s.withProjects} onClick={() => dispatch({ type: 'scenario', withProjects: false })}>Growth only</button>
-        </div></div>
+      <div><p className="sec">Projects counted</p>
+        <label className="switch"><input type="checkbox" checked={s.withProjects} onChange={e => dispatch({ type: 'scenario', withProjects: e.target.checked })} />
+          <span><b>Already planned</b><small>Approved city projects (council and P&amp;Z records)</small></span></label>
+        {s.mode === 'planner' && <label className="switch"><input type="checkbox" checked={s.withNew} onChange={e => dispatch({ type: 'scenario', withNew: e.target.checked })} />
+          <span><b>New projects</b><small>The ones you place: on the map, in view or by AI</small></span></label>}
+        <small style={{ color: 'var(--muted)' }}>{s.withProjects && (s.withNew || s.mode !== 'planner') ? 'Showing everything.' : !s.withProjects && !(s.withNew && s.mode === 'planner') ? 'Showing growth only: no projects.' : s.withProjects ? 'Showing already planned only.' : 'Showing your new projects only.'}</small>
+        {mix}</div>
       <div><p className="sec">Show on map</p>
         {check('traffic', 'Road load')}{check('cars', 'Moving traffic')}{check('signals', 'Traffic signals', s.layers.signals !== false)}</div>
       <div><p className="sec">Traffic congestion</p>

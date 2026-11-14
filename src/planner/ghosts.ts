@@ -7,7 +7,9 @@ import type { XZ } from '../model/types';
 
 export type GhostKind = 'student' | 'homes' | 'grocery' | 'office' | 'parking';
 /* place: result of the placement rules at the last drop (moved = meters it snapped; ok false = no legal spot nearby) */
-export type Ghost = { id: string; kind: GhostKind; pos: XZ; year: number; status: 'planned' | 'suggested'; why?: string; place?: { moved: number; ok: boolean; lot?: boolean };
+/* draft: placed by the planner but not added to the plan yet. A draft is counted only while it is the project being
+   tested (the selected one), so nothing enters the plan until a planner adds it. Older saved ghosts have no flag: in the plan. */
+export type Ghost = { id: string; kind: GhostKind; pos: XZ; year: number; status: 'planned' | 'suggested'; draft?: boolean; why?: string; place?: { moved: number; ok: boolean; lot?: boolean };
   roads?: GhostRoad[] };
 /* An access road from a ghost to an existing street node (found by the slime-mold search, judged by the router).
    Suggested roads are drawn dashed and not counted; accepted ones are added to the network with their project. */
@@ -48,24 +50,26 @@ export function zoneFinder(A: Atlas, zones: ZonesFile | null) {  /* nearest Cens
    (scenario.plans), with a driveway to the nearest street, so its trips leave from where it actually sits.
    Positions are rounded to 4 m so tiny drags reuse cached runs. */
 const r2 = (x: number) => Math.round(x * 50) / 50;
-export function ghostRoads(list: Ghost[], t: number): NewRoad[] {
+/* counted at time t: planned, open by then, and either in the plan or the draft being tested (testing = selected id) */
+export const ghostCounts = (g: Ghost, t: number, testing?: string | null) => g.status === 'planned' && ghostActive(g, t) && (!g.draft || g.id === testing);
+export function ghostRoads(list: Ghost[], t: number, testing?: string | null): NewRoad[] {
   const out: NewRoad[] = [];
-  list.forEach(g => { if (g.status !== 'planned' || !ghostActive(g, t) || g.kind === 'parking') return;
+  list.forEach(g => { if (!ghostCounts(g, t, testing) || g.kind === 'parking') return;
     (g.roads || []).forEach(r => { if (r.status === 'planned') out.push({ id: r.id, plan: g.id, to: r.to, lenM: Math.round(r.lenM), cls: 'collector' }); }); });
   return out;
 }
-export function ghostPlans(list: Ghost[], t: number): PlanSite[] {
-  return list.filter(g => g.status === 'planned' && ghostActive(g, t) && g.kind !== 'parking').map(g => {
+export function ghostPlans(list: Ghost[], t: number, testing?: string | null): PlanSite[] {
+  return list.filter(g => ghostCounts(g, t, testing) && g.kind !== 'parking').map(g => {
     const ty = GHOST_TYPES[g.kind];
     return { id: g.id, pos: [r2(g.pos[0]), r2(g.pos[1])] as XZ, beds: ty.beds || 0, units: ty.units || 0, attract: ty.trips || 0 };
   });
 }
 
 /* Supply the active planned ghosts add, for the counter strip */
-export function ghostSupply(list: Ghost[], t: number) {
+export function ghostSupply(list: Ghost[], t: number, testing?: string | null) {
   const s = { beds: 0, units: 0, spaces: 0, parkNeed: 0 };
   list.forEach(g => {
-    if (g.status !== 'planned' || !ghostActive(g, t)) return;
+    if (!ghostCounts(g, t, testing)) return;
     const ty = GHOST_TYPES[g.kind];
     s.beds += ty.beds || 0; s.units += ty.units || 0; s.spaces += ty.spaces || 0; s.parkNeed += ty.park;
   });

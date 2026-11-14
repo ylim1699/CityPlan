@@ -8,6 +8,7 @@ import { setExtraProjects } from './hooks/useTraffic';
 import type { Scenario, ZonesFile } from './model/routing';
 import { initialState, reducer } from './state';
 import { LAST_I, TODAY_I, tOf } from './ui';
+import { PlanMix } from './planner/PlanMix';
 import { CityScene } from './components/CityScene';
 import { LeftControls } from './components/LeftControls';
 import { TimeDock } from './components/TimeDock';
@@ -17,8 +18,8 @@ import { useTraffic } from './hooks/useTraffic';
 import { AccuracyPanel, type CalibFile } from './components/AccuracyPanel';
 import { ProblemCards } from './components/ProblemCards';
 import { DemoViews, Placement } from './components/Placement';
-import { GhostTools, YearStrip } from './planner/PlannerWorkspace';
-import { GHOST_TYPES, ghostActive, ghostPlans, ghostRoads, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
+import { GhostTools } from './planner/PlannerWorkspace';
+import { GHOST_TYPES, ghostActive, ghostCounts, ghostPlans, ghostRoads, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
 import { snapSite, useSuggest } from './planner/suggest';
 import { OverviewPanel, OverviewStrip, useOverview, useOverviewSeries } from './components/Overview';
 import { RecordPill, StartScreen } from './components/StartScreen';
@@ -64,9 +65,13 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
 
   /* Routed volumes from the worker (with and without projects); the count-based method fills in until they arrive. */
   const t = tOf(s.ti);
-  const plans = useMemo(() => s.mode === 'planner' ? ghostPlans(ghosts, t) : [], [s.mode, ghosts, t]);
-  const roads = useMemo(() => s.mode === 'planner' ? ghostRoads(ghosts, t) : [], [s.mode, ghosts, t]);
+  /* your new projects: always computed (the Filter readout needs them), counted on the map only while "New projects" is on */
+  const allPlans = useMemo(() => s.mode === 'planner' ? ghostPlans(ghosts, t, ghostSel) : [], [s.mode, ghosts, t, ghostSel]);
+  const allRoads = useMemo(() => s.mode === 'planner' ? ghostRoads(ghosts, t, ghostSel) : [], [s.mode, ghosts, t, ghostSel]);
+  const plans = s.withNew ? allPlans : [], roads = s.withNew ? allRoads : [];
   const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev, ...(plans.length ? { plans } : {}), ...(roads.length ? { roads } : {}) }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev, plans, roads]);
+  /* the Details analyses always count your new projects, whatever the map shows */
+  const scAll: Scenario = useMemo(() => s.withNew ? sc : { ...sc, ...(allPlans.length ? { plans: allPlans } : {}), ...(allRoads.length ? { roads: allRoads } : {}) }, [sc, s.withNew, allPlans, allRoads]);
   const routing = s.method === 'routed' && !!zones;
   const tr = useTraffic(sc, routing);
   const run = routing ? tr.stale : null;
@@ -113,12 +118,12 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   }, [A, zones, blocks, shopFlows, s.flow, s.layers.flows]);
   /* ghosts on the map: planner mode only; double-click one to move it */
   useEffect(() => {
-    const list = s.mode !== 'planner' ? [] : ghosts.map(g => { const ty = GHOST_TYPES[g.kind], act = ghostActive(g, c.t);
+    const list = s.mode !== 'planner' || !s.withNew ? [] : ghosts.map(g => { const ty = GHOST_TYPES[g.kind], open = ghostActive(g, c.t), act = ghostCounts(g, c.t, ghostSel);
       return { id: g.id, pos: g.pos, w: ty.w, d: ty.d, h: ty.h, n: ty.n, status: g.status, active: act,
-        label: (g.status === 'suggested' ? 'Suggested · ' : '') + ty.label + (act || g.status === 'suggested' ? '' : ' · from ' + g.year),
+        label: (g.status === 'suggested' ? 'Suggested · ' : g.draft ? 'Draft · ' : '') + ty.label + (open || g.status === 'suggested' ? '' : ' · from ' + g.year),
         roads: (g.roads || []).map((r, i) => ({ pts: r.pts, status: r.status, label: r.status === 'suggested' ? 'Road option ' + (i + 1) : '' })) }; });
     view.current?.setGhosts(list, ghostSel);
-  }, [A, ghosts, ghostSel, s.mode, c.t]);
+  }, [A, ghosts, ghostSel, s.mode, s.withNew, c.t]);
   const ghostsRef = useRef(ghosts); ghostsRef.current = ghosts;
   useEffect(() => {
     view.current?.onGhost(e => {
@@ -167,24 +172,31 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   const fly = (pos: [number, number]) => view.current?.flyTo(pos);
   const methodNote = <p className="note" style={{ margin: 0 }}>{routing ? (tr.status === 'ready' ? 'Street loads come from routing every trip in town through the street network.' : tr.status === 'error' ? 'Routing failed to start; showing the count-based estimate.' : 'Routing trips… showing the count-based estimate until it finishes.') : 'Showing the count-based estimate (city counts plus nearby project trips), not routed trips.'}</p>;
   const residentExtra = routing ? <><ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={3} onFly={fly} />{methodNote}</> : undefined;
+  /* Planner: the 4-step flow first; everything else is evidence and settings, folded away until wanted */
   const plannerExtra = <>
-    <DemoViews dispatch={dispatch} />
-    <AgentPanel A={A} base={projects} confirmed={confirmed} pick={cb => view.current?.pick(cb)} flyTo={fly} highlight={l => view.current?.setHighlight(l)}
-      onSaved={() => { saveConfirmed([]); location.reload(); }}
-      onConfirm={p => { saveConfirmed(confirmed.filter(x => x.id !== p.id).concat([p])); setTimeout(() => select(p.id), 300); }}
-      onRemove={id => { if (s.sel === id) dispatch({ type: 'select', id: null }); saveConfirmed(confirmed.filter(x => x.id !== id)); }} />
-    <div><p className="sec">Traffic method</p><div className="seg" role="group" aria-label="Traffic method" style={{ marginBottom: 6 }}>
-      <button aria-pressed={s.method === 'routed'} onClick={() => dispatch({ type: 'view', patch: { method: 'routed' } })} disabled={!zones}>Routed trips</button>
-      <button aria-pressed={s.method === 'counts'} onClick={() => dispatch({ type: 'view', patch: { method: 'counts' } })}>Count-based</button></div>{methodNote}</div>
-    {routing && <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner added={ghostSupply(ghosts, c.t)}
-      onApply={o => dispatch({ type: 'view', patch: { fixes: o.fixes, widen: o.widen } })}
-      onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); setLay(l => ({ ...l, pan: true, ctl: false })); }} />}
-    {routing && cal && <AccuracyPanel cal={cal} />}
-    {routing && zones && <Placement A={A} sc={sc} zones={zones} />}
+    <More title="City records · what the city has approved" sub="The AI agent reads council and P&Z records; a person confirms each project">
+      <AgentPanel A={A} base={projects} confirmed={confirmed} pick={cb => view.current?.pick(cb)} flyTo={fly} highlight={l => view.current?.setHighlight(l)}
+        onSaved={() => { saveConfirmed([]); location.reload(); }}
+        onConfirm={p => { saveConfirmed(confirmed.filter(x => x.id !== p.id).concat([p])); setTimeout(() => select(p.id), 300); }}
+        onRemove={id => { if (s.sel === id) dispatch({ type: 'select', id: null }); saveConfirmed(confirmed.filter(x => x.id !== id)); }} /></More>
+    {routing && <More title="Problems the city already has" sub="Overloaded streets and housing gaps, with fixes to test">
+      <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner added={ghostSupply(ghosts, c.t, ghostSel)}
+        onApply={o => dispatch({ type: 'view', patch: { fixes: o.fixes, widen: o.widen } })}
+        onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); setLay(l => ({ ...l, pan: true, ctl: false })); }} /></More>}
+    <More title="Numbers and assumptions" sub="Population, supply against need, growth settings, pressure points">
+      <PlannerPanel {...props} /></More>
+    <More title="How the numbers are made" sub="Traffic method, accuracy against city counts, demo views">
+      <div><p className="sec">Traffic method</p><div className="seg" role="group" aria-label="Traffic method" style={{ marginBottom: 6 }}>
+        <button aria-pressed={s.method === 'routed'} onClick={() => dispatch({ type: 'view', patch: { method: 'routed' } })} disabled={!zones}>Routed trips</button>
+        <button aria-pressed={s.method === 'counts'} onClick={() => dispatch({ type: 'view', patch: { method: 'counts' } })}>Count-based</button></div>{methodNote}</div>
+      {routing && cal && <AccuracyPanel cal={cal} />}
+      {routing && zones && <Placement A={A} sc={sc} zones={zones} />}
+      <DemoViews dispatch={dispatch} /></More>
   </>;
-  const ghostTools = routing ? <GhostTools A={A} s={s} c={c} sc={sc} dispatch={dispatch} ghosts={ghosts} setGhosts={setGhosts} selId={ghostSel} setSel={setGhostSel}
-    pick={cb => view.current?.pick(cb)} flyTo={fly} target={() => view.current ? view.current.target() : null}
-    suggest={suggest} suggestSt={suggestSt} highlight={l => view.current?.setHighlight(l)} />
+  const ghostTools = routing ? <GhostTools A={A} s={s} c={c} sc={scAll} dispatch={dispatch} ghosts={ghosts} setGhosts={setGhosts} selId={ghostSel} setSel={setGhostSel}
+    pick={cb => view.current?.pick(cb)} flyTo={fly} flyClose={pos => view.current?.flyTo(pos, 4)} target={() => view.current ? view.current.target() : null}
+    suggest={suggest} suggestSt={suggestSt} highlight={l => view.current?.setHighlight(l)}
+    mark={(pos, label) => view.current?.mark(pos, label)} select={select} />
     : <div className="zoning-banner err" role="status"><b>Ghost projects need routed trips.</b> Switch the traffic method to Routed trips (zones.json must load).</div>;
   const cls = [!lay.ctl && 'ctl-folded', !lay.pan && 'pan-folded'].filter(Boolean).join(' ');
 
@@ -214,20 +226,20 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
       </div>
     </div>
     <LeftControls s={s} dispatch={dispatch} onFold={() => showFilter(false)} hasBlocks={!!blocks} hasZones={!!zones && !!blocks}
-      zones={zones} blocks={blocks?.groups ?? null} flows={routing ? shopFlows : null} S={A.S} />
+      zones={zones} blocks={blocks?.groups ?? null} flows={routing ? shopFlows : null} S={A.S}
+      mix={routing && s.mode === 'planner' ? <PlanMix sc={sc} plans={allPlans} roads={allRoads} today={A.TODAY} open={lay.ctl} /> : null} />
     <section className="card right" aria-live="polite">
       <div className="right-head"><div className="row" style={{ justifyContent: 'flex-end', marginBottom: 6 }}>
         <CloseButton label="Hide details" onClick={() => showDetails(false)} /></div>
         <h2 key={title}>{title}</h2><p key={sub}>{sub}</p></div>
       <div className="scroll" ref={body}>
-        {s.sel ? <ProjectDetail {...props} /> : block && blocks ? <BlockDetail b={block} meta={blocks.meta} onClose={() => pickBlock(null)} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <PlannerPanel {...props} extra={<>{ghostTools}{plannerExtra}</>} />}
+        {s.sel ? <ProjectDetail {...props} /> : block && blocks ? <BlockDetail b={block} meta={blocks.meta} onClose={() => pickBlock(null)} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <>{ghostTools}{plannerExtra}</>}
       </div>
     </section>
     {ovShown && <OverviewPanel closing={!ovOpen} A={A} o={ov} stale={ovS.stale} t={c.t} hour={s.hour} onPeak={() => { setDayPlaying(false); dispatch({ type: 'hour', hour: 17 }); }}
       routed={routing} ghosts={plans.length + roads.length > 0} withProjects={s.withProjects} setWithProjects={w => dispatch({ type: 'scenario', withProjects: w })} onClose={closeOv} onFly={fly} />}
     <div className="hint" aria-hidden="true"><span>Drag to move</span><span>Scroll or pinch to zoom</span><span>Right-drag to tilt and turn</span></div>
     <div className="osm-credit">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
-    {s.mode === 'planner' && <YearStrip A={A} s={s} c={c} dispatch={dispatch} ghosts={ghosts} trips={tr.run ? tr.run.with.trips ?? null : null} />}
     <TimeDock A={A} ti={s.ti} t={c.t} total={g.pop.total} playing={playing} onPlay={onPlay} onChange={ti => dispatch({ type: 'ti', ti })}
       hour={s.hour} hours={hours} dayPlaying={dayPlaying} onDayPlay={() => setDayPlaying(!dayPlaying)} onHour={h => { setDayPlaying(false); dispatch({ type: 'hour', hour: h }); }}
       speed={s.speed} onSpeed={v => dispatch({ type: 'view', patch: { speed: v } })} />
@@ -239,4 +251,9 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
 function qLabel2(c: Computed, withProjects: boolean) {
   const y = Math.floor(c.t);
   return 'Q' + (Math.floor((c.t - y) * 4) + 1) + ' ' + y + ' · ' + (withProjects ? 'growth plus planned projects' : 'growth only, no new projects');
+}
+
+/* a folded section in the planner panel */
+function More({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
+  return <details className="more"><summary><b>{title}</b><small>{sub}</small></summary><div className="more-body">{children}</div></details>;
 }

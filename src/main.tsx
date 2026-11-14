@@ -3,6 +3,7 @@ import type { BlockGroupsFile, OsmCity, ProjectsFile } from './model/types';
 import { App } from './App';
 import './styles.css';
 import './theme.css';
+import './responsive.css';  /* last: side-panel, tablet and phone layouts */
 
 /* On-screen error box (from the UI sandbox): a failure shows in red instead of a silent blank map */
 function showError(msg: string) {

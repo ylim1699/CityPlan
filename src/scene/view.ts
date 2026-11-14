@@ -18,7 +18,7 @@ import type { ZonesFile, ZoneStats } from '../model/routing';
 const ROAD_TYPE: Record<string, string> = { highway: 'Highway', arterial: 'Major arterial', minor: 'Minor arterial', collector: 'Collector', ramp: 'Ramp', local: 'Local street' };
 
 export type ViewEls = { canvas: HTMLCanvasElement; overlay: HTMLElement; app: HTMLElement };
-export type View = { apply: (shown: SegResult[], tp: number) => void; flyTo: (pos: XZ) => void; pick: (cb: ((pos: XZ) => void) | null) => void; dispose: () => void;
+export type View = { apply: (shown: SegResult[], tp: number) => void; flyTo: (pos: XZ, near?: number) => void; pick: (cb: ((pos: XZ) => void) | null) => void; dispose: () => void;
   /* Planner ghosts (src/planner) */
   setGhosts: (list: GhostDraw[], sel: string | null) => void; onGhost: (cb: ((e: GhostEvent) => void) | null) => void; target: () => XZ;
   setHighlight: (list: Highlight[]) => void;
@@ -297,10 +297,10 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
 
   /* Traffic signals from OpenStreetMap, one per signalized intersection: a dark pole on the corner with a lamp
      that cycles green, yellow, red (each intersection on its own offset), drawn at a steady size on screen */
-  const SIG = C.signals || [], sigH = 7 * A.VEX * S, sigOff = 9 * S, sigCycle = 24;
+  const SIG = C.signals || [], sigH = 5 * A.VEX * S, sigOff = 9 * S, sigCycle = 24;
   const poleG = new T.CylinderGeometry(0.5, 0.5, 1, 5); poleG.translate(0, 0.5, 0);
   const sigPoles = new T.InstancedMesh(poleG, new T.MeshLambertMaterial({ color: 0x2b2a28 }), Math.max(1, SIG.length));
-  const sigPos: number[] = [], sigM4 = new T.Matrix4(), sigQ = new T.Quaternion(), sigV = new T.Vector3(), sigSc = new T.Vector3(S * 1.4, sigH, S * 1.4);
+  const sigPos: number[] = [], sigM4 = new T.Matrix4(), sigQ = new T.Quaternion(), sigV = new T.Vector3(), sigSc = new T.Vector3(S * 0.9, sigH, S * 0.9);
   SIG.forEach(([x, z], k) => {
     sigV.set(x * S + sigOff, 0, z * S + sigOff); sigM4.compose(sigV, sigQ, sigSc); sigPoles.setMatrixAt(k, sigM4);
     sigPos.push(sigV.x, sigH, sigV.z);
@@ -320,7 +320,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   const sigPx = renderer.getPixelRatio();  /* fixed size on screen, like a map pin */
   const sigSets = [0, 1, 2].map(lit => {
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(new Float32Array(sigPos.length), 3));
-    const pts = new T.Points(g, new T.PointsMaterial({ size: 24 * sigPx, map: sigIcon(lit), transparent: true, alphaTest: 0.05, depthWrite: false, sizeAttenuation: false }));
+    const pts = new T.Points(g, new T.PointsMaterial({ size: 14 * sigPx, map: sigIcon(lit), transparent: true, alphaTest: 0.05, depthWrite: false, sizeAttenuation: false }));
     pts.renderOrder = 7; pts.frustumCulled = false; scene.add(pts); return pts;
   });
   let sigT = 0;
@@ -734,9 +734,9 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
       const sp = document.createElement('span'); sp.textContent = label || ''; el.appendChild(sp); el.appendChild(document.createElement('i'));
       overlay.appendChild(el); found = { el, v: new T.Vector3(pos[0], 0.1, pos[1]) }; place(found);
     },
-    flyTo(pos) {
+    flyTo(pos, near) {
       const off = camera.position.clone().sub(controls.target), len = off.length();
-      fly = { k: 0, from: controls.target.clone(), to: new T.Vector3(pos[0], 0, pos[1]), dir: off.normalize(), len0: len, len1: Math.min(len, 9) };
+      fly = { k: 0, from: controls.target.clone(), to: new T.Vector3(pos[0], 0, pos[1]), dir: off.normalize(), len0: len, len1: near ?? Math.min(len, 9) };
     },
     pick(cb) { picker = cb; canvas.style.cursor = cb ? 'crosshair' : ''; },
     setGhosts(list, sel) { ghosts.set(list, sel); },

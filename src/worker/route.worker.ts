@@ -16,7 +16,7 @@ export type Req =
   | { type: 'overview'; key: string; sc: Scenario; from: number; to: number }
   | { type: 'compare'; key: string; sc: Scenario; options: { id: string; sc: Scenario }[]; pos?: XZ }
   | { type: 'slime'; key: string; site: XZ; rad?: number; skipNode?: number | null }
-  | { type: 'judge'; key: string; sc: Scenario; options: { id: string; sc: Scenario }[] };
+  | { type: 'judge'; key: string; sc: Scenario; options: { id: string; sc: Scenario; pos?: XZ }[] };
 export type Res =
   | { type: 'ready' } | { type: 'error'; error: string }
   | { type: 'run'; key: string; with: { vol: Float64Array; tti: Float64Array; vht: number; trips?: number; zone?: ZoneStats; flows?: { zone: number; from: Float32Array }[] }; without: { vol: Float64Array; tti: Float64Array; vht: number; zone?: ZoneStats }; ms: number }
@@ -25,7 +25,8 @@ export type Res =
   | { type: 'overview'; key: string; series: Series }
   | { type: 'compare'; key: string; base: number; options: { id: string; vht: number; vol: Float64Array; worst?: Worst | null; roadVol?: Record<string, { vol: number; vc: number }>; planTrips?: number[] }[]; baseWorst?: Worst | null }
   | { type: 'slime'; key: string; cands: RoadCandidate[]; sinks: number; ms: number }
-  | { type: 'judge'; key: string; base: number; options: { id: string; vht: number; planTrips?: number[]; roadVol?: Record<string, { vol: number; vc: number }> }[] };
+  | { type: 'judge'; key: string; base: number; options: { id: string; vht: number; planTrips?: number[]; roadVol?: Record<string, { vol: number; vc: number }>; worst?: Worst | null; jump?: Jump | null }[] };
+type Jump = { pts: number; name: string; vc: number };
 type Worst = { vc: number; name: string };
 
 let R: Router | null = null, A: ReturnType<typeof createAtlas> | null = null;
@@ -46,6 +47,15 @@ const post = (m: Res, tr: Transferable[] = []) => (self as any).postMessage(m, t
 function runOne(sc: Scenario) {
   const k = JSON.stringify(sc);
   return cache.get(k) || remember(k, R!.run(sc));
+}
+function biggestJump(sc: Scenario, vol: Float64Array, baseVol: Float64Array, pos: XZ, rad: number): Jump | null {
+  const tp = sc.withProjects ? sc.t : Math.min(sc.t, A!.TODAY), caps = A!.capacities(tp, { widen: sc.widen, fixes: sc.fixes });
+  let j: Jump | null = null;
+  A!.SEGS.forEach((s, i) => {
+    if (s.road.cls === 'local' || !s.road.name || Math.hypot(s.mid[0] - pos[0], s.mid[1] - pos[1]) > rad) return;
+    const pts = (vol[i] - baseVol[i]) / caps[i]; if (!j || pts > j.pts) j = { pts, name: s.road.name, vc: vol[i] / caps[i] };
+  });
+  return j;
 }
 function summarize(sc: Scenario, vol: Float64Array) {
   const tp = sc.withProjects ? sc.t : Math.min(sc.t, A!.TODAY), caps = A!.capacities(tp, { widen: sc.widen, fixes: sc.fixes });
@@ -99,8 +109,10 @@ function handle(m: Req) {
       worst: m.pos ? R!.localWorst(o.sc, r.vol, m.pos, 10) : null }; });
     post({ type: 'compare', key: m.key, base, options, baseWorst: m.pos ? R!.localWorst(m.sc, runOne(m.sc).vol, m.pos, 10) : null });
   } else if (m.type === 'judge') {  /* like compare, but queued per key so other panels' compares never drop it */
-    const base = runOne(m.sc).vht;
-    post({ type: 'judge', key: m.key, base, options: m.options.map(o => { const r = runOne(o.sc); return { id: o.id, vht: r.vht, planTrips: r.planTrips, roadVol: r.roadVol }; }) });
+    const b = runOne(m.sc), base = b.vht;
+    /* pos (per option): the worst main street near that site, and the biggest jump one main street takes, so a lower total can't hide one overloaded street */
+    post({ type: 'judge', key: m.key, base, options: m.options.map(o => { const r = runOne(o.sc); return { id: o.id, vht: r.vht, planTrips: r.planTrips, roadVol: r.roadVol,
+      ...(o.pos ? { worst: R!.localWorst(o.sc, r.vol, o.pos, 10), jump: biggestJump(o.sc, r.vol, b.vol, o.pos, 10) } : {}) }; }) });
   } else if (m.type === 'slime') {
     const t0 = performance.now(), r = slimeRoads(A!, R!, m.site, m.rad, m.skipNode);
     post({ type: 'slime', key: m.key, cands: r.cands, sinks: r.sinks, ms: Math.round(performance.now() - t0) });

@@ -31,3 +31,93 @@
 .yearstrip.closed{gap:3px;padding:6px 12px}
 .ys-mini{color:var(--muted);font-size:12px}
 .planlabel.hl{background:#3a1410;color:#ffd0bd;border-color:#ff5a2a;font-size:11px;padding:2px 6px;transform:translate(-50%,-50%)}
+
+/* ---------- Planner flow: four numbered steps ---------- */
+.flow{display:grid;gap:10px}
+.yearline{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:12px;color:var(--muted);padding:2px 0}
+.yearline b{color:#fff;font-weight:600;margin-right:2px}
+.yearline [data-tone="ok"]{color:#d8c49a}.yearline [data-tone="warn"]{color:#e8b65a}.yearline [data-tone="bad"]{color:#ff8a5c}
+.flow .zoning-banner{padding:7px 10px;font-size:11.5px}
+.linkbtn{background:none;border:0;padding:0;color:#ffc59a;text-decoration:underline;cursor:pointer;font:inherit}
+.step{border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:10px 12px;background:rgba(255,255,255,.025);transition:opacity .2s}
+.step h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13.5px;font-weight:600;color:#fff}
+.step h3 i{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:600 11px/1 var(--mono);font-style:normal;background:#e9b25f;color:#1a1408}
+.step.done h3 i{background:#6fbf73;color:#0d1a0e}
+.step.off{opacity:.5}
+.step.off h3 i{background:rgba(255,255,255,.18);color:#ddd}
+.step .impact{border-top:0;padding-top:0;margin-top:0}
+.inplan{color:#8fd694;font-size:12.5px}
+.better{display:grid;gap:4px}
+.cmp{display:grid;grid-template-columns:1fr auto 74px;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.03)}
+.cmp.head{background:none;padding:0 8px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cmp.mine{outline:1px solid rgba(233,178,95,.5)}
+.cmp span{display:grid;gap:2px}
+.cmp small{color:var(--muted);font-size:11px}
+.cmp .num{text-align:right;font-family:var(--mono)}
+.cmp .save{color:#8fd694}
+.coming{margin-top:8px}
+.coming .chg{display:grid;gap:1px}
+.coming small{color:var(--muted);font-size:11px}
+.plan-list{display:grid;gap:4px;padding-top:4px}
+.planrow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:5px 8px;border-radius:8px;cursor:pointer;font-size:12.5px}
+.planrow:hover{background:rgba(255,255,255,.04)}
+.planrow.on{background:rgba(240,140,58,.1);outline:1px solid rgba(240,140,58,.55)}
+.planrow .tag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.08);color:#ddd}
+.planrow .tag[data-s="In plan"]{background:rgba(111,191,115,.18);color:#9fe0a3}
+.planrow .tag[data-s="Draft"]{background:rgba(233,178,95,.18);color:#f0c27a}
+.planrow .tag[data-s="Suggested"]{background:rgba(255,207,122,.12);color:#ffdba0}
+/* folded sections under the flow */
+details.more{border-top:1px solid rgba(255,255,255,.08);padding:8px 0}
+details.more summary{list-style:none;cursor:pointer;display:grid;gap:2px;padding-left:16px;position:relative}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:'▸';position:absolute;left:0;top:0;color:var(--muted)}
+details.more[open] summary::before{content:'▾'}
+details.more summary b{font-size:12.5px;color:#eee;font-weight:600}
+details.more summary small{font-size:11px;color:var(--muted)}
+details.more .more-body{display:grid;gap:12px;margin-top:10px}
+
+/* cycle through suggested spots */
+.better .cycle{display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:6px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--panel2,rgba(0,0,0,.03))}
+.better .cycle>span{flex:1;display:flex;flex-direction:column;line-height:1.2}
+.better .cycle>span small{opacity:.7}
+.better .cycle button[aria-label]{min-width:28px;font-size:15px}
+.better .cmp:not(.head){cursor:pointer;border-radius:6px}
+.better .cmp.on{outline:2px solid #e88e3a;outline-offset:-2px}
+
+/* AI recommendation: a close-up card over the map */
+.mini.ai{border-color:#e88e3a;color:#b85a12}
+.airec{position:fixed;top:72px;left:50%;transform:translateX(-50%);width:min(440px,calc(100vw - 16px));z-index:30;
+  background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;font-family:var(--body)}
+.airec-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.airec-head small{color:var(--muted);flex:1}
+.airec-x{border:0;background:none;font-size:16px;cursor:pointer;color:var(--muted);padding:2px 6px}
+.airec-pick{display:flex;flex-direction:column;margin-bottom:6px}
+.airec-pick small{color:var(--muted)}
+.airec-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px}
+.airec-nums>div{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;padding:5px 7px;min-width:0}
+.airec-nums small{color:var(--muted);font-size:11px;line-height:1.25}
+.airec-nums b.warn{color:#cf552d}
+.airec-btns{display:flex;gap:6px;margin-top:8px}
+.airec-btns .act{margin-left:auto}
+@media (max-width:900px){
+  .airec{top:auto;bottom:10px}
+  body.rec-open #app .right, body.rec-open #app .left, body.rec-open #app .dock{visibility:hidden}
+}
+
+/* Filter: project switches and the alone/together readout */
+#left .switch{display:flex;gap:8px;align-items:flex-start;padding:6px 0;cursor:pointer}
+#left .switch input{margin-top:3px;accent-color:var(--accent)}
+#left .switch span{display:flex;flex-direction:column;line-height:1.25}
+#left .switch small{color:var(--muted);font-size:11.5px}
+.mix{display:grid;gap:4px;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:8px}
+.mix>small,.mix-wait{color:var(--muted);font-size:11.5px}
+.mix-row{display:grid;grid-template-columns:minmax(0,1.3fr) 1fr auto;gap:6px;align-items:center;font-size:12.5px}
+.mix-row span{display:flex;flex-direction:column;line-height:1.2}
+.mix-row span small{color:var(--muted);font-size:10.5px}
+.mix-row i{height:8px;border-radius:4px;background:var(--c2);min-width:2px}
+.mix .mix-warn{color:#b8461f}
+
+.better .cmp .num small.now{color:var(--muted)}
+.better .cmp .num small.more{color:var(--muted)}
+.better .cmp .num small.best{color:#0e8a79;font-weight:600}
+.better .cmp.head span small{display:block;font-weight:400;text-transform:none;letter-spacing:0;opacity:.8}

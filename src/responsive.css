@@ -1,0 +1,82 @@
+/* Responsive layout: loaded last, so it wins over styles.css / theme.css at small sizes.
+   Wide (> 900px): panels float beside the map, time dock at the bottom (unchanged).
+   Narrow (<= 900px: a side panel, tablet or phone): one compact top bar, the time dock pinned to the bottom,
+   and Filter / Details open as a bottom sheet over the dock, leaving the top of the map visible.
+   Phone (<= 520px): tighter type and spacing, fewer top-bar stats, icon-only panel toggles. */
+
+@media (max-width: 900px) {
+  /* top bar: brand icon + Resident/Planner + panel toggles on one row, search under it */
+  #app .topbar{left:8px;right:8px;top:8px;gap:6px;flex-wrap:wrap}
+  #app .topcard{padding:4px;gap:4px}
+  #app .topcard:first-child{flex:0 1 auto;min-width:0;overflow:hidden}
+  #app .topcard.panels{margin-left:auto;flex:none}
+  #app .brand h1,#app .bar-div{display:none}
+  #app .tog{padding:6px 10px}
+  #app .search{order:3;flex:1 1 100%;min-width:0;padding:2px 6px 2px 10px}
+  #app .search input{padding:5px 0}
+  #app .ov-strip{gap:10px;padding:4px 8px;min-width:0}
+  #app .ov-strip span:nth-of-type(n+3){display:none}
+
+  /* time dock: full width at the bottom, compact */
+  #app .dock{left:8px;right:8px;bottom:8px;max-width:none;padding:8px 10px;gap:8px;grid-template-columns:1fr;border-radius:16px;z-index:3}
+  #app .dk{gap:6px}
+  #app .dk+.dk{border-left:0;border-top:1px solid rgba(255,255,255,.07);padding:8px 0 0}
+  #app .dk-head strong{font-size:15px}
+  #app .dk-b{width:26px;height:26px}
+  #app .dk-b.play{width:28px;height:28px}
+  /* years scroll sideways instead of squeezing; quarter ticks hidden (the arrows step quarters) */
+  #app .years{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  #app .years::-webkit-scrollbar{display:none}
+  #app .yr{flex:0 0 40px}
+  #app .yr-b{height:26px}
+  #app .qs{display:none}
+  #app .hours{height:22px}
+  #app .hticks{font-size:9.5px}
+
+  /* Filter and Details: a bottom sheet over the dock; the map stays visible above it */
+  #app .right,#app .left,#app.dock-left .right,#app.dock-left .left{
+    left:0;right:0;top:auto;bottom:0;width:auto;height:min(60%,calc(100% - 120px));max-height:none;
+    border-radius:18px 18px 0 0;border-bottom:0;z-index:6;transform:none}
+  #app .left{overflow-y:auto;padding:14px 14px 20px}
+  #app .right::before,#app .left::before{content:"";display:block;width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.22);margin:8px auto 0;flex:none}
+  #app .left::before{margin:-6px auto 4px}
+  #app.pan-folded .right,#app.ctl-folded .left{transform:translateY(24px)}
+  #app .right-head{padding:8px 14px 8px}
+  #app .right-head h2{font-size:16px}
+  #app .right .scroll{padding:12px 14px 24px}
+  /* with a sheet open the dock is covered anyway: hide it so it can't peek out */
+  #app:not(.pan-folded) .dock,#app:not(.ctl-folded) .dock{visibility:hidden}
+  #app .yearstrip{display:none}
+  #app .hint{display:none}
+
+  /* planner flow: compare rows wrap so buttons never squeeze the numbers */
+  #app .cmp{grid-template-columns:minmax(0,1fr) auto}
+  #app .cmp>span:last-child:not(:empty){grid-column:1/-1;display:flex;gap:6px}
+  #app .cmp.head>span:last-child{display:none}
+  #app .tiles{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+  #app .seg.wrap button{flex:1 1 auto}
+}
+
+@media (max-width: 700px) {
+  #app .ov-strip .ov-sk{display:none}   /* keeps the panel toggles on the first row */
+}
+
+@media (max-width: 520px) {
+  #app .tog{font-size:0;gap:0;padding:7px 9px}   /* icon only */
+  #app .tog svg{width:16px;height:16px}
+  #app .topcard .seg button{padding:6px 10px;font-size:12.5px}
+  #app .ov-strip .ov-sk{display:none}
+  #app .ov-strip span:nth-of-type(n+2){display:none}
+  #app .dk-head small{display:none}
+  #app .right,#app .left{height:min(70%,calc(100% - 110px))}
+  #app .step{padding:9px 10px}
+  #app .step h3{font-size:13px}
+  #app .zoning-banner{font-size:11px}
+  #app .tablewrap{overflow-x:auto}
+}
+
+/* very short screens (phone sideways): keep the sheet from covering the whole map */
+@media (max-height: 520px) and (max-width: 900px) {
+  #app .right,#app .left{height:calc(100% - 64px)}
+  #app .search{display:none}
+}
