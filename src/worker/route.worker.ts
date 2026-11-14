@@ -3,6 +3,8 @@
    main runs first, then fix comparisons, then the year scan. Results are cached. */
 import { createAtlas, HOURLY } from '../model/atlas';
 import { createRouter, type Router, type Scenario } from '../model/routing';
+import { slimeRoads, type RoadCandidate } from '../model/physarum';
+import type { XZ } from '../model/types';
 
 export type Req =
   | { type: 'init'; base: string }
@@ -10,13 +12,16 @@ export type Req =
   | { type: 'run'; key: string; sc: Scenario; hours?: boolean }
   | { type: 'hours'; key: string; sc: Scenario }
   | { type: 'years'; key: string; sc: Scenario; from: number; to: number }
-  | { type: 'compare'; key: string; sc: Scenario; options: { id: string; sc: Scenario }[] };
+  | { type: 'compare'; key: string; sc: Scenario; options: { id: string; sc: Scenario }[]; pos?: XZ }
+  | { type: 'slime'; key: string; site: XZ; rad?: number; skipNode?: number | null };
 export type Res =
   | { type: 'ready' } | { type: 'error'; error: string }
-  | { type: 'run'; key: string; with: { vol: Float64Array; tti: Float64Array; vht: number }; without: { vol: Float64Array; tti: Float64Array; vht: number }; ms: number }
+  | { type: 'run'; key: string; with: { vol: Float64Array; tti: Float64Array; vht: number; trips?: number }; without: { vol: Float64Array; tti: Float64Array; vht: number }; ms: number }
   | { type: 'hours'; key: string; hours: { mx: number; avg: number }[] }
   | { type: 'years'; key: string; years: { t: number; vc: Float32Array }[] }
-  | { type: 'compare'; key: string; base: number; options: { id: string; vht: number; vol: Float64Array }[] };
+  | { type: 'compare'; key: string; base: number; options: { id: string; vht: number; vol: Float64Array; worst?: Worst | null; roadVol?: Record<string, { vol: number; vc: number }>; planTrips?: number[] }[]; baseWorst?: Worst | null }
+  | { type: 'slime'; key: string; cands: RoadCandidate[]; sinks: number; ms: number };
+type Worst = { vc: number; name: string };
 
 let R: Router | null = null, A: ReturnType<typeof createAtlas> | null = null;
 let files: any = null, extra: any[] = [];
@@ -26,7 +31,7 @@ function build() {
   R = createRouter(A, graph, zones, cal.calib, hourly);
   cache.clear();
 }
-const ORDER = ['run', 'compare', 'years', 'hours'] as const;
+const ORDER = ['run', 'compare', 'slime', 'years', 'hours'] as const;
 const pending = new Map<string, Req>(); let busy = false;
 const newerRun = () => pending.has('run');
 const cache = new Map<string, any>();
@@ -47,7 +52,7 @@ function handle(m: Req) {
   if (m.type === 'run') {
     const t0 = performance.now();
     const w = runOne(m.sc), wo = runOne({ ...m.sc, withProjects: false });
-    post({ type: 'run', key: m.key, with: { vol: w.vol, tti: w.tti, vht: w.vht }, without: { vol: wo.vol, tti: wo.tti, vht: wo.vht }, ms: Math.round(performance.now() - t0) });
+    post({ type: 'run', key: m.key, with: { vol: w.vol, tti: w.tti, vht: w.vht, trips: w.trips }, without: { vol: wo.vol, tti: wo.tti, vht: wo.vht }, ms: Math.round(performance.now() - t0) });
     if (m.hours) pending.set('hours', { type: 'hours', key: m.key, sc: m.sc });  // the hour bar fills in last
   } else if (m.type === 'hours') {
     {
@@ -70,8 +75,13 @@ function handle(m: Req) {
     post({ type: 'years', key: m.key, years });
   } else if (m.type === 'compare') {
     const base = runOne(m.sc).vht;
-    const options = m.options.map(o => { const r = runOne(o.sc); return { id: o.id, vht: r.vht, vol: r.vol }; });
-    post({ type: 'compare', key: m.key, base, options });
+    /* pos: also report the worst main street within 2 km of it (scene radius 10), for local before/after */
+    const options = m.options.map(o => { const r = runOne(o.sc); return { id: o.id, vht: r.vht, vol: r.vol, roadVol: r.roadVol, planTrips: r.planTrips,
+      worst: m.pos ? R!.localWorst(o.sc, r.vol, m.pos, 10) : null }; });
+    post({ type: 'compare', key: m.key, base, options, baseWorst: m.pos ? R!.localWorst(m.sc, runOne(m.sc).vol, m.pos, 10) : null });
+  } else if (m.type === 'slime') {
+    const t0 = performance.now(), r = slimeRoads(A!, R!, m.site, m.rad, m.skipNode);
+    post({ type: 'slime', key: m.key, cands: r.cands, sinks: r.sinks, ms: Math.round(performance.now() - t0) });
   }
 }
 function pump() {
