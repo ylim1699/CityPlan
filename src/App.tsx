@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createAtlas } from './model/atlas';
-import type { Meta, OsmCity, Project, ProjectsFile } from './model/types';
+import type { BlockGroupsFile, OsmCity, Project, ProjectsFile } from './model/types';
+import { CloseButton } from './components/CloseButton';
+import { BlockDetail, blockSub } from './components/BlockPanel';
 import { AgentPanel } from './components/AgentPanel';
 import { setExtraProjects } from './hooks/useTraffic';
 import type { Scenario, ZonesFile } from './model/routing';
@@ -8,8 +10,7 @@ import { initialState, reducer } from './state';
 import { LAST_I, TODAY_I, tOf } from './ui';
 import { CityScene } from './components/CityScene';
 import { LeftControls } from './components/LeftControls';
-import { Timeline } from './components/Timeline';
-import { AboutDialog } from './components/AboutDialog';
+import { TimeDock } from './components/TimeDock';
 import { PlannerPanel, ProjectDetail, ResidentPanel, residentSub, type Computed } from './components/Panels';
 import type { View } from './scene/view';
 import { useTraffic } from './hooks/useTraffic';
@@ -19,19 +20,27 @@ import { DemoViews, Placement } from './components/Placement';
 import { GhostTools, YearStrip } from './planner/PlannerWorkspace';
 import { GHOST_TYPES, ghostActive, ghostPlans, ghostRoads, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
 import { snapSite, useSuggest } from './planner/suggest';
+import { OverviewPanel, OverviewStrip, useOverview, useOverviewSeries } from './components/Overview';
+import { RecordPill, StartScreen } from './components/StartScreen';
+import { useRecords } from './hooks/useRecords';
+import { MapSearch } from './components/MapSearch';
+import { flowsTo, walmartId } from './model/flows';
 
 type Lay = { ctl: boolean; pan: boolean; left: boolean };
 function loadLayout(): Lay {
   const lay = { ctl: true, pan: true, left: false };
-  try { const sv = JSON.parse(localStorage.getItem('atlas-layout') || 'null'); if (sv) return { ctl: !!sv.ctl, pan: !!sv.pan, left: !!sv.left }; } catch (e) {}
+  try { const sv = JSON.parse(localStorage.getItem('atlas-layout') || 'null'); if (sv) { lay.ctl = !!sv.ctl; lay.pan = !!sv.pan; } } catch (e) {}
   if (window.innerWidth < 1180) lay.ctl = false;
+  if (lay.ctl && lay.pan) lay.ctl = false;  /* Filter and Details share the left side: one at a time */
   return lay;
 }
 
 function loadConfirmed(): Project[] { try { return JSON.parse(localStorage.getItem('atlas-agent-projects') || '[]'); } catch { return []; } }
 
-export function App({ city, projects, metas, cal, zones }: { city: OsmCity; projects: ProjectsFile; metas: Meta[]; cal: CalibFile | null; zones: ZonesFile | null }) {
+export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCity; projects: ProjectsFile; cal: CalibFile | null; zones: ZonesFile | null; blocks?: BlockGroupsFile | null }) {
   const [s, dispatch] = useReducer(reducer, initialState);
+  /* the start screen over the loading city, and the live check for new city records it starts */
+  const rec = useRecords(projects), [start, setStart] = useState(true);
   /* Projects a person confirmed from the AI agent's findings (this browser), on top of projects.json */
   const [confirmed, setConfirmed] = useState<Project[]>(loadConfirmed);
   const saveConfirmed = (list: Project[]) => { setConfirmed(list); try { localStorage.setItem('atlas-agent-projects', JSON.stringify(list)); } catch (e) {} };
@@ -46,9 +55,12 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   useEffect(() => { setExtraProjects(confirmed); }, [rev]);
   const sRef = useRef(s); sRef.current = s;
   const getState = useCallback(() => sRef.current, []);
-  const appRef = useRef<HTMLDivElement>(null), view = useRef<View | null>(null), about = useRef<HTMLDialogElement>(null), body = useRef<HTMLDivElement>(null);
+  const appRef = useRef<HTMLDivElement>(null), view = useRef<View | null>(null), body = useRef<HTMLDivElement>(null);
   const [lay, setLay] = useState(loadLayout);
   const setLayout = (l: Lay) => { setLay(l); try { localStorage.setItem('atlas-layout', JSON.stringify(l)); } catch (e) {} };
+  /* Filter and Details open in the same place on the left: opening one closes the other */
+  const showFilter = (on: boolean) => setLayout({ ...lay, ctl: on, pan: on ? false : lay.pan });
+  const showDetails = (on: boolean) => setLayout({ ...lay, pan: on, ctl: on ? false : lay.ctl });
 
   /* Routed volumes from the worker (with and without projects); the count-based method fills in until they arrive. */
   const t = tOf(s.ti);
@@ -79,9 +91,26 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   const hours = (routing && s.withProjects && tr.hours) || countHours || [];
   /* AI suggestions: open land screened, then judged by the router; they arrive as Suggested ghosts */
   const { suggest, st: suggestSt } = useSuggest(A, sc, c.shown, ghosts, setGhosts, p => view.current?.flyTo(p));
+  /* Overview: headline strip in the top bar (the selected quarter and hour, as the map shows them), opening into the dashboard */
+  const [ovOpen, setOvOpen] = useState(false), [ovShown, setOvShown] = useState(false);
+  useEffect(() => {  /* stay on screen for the closing animation */
+    if (ovOpen) { setOvShown(true); return; }
+    const id = setTimeout(() => setOvShown(false), 200); return () => clearTimeout(id);
+  }, [ovOpen]);
+  const ovIn = { t: c.t, hour: s.hour, pop: c.pop, prm: s.prm, spring: s.spring, fixes: s.fixes, widen: s.widen };
+  const ovS = useOverviewSeries(A, sc, ovIn, routing, ovOpen);
+  const ov = useOverview(A, ovIn, c.withP, c.base, ovS.series);
+  const closeOv = useCallback(() => setOvOpen(false), []);
   const suggestYear = s.ti === TODAY_I ? 2030 : Math.max(2027, Math.floor(c.t));
 
-  useEffect(() => { view.current?.apply(c.shown, c.tp); }, [c, s.layers, s.sel]);
+  useEffect(() => { view.current?.apply(c.shown, c.tp); }, [c, s.layers, s.sel, s.cong, s.block]);
+  /* Shopping filter: arcs from the 40 areas sending the most car trips to the chosen store */
+  const shopFlows = run?.with.flows ?? null;
+  useEffect(() => {
+    const id = zones && (s.flow || walmartId(zones));
+    const f = s.layers.flows && zones && shopFlows && id ? flowsTo(zones, shopFlows, id, blocks?.groups ?? null, A.S) : null;
+    view.current?.setFlows(f ? f.rows.slice(0, 40).map(r => ({ a: r.pos, b: f.pos, n: r.n })) : null);
+  }, [A, zones, blocks, shopFlows, s.flow, s.layers.flows]);
   /* ghosts on the map: planner mode only; double-click one to move it */
   useEffect(() => {
     const list = s.mode !== 'planner' ? [] : ghosts.map(g => { const ty = GHOST_TYPES[g.kind], act = ghostActive(g, c.t);
@@ -104,10 +133,13 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
 
   const select = (id: string | null) => {
     dispatch({ type: 'select', id });
-    if (id && !lay.pan) setLayout({ ...lay, pan: true });
+    if (id && !lay.pan) showDetails(true);
     if (id) { const p = A.byId(id); if (p?.pos) view.current?.flyTo(p.pos); }
   };
-  const panelKey = s.sel ? 'd:' + s.sel : s.mode;
+  /* a Census block group clicked on the map (blocks layer) opens in the panel */
+  const block = s.block && blocks ? blocks.groups.find(b => b.id === s.block) ?? null : null;
+  const pickBlock = (id: string | null) => { dispatch({ type: 'block', id }); if (id && !lay.pan) showDetails(true); };
+  const panelKey = s.sel ? 'd:' + s.sel : block ? 'b:' + block.id : s.mode;
   useEffect(() => { if (body.current) body.current.scrollTop = 0; }, [panelKey]);
 
   /* Play the day (hour by hour) and play through time (quarter by quarter) */
@@ -129,15 +161,16 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   const onPlay = () => { if (playing) { setPlaying(false); return; } if (s.ti >= LAST_I) dispatch({ type: 'ti', ti: TODAY_I }); setPlaying(true); };
 
   const g = A.gaps(c.t, s.prm, c.pop);
-  const title = s.sel ? A.byId(s.sel)!.name : s.mode === 'resident' ? 'What is changing in Rexburg' : 'Planner view';
-  const sub = s.sel ? A.byId(s.sel)!.where : s.mode === 'resident' ? residentSub(A, c) : qLabel2(c, s.withProjects);
+  const title = s.sel ? A.byId(s.sel)!.name : block ? block.name : s.mode === 'resident' ? 'What is changing in Rexburg' : 'Planner view';
+  const sub = s.sel ? A.byId(s.sel)!.where : block ? blockSub(block) : s.mode === 'resident' ? residentSub(A, c) : qLabel2(c, s.withProjects);
   const props = { A, s, c, dispatch, select };
   const fly = (pos: [number, number]) => view.current?.flyTo(pos);
   const methodNote = <p className="note" style={{ margin: 0 }}>{routing ? (tr.status === 'ready' ? 'Street loads come from routing every trip in town through the street network.' : tr.status === 'error' ? 'Routing failed to start; showing the count-based estimate.' : 'Routing trips… showing the count-based estimate until it finishes.') : 'Showing the count-based estimate (city counts plus nearby project trips), not routed trips.'}</p>;
   const residentExtra = routing ? <><ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={3} onFly={fly} />{methodNote}</> : undefined;
   const plannerExtra = <>
     <DemoViews dispatch={dispatch} />
-    <AgentPanel A={A} base={projects} confirmed={confirmed} pick={cb => view.current?.pick(cb)}
+    <AgentPanel A={A} base={projects} confirmed={confirmed} pick={cb => view.current?.pick(cb)} flyTo={fly} highlight={l => view.current?.setHighlight(l)}
+      onSaved={() => { saveConfirmed([]); location.reload(); }}
       onConfirm={p => { saveConfirmed(confirmed.filter(x => x.id !== p.id).concat([p])); setTimeout(() => select(p.id), 300); }}
       onRemove={id => { if (s.sel === id) dispatch({ type: 'select', id: null }); saveConfirmed(confirmed.filter(x => x.id !== id)); }} />
     <div><p className="sec">Traffic method</p><div className="seg" role="group" aria-label="Traffic method" style={{ marginBottom: 6 }}>
@@ -145,7 +178,7 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
       <button aria-pressed={s.method === 'counts'} onClick={() => dispatch({ type: 'view', patch: { method: 'counts' } })}>Count-based</button></div>{methodNote}</div>
     {routing && <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner added={ghostSupply(ghosts, c.t)}
       onApply={o => dispatch({ type: 'view', patch: { fixes: o.fixes, widen: o.widen } })}
-      onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); setLay(l => ({ ...l, pan: true })); }} />}
+      onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); setLay(l => ({ ...l, pan: true, ctl: false })); }} />}
     {routing && cal && <AccuracyPanel cal={cal} />}
     {routing && zones && <Placement A={A} sc={sc} zones={zones} />}
   </>;
@@ -153,35 +186,54 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
     pick={cb => view.current?.pick(cb)} flyTo={fly} target={() => view.current ? view.current.target() : null}
     suggest={suggest} suggestSt={suggestSt} highlight={l => view.current?.setHighlight(l)} />
     : <div className="zoning-banner err" role="status"><b>Ghost projects need routed trips.</b> Switch the traffic method to Routed trips (zones.json must load).</div>;
-  const cls = [!lay.ctl && 'ctl-folded', !lay.pan && 'pan-folded', lay.left && 'dock-left'].filter(Boolean).join(' ');
+  const cls = [!lay.ctl && 'ctl-folded', !lay.pan && 'pan-folded'].filter(Boolean).join(' ');
 
   return <div id="app" ref={appRef} className={cls}>
-    <CityScene ref={view} A={A} getState={getState} onSelect={id => select(id)} appRef={appRef} />
+    <CityScene ref={view} A={A} getState={getState} onSelect={id => select(id)} appRef={appRef} blocks={blocks?.groups ?? null} onBlock={pickBlock}
+      zones={zones} zoneStats={run ? (s.withProjects ? run.with.zone : run.without.zone) ?? null : null} />
     <div className="topbar">
-      <div className="card brand"><h1>Rexburg Growth Atlas</h1><small>What is built, what is coming, and where traffic builds up</small></div>
-      <div className="card mode"><div className="seg" role="group" aria-label="View for">
-        <button aria-pressed={s.mode === 'resident'} onClick={() => dispatch({ type: 'mode', mode: 'resident' })}>Resident</button>
-        <button aria-pressed={s.mode === 'planner'} onClick={() => dispatch({ type: 'mode', mode: 'planner' })}>Planner</button>
-      </div></div>
-      <button className="tog" aria-pressed={lay.ctl} onClick={() => setLayout({ ...lay, ctl: !lay.ctl })}>Controls</button>
-      <button className="tog" aria-pressed={lay.pan} onClick={() => setLayout({ ...lay, pan: !lay.pan })}>Details</button>
-      <button className="chip" onClick={() => about.current?.showModal()}><b></b>Model, not measurement</button>
+      <div className="card topcard">
+        <div className="brand" title="Rexburg Growth Atlas: what is built, what is coming, and where traffic builds up">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" /><path d="M8 24h16M11 24V15h4v9M18 24V9h4v15" /></svg>
+          <h1><small>Rexburg</small>Growth Atlas</h1></div>
+        <i className="bar-div" />
+        <div className="seg" role="group" aria-label="View for">
+          <button aria-pressed={s.mode === 'resident'} onClick={() => dispatch({ type: 'mode', mode: 'resident' })}>Resident</button>
+          <button aria-pressed={s.mode === 'planner'} onClick={() => dispatch({ type: 'mode', mode: 'planner' })}>Planner</button>
+        </div>
+        <i className="bar-div" />
+        <OverviewStrip o={ov} t={c.t} hour={s.hour} withProjects={s.withProjects} open={ovOpen} onOpen={() => setOvOpen(!ovOpen)} />
+      </div>
+      <MapSearch A={A} zones={zones} onPick={(pos, label) => { view.current?.mark(pos, label); if (pos) view.current?.flyTo(pos); }} />
+      {/* panel toggles, in their own card at the top right */}
+      <div className="card topcard panels">
+        <button className="tog" aria-pressed={lay.ctl} onClick={() => showFilter(!lay.ctl)}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M4.5 8h7M7 12h2" /></svg>Filter</button>
+        <button className="tog" aria-pressed={lay.pan} onClick={() => showDetails(!lay.pan)}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="2" /><path d="M10 2.5v11" /></svg>Details</button>
+      </div>
     </div>
-    <LeftControls A={A} s={s} dispatch={dispatch} hours={hours} dayPlaying={dayPlaying} onDayPlay={() => setDayPlaying(!dayPlaying)} onStopDay={() => setDayPlaying(false)} onFold={() => setLayout({ ...lay, ctl: false })} />
+    <LeftControls s={s} dispatch={dispatch} onFold={() => showFilter(false)} hasBlocks={!!blocks} hasZones={!!zones && !!blocks}
+      zones={zones} blocks={blocks?.groups ?? null} flows={routing ? shopFlows : null} S={A.S} />
     <section className="card right" aria-live="polite">
       <div className="right-head"><div className="row" style={{ justifyContent: 'flex-end', marginBottom: 6 }}>
-        <button className="mini" onClick={() => setLayout({ ...lay, left: !lay.left })}>{lay.left ? 'Move right →' : '← Move left'}</button>
-        <button className="mini" onClick={() => setLayout({ ...lay, pan: false })}>Hide</button></div>
-        <h2>{title}</h2><p>{sub}</p></div>
+        <CloseButton label="Hide details" onClick={() => showDetails(false)} /></div>
+        <h2 key={title}>{title}</h2><p key={sub}>{sub}</p></div>
       <div className="scroll" ref={body}>
-        {s.sel ? <ProjectDetail {...props} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <PlannerPanel {...props} extra={<>{ghostTools}{plannerExtra}</>} />}
+        {s.sel ? <ProjectDetail {...props} /> : block && blocks ? <BlockDetail b={block} meta={blocks.meta} onClose={() => pickBlock(null)} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <PlannerPanel {...props} extra={<>{ghostTools}{plannerExtra}</>} />}
       </div>
     </section>
-    <div className="hint" aria-hidden="true">Drag to move · pinch to zoom · two-finger swipe to turn and tilt</div>
+    {ovShown && <OverviewPanel closing={!ovOpen} A={A} o={ov} stale={ovS.stale} t={c.t} hour={s.hour} onPeak={() => { setDayPlaying(false); dispatch({ type: 'hour', hour: 17 }); }}
+      routed={routing} ghosts={plans.length + roads.length > 0} withProjects={s.withProjects} setWithProjects={w => dispatch({ type: 'scenario', withProjects: w })} onClose={closeOv} onFly={fly} />}
+    <div className="hint" aria-hidden="true"><span>Drag to move</span><span>Scroll or pinch to zoom</span><span>Right-drag to tilt and turn</span></div>
     <div className="osm-credit">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
     {s.mode === 'planner' && <YearStrip A={A} s={s} c={c} dispatch={dispatch} ghosts={ghosts} trips={tr.run ? tr.run.with.trips ?? null : null} />}
-    <Timeline ti={s.ti} t={c.t} total={g.pop.total} playing={playing} onPlay={onPlay} onChange={ti => dispatch({ type: 'ti', ti })} />
-    <AboutDialog ref={about} A={A} metas={metas} />
+    <TimeDock A={A} ti={s.ti} t={c.t} total={g.pop.total} playing={playing} onPlay={onPlay} onChange={ti => dispatch({ type: 'ti', ti })}
+      hour={s.hour} hours={hours} dayPlaying={dayPlaying} onDayPlay={() => setDayPlaying(!dayPlaying)} onHour={h => { setDayPlaying(false); dispatch({ type: 'hour', hour: h }); }}
+      speed={s.speed} onSpeed={v => dispatch({ type: 'view', patch: { speed: v } })} />
+    {!start && <RecordPill rec={rec} onOpen={() => setStart(true)} />}
+    {start && <StartScreen rec={rec} onEnter={() => setStart(false)}
+      onReview={() => { setStart(false); dispatch({ type: 'mode', mode: 'planner' }); showDetails(true); }} />}
   </div>;
 }
 function qLabel2(c: Computed, withProjects: boolean) {
