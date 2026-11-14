@@ -28,13 +28,15 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   const camera = new T.PerspectiveCamera(38, 1, 0.05, 400);
   const home = A.M(C.places.campus);
   camera.position.set(home[0] + 5, 26, home[1] / 2 + 24);
-  /* Map controls (from the UI sandbox): left-drag moves the map, right-drag tilts and turns; the wheel handler below
-     zooms toward the pointer (mouse wheel or pinch) and tilts/turns on a two-finger trackpad scroll */
+  /* Map controls (Ben's spec): click-and-drag only moves you across the map. Two fingers on a trackpad do the rest:
+     pinch zooms toward the pointer, swipe left/right turns a full 360, swipe up/down tilts from straight down to nearly
+     flat on the ground (handled in onWheel below). Right-drag also turns and tilts, for a mouse. */
   const controls = new MapControls(camera, canvas);
   controls.enableZoom = false; controls.screenSpacePanning = false; controls.rotateSpeed = 0.55; controls.panSpeed = 1;
+  controls.mouseButtons = { LEFT: T.MOUSE.PAN, MIDDLE: T.MOUSE.PAN, RIGHT: T.MOUSE.ROTATE };
   controls.target.set(home[0] * 0.5, 0, home[1] * 0.5);
   controls.enableDamping = true; controls.dampingFactor = 0.12;
-  controls.maxPolarAngle = 1.42; controls.minDistance = 1.5; controls.maxDistance = 90;
+  controls.maxPolarAngle = 1.5; controls.minDistance = 0.35; controls.maxDistance = 90;  /* 1.5 rad = nearly flat; 0.35 = about 70 m away */
   controls.update();
   const hemi = new T.HemisphereLight(0xffffff, 0xb9c4bd, 0.9); scene.add(hemi);
   const sun = new T.DirectionalLight(0xffffff, 0.5); sun.position.set(-12, 30, 14); scene.add(sun); scene.add(sun.target);
@@ -339,7 +341,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     grey.setHex(0x3f3a35).lerp(new T.Color(0x1c1a18), 1 - d);
     lastLights = st.lights;
   }
-  let fly: any = null, raf = 0, zoomVel = 0, tiltVel = 0, turnVel = 0, zoomAt: T.Vector3 | null = null;
+  let fly: any = null, raf = 0, zoomVel = 0, tiltVel = 0, turnVel = 0, zoomAt: T.Vector3 | null = null, lastSwipe = -1e9;
   const clock = new T.Clock(), compass = els.compass.firstElementChild as HTMLElement;
   function frame() {
     const dt = Math.min(clock.getDelta(), 0.05);
@@ -392,10 +394,18 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     e.preventDefault();
     let dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
     dy = Math.max(-400, Math.min(400, dy));
-    /* trackpad two-finger scroll: small pixel deltas, often with a sideways part; a mouse wheel sends larger whole steps */
-    const trackpad = !e.ctrlKey && e.deltaMode === 0 && (e.deltaX !== 0 || Math.abs(e.deltaY) < 50 || e.deltaY % 1 !== 0);
-    if (trackpad && !e.shiftKey) { tiltVel += dy * 0.0032; turnVel += Math.max(-80, Math.min(80, e.deltaX)) * 0.0032; fly = null; return; }
-    zoomVel += dy * (e.ctrlKey ? 0.012 : 0.0021);  /* pinch arrives as ctrl + wheel */
+    /* Pinch arrives as ctrl + wheel: always zoom. A two-finger swipe sends pixel deltas with a sideways part or
+       fractions; once a swipe is seen, the rest of that gesture (including big fast deltas) stays a swipe for 0.6 s,
+       so it never flips into zooming halfway. A mouse wheel (whole steps, no sideways part) zooms. Shift forces zoom. */
+    const now = performance.now();
+    if (!e.ctrlKey && e.deltaMode === 0 && (e.deltaX !== 0 || !Number.isInteger(e.deltaY) || Math.abs(e.deltaY) < 40)) lastSwipe = now;
+    const swipe = !e.ctrlKey && !e.shiftKey && e.deltaMode === 0 && now - lastSwipe < 600;
+    if (swipe) {
+      tiltVel += Math.max(-80, Math.min(80, dy)) * 0.004;           /* up/down: tilt */
+      turnVel += Math.max(-80, Math.min(80, e.deltaX)) * 0.006;     /* left/right: turn, all the way around */
+      fly = null; return;
+    }
+    zoomVel += dy * (e.ctrlKey ? 0.012 : 0.0021);
     const r = canvas.getBoundingClientRect();
     wNdc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); wRay.setFromCamera(wNdc, camera);
     const d = camera.position.distanceTo(controls.target);

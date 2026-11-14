@@ -177,7 +177,7 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
         {s.sel ? <ProjectDetail {...props} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <PlannerPanel {...props} extra={<>{ghostTools}{plannerExtra}</>} />}
       </div>
     </section>
-    <div className="hint" aria-hidden="true">Drag to move · scroll or pinch to zoom · right-drag or two-finger scroll to tilt and turn</div>
+    <div className="hint" aria-hidden="true">Drag to move · pinch to zoom · two-finger swipe to turn and tilt</div>
     <div className="osm-credit">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
     {s.mode === 'planner' && <YearStrip A={A} s={s} c={c} dispatch={dispatch} ghosts={ghosts} trips={tr.run ? tr.run.with.trips ?? null : null} />}
     <Timeline ti={s.ti} t={c.t} total={g.pop.total} playing={playing} onPlay={onPlay} onChange={ti => dispatch({ type: 'ti', ti })} />
