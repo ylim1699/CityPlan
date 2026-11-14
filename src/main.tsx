@@ -2,6 +2,16 @@ import { createRoot } from 'react-dom/client';
 import type { Meta, OsmCity, ProjectsFile } from './model/types';
 import { App } from './App';
 import './styles.css';
+import './theme.css';
+
+/* On-screen error box (from the UI sandbox): a failure shows in red instead of a silent blank map */
+function showError(msg: string) {
+  let b = document.getElementById('errbox');
+  if (!b) { b = document.createElement('div'); b.id = 'errbox'; b.setAttribute('role', 'alert'); document.body.appendChild(b); }
+  b.textContent = (b.textContent ? b.textContent + '\n' : '') + msg; b.style.display = 'block';
+}
+window.addEventListener('error', e => showError('Error: ' + (e.message || e.error)));
+window.addEventListener('unhandledrejection', e => showError('Error: ' + String(e.reason)));
 
 /* Load the snapshot files from public/data, build the model, render. */
 async function start() {

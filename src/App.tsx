@@ -17,7 +17,8 @@ import { AccuracyPanel, type CalibFile } from './components/AccuracyPanel';
 import { ProblemCards } from './components/ProblemCards';
 import { DemoViews, Placement } from './components/Placement';
 import { GhostTools, YearStrip } from './planner/PlannerWorkspace';
-import { GHOST_TYPES, ghostActive, ghostPlans, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
+import { GHOST_TYPES, ghostActive, ghostPlans, ghostRoads, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
+import { snapSite, useSuggest } from './planner/suggest';
 
 type Lay = { ctl: boolean; pan: boolean; left: boolean };
 function loadLayout(): Lay {
@@ -52,7 +53,8 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   /* Routed volumes from the worker (with and without projects); the count-based method fills in until they arrive. */
   const t = tOf(s.ti);
   const plans = useMemo(() => s.mode === 'planner' ? ghostPlans(ghosts, t) : [], [s.mode, ghosts, t]);
-  const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev, ...(plans.length ? { plans } : {}) }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev, plans]);
+  const roads = useMemo(() => s.mode === 'planner' ? ghostRoads(ghosts, t) : [], [s.mode, ghosts, t]);
+  const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev, ...(plans.length ? { plans } : {}), ...(roads.length ? { roads } : {}) }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev, plans, roads]);
   const routing = s.method === 'routed' && !!zones;
   const tr = useTraffic(sc, routing);
   const run = routing ? tr.stale : null;
@@ -75,20 +77,28 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
     return out;
   }, [A, c.t, c.pop, s.spring, s.fixes, s.widen, s.withProjects, routing, !!tr.hours]);
   const hours = (routing && s.withProjects && tr.hours) || countHours || [];
+  /* AI suggestions: open land screened, then judged by the router; they arrive as Suggested ghosts */
+  const { suggest, st: suggestSt } = useSuggest(A, sc, c.shown, ghosts, setGhosts, p => view.current?.flyTo(p));
+  const suggestYear = s.ti === TODAY_I ? 2030 : Math.max(2027, Math.floor(c.t));
 
   useEffect(() => { view.current?.apply(c.shown, c.tp); }, [c, s.layers, s.sel]);
   /* ghosts on the map: planner mode only; double-click one to move it */
   useEffect(() => {
     const list = s.mode !== 'planner' ? [] : ghosts.map(g => { const ty = GHOST_TYPES[g.kind], act = ghostActive(g, c.t);
       return { id: g.id, pos: g.pos, w: ty.w, d: ty.d, h: ty.h, n: ty.n, status: g.status, active: act,
-        label: (g.status === 'suggested' ? 'Suggested · ' : '') + ty.label + (act || g.status === 'suggested' ? '' : ' · from ' + g.year) }; });
+        label: (g.status === 'suggested' ? 'Suggested · ' : '') + ty.label + (act || g.status === 'suggested' ? '' : ' · from ' + g.year),
+        roads: (g.roads || []).map((r, i) => ({ pts: r.pts, status: r.status, label: r.status === 'suggested' ? 'Road option ' + (i + 1) : '' })) }; });
     view.current?.setGhosts(list, ghostSel);
   }, [A, ghosts, ghostSel, s.mode, c.t]);
   const ghostsRef = useRef(ghosts); ghostsRef.current = ghosts;
   useEffect(() => {
     view.current?.onGhost(e => {
       setGhostSel(e.id);
-      if (e.type === 'move') setGhosts(ghostsRef.current.map(g => g.id === e.id ? { ...g, pos: e.pos } : g));
+      if (e.type !== 'move') return;
+      const list = ghostsRef.current, me = list.find(g => g.id === e.id); if (!me) return;
+      const pl = snapSite(A, me.kind, e.pos, list.filter(g => g.id !== e.id));  /* placement rules */
+      /* a moved project loses its access roads: they were drawn from the old site */
+      setGhosts(list.map(g => g.id === e.id ? { ...g, pos: pl.pos, place: { moved: pl.moved, ok: pl.ok, lot: pl.lot }, roads: undefined } : g));
     });
   }, [A]);
 
@@ -104,17 +114,18 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   const [dayPlaying, setDayPlaying] = useState(false), [playing, setPlaying] = useState(false);
   useEffect(() => {
     if (!dayPlaying) return;
-    const id = setInterval(() => dispatch({ type: 'hour', hour: sRef.current.hour + 1 }), 650);
+    /* one hour per 3 s at 1x, so the light can glide between hours (Demo speed scales it) */
+    const id = setInterval(() => dispatch({ type: 'hour', hour: sRef.current.hour + 1 }), 3000 / (s.speed || 1));
     return () => clearInterval(id);
-  }, [dayPlaying]);
+  }, [dayPlaying, s.speed]);
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => {
       if (sRef.current.ti >= LAST_I) { setPlaying(false); return; }
       dispatch({ type: 'ti', ti: sRef.current.ti + 1 });
-    }, 750);
+    }, 1500 / (s.speed || 1));
     return () => clearInterval(id);
-  }, [playing]);
+  }, [playing, s.speed]);
   const onPlay = () => { if (playing) { setPlaying(false); return; } if (s.ti >= LAST_I) dispatch({ type: 'ti', ti: TODAY_I }); setPlaying(true); };
 
   const g = A.gaps(c.t, s.prm, c.pop);
@@ -132,12 +143,15 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
     <div><p className="sec">Traffic method</p><div className="seg" role="group" aria-label="Traffic method" style={{ marginBottom: 6 }}>
       <button aria-pressed={s.method === 'routed'} onClick={() => dispatch({ type: 'view', patch: { method: 'routed' } })} disabled={!zones}>Routed trips</button>
       <button aria-pressed={s.method === 'counts'} onClick={() => dispatch({ type: 'view', patch: { method: 'counts' } })}>Count-based</button></div>{methodNote}</div>
-    {routing && <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner />}
+    {routing && <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner added={ghostSupply(ghosts, c.t)}
+      onApply={o => dispatch({ type: 'view', patch: { fixes: o.fixes, widen: o.widen } })}
+      onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); setLay(l => ({ ...l, pan: true })); }} />}
     {routing && cal && <AccuracyPanel cal={cal} />}
     {routing && zones && <Placement A={A} sc={sc} zones={zones} />}
   </>;
   const ghostTools = routing ? <GhostTools A={A} s={s} c={c} sc={sc} dispatch={dispatch} ghosts={ghosts} setGhosts={setGhosts} selId={ghostSel} setSel={setGhostSel}
-    pick={cb => view.current?.pick(cb)} flyTo={fly} target={() => view.current ? view.current.target() : null} />
+    pick={cb => view.current?.pick(cb)} flyTo={fly} target={() => view.current ? view.current.target() : null}
+    suggest={suggest} suggestSt={suggestSt} highlight={l => view.current?.setHighlight(l)} />
     : <div className="zoning-banner err" role="status"><b>Ghost projects need routed trips.</b> Switch the traffic method to Routed trips (zones.json must load).</div>;
   const cls = [!lay.ctl && 'ctl-folded', !lay.pan && 'pan-folded', lay.left && 'dock-left'].filter(Boolean).join(' ');
 
@@ -163,7 +177,7 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
         {s.sel ? <ProjectDetail {...props} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <PlannerPanel {...props} extra={<>{ghostTools}{plannerExtra}</>} />}
       </div>
     </section>
-    <div className="hint" aria-hidden="true">Drag to turn · scroll to zoom · right-drag to move</div>
+    <div className="hint" aria-hidden="true">Drag to move · scroll or pinch to zoom · right-drag or two-finger scroll to tilt and turn</div>
     <div className="osm-credit">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
     {s.mode === 'planner' && <YearStrip A={A} s={s} c={c} dispatch={dispatch} ghosts={ghosts} trips={tr.run ? tr.run.with.trips ?? null : null} />}
     <Timeline ti={s.ti} t={c.t} total={g.pop.total} playing={playing} onPlay={onPlay} onChange={ti => dispatch({ type: 'ti', ti })} />

@@ -19,6 +19,15 @@ export function LeftControls({ A, s, dispatch, hours, dayPlaying, onDayPlay, onS
         {[[8, '8 am'], [12, 'Noon'], [17, '5 pm'], [22, '10 pm']].map(([h, l]) =>
           <button key={h} aria-pressed={s.hour === h} onClick={() => setHour(h as number)}>{l}</button>)}
       </div></div>
+    <div><p className="sec">Demo speed</p>
+      <div className="seg" role="group" aria-label="Demo speed">
+        {[[0.25, '¼×', 'An hour every 12 seconds'], [0.5, '½×', 'An hour every 6 seconds'], [1, '1×', 'An hour every 3 seconds'], [2, '2×', 'An hour every 1.5 seconds'], [4, '4×', 'An hour every 0.75 seconds']].map(([v, l, t]) =>
+          <button key={v as number} title={t as string} aria-pressed={s.speed === v} onClick={() => dispatch({ type: 'view', patch: { speed: v as number } })}>{l}</button>)}
+      </div></div>
+    <div><p className="sec">City lights at night</p>
+      <input type="range" min={0} max={1.5} step={0.05} value={s.lights} aria-label="City lights at night" style={{ width: '100%' }}
+        onChange={e => dispatch({ type: 'view', patch: { lights: +e.target.value } })} />
+      <small style={{ color: 'var(--muted)' }}>Windows and streetlights after dark · {Math.round(s.lights * 100)}%</small></div>
     <div><p className="sec">Compare</p>
       <div className="seg" role="group" aria-label="Scenario">
         <button aria-pressed={s.withProjects} onClick={() => dispatch({ type: 'scenario', withProjects: true })}>With projects</button>
@@ -38,8 +47,8 @@ export function LeftControls({ A, s, dispatch, hours, dayPlaying, onDayPlay, onS
       </div></div>
     <div><p className="sec">Buildings</p>
       <div className="legend">
-        <div><span className="sw box" style={{ background: '#f4f5f1', border: '1px solid #c9d1cc' }}></span>Existing (OpenStreetMap)</div>
-        <div><span className="sw box" style={{ background: '#cfd3cf' }}></span>Parking lot</div>
+        <div><span className="sw box" style={{ background: '#d8c8a8', border: '1px solid #7b7b79' }}></span>Existing (OpenStreetMap)</div>
+        <div><span className="sw box" style={{ background: '#6f6a60' }}></span>Parking lot</div>
         <div><span className="sw box" style={{ background: 'var(--build)' }}></span>Under construction</div>
         <div><span className="sw box ghost"></span>Approved, not started</div>
         <div><span className="sw box" style={{ background: 'none', border: '2px solid var(--planned)' }}></span>Widening, no date</div>
