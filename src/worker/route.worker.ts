@@ -13,14 +13,16 @@ export type Req =
   | { type: 'hours'; key: string; sc: Scenario }
   | { type: 'years'; key: string; sc: Scenario; from: number; to: number }
   | { type: 'compare'; key: string; sc: Scenario; options: { id: string; sc: Scenario }[]; pos?: XZ }
-  | { type: 'slime'; key: string; site: XZ; rad?: number; skipNode?: number | null };
+  | { type: 'slime'; key: string; site: XZ; rad?: number; skipNode?: number | null }
+  | { type: 'judge'; key: string; sc: Scenario; options: { id: string; sc: Scenario }[] };
 export type Res =
   | { type: 'ready' } | { type: 'error'; error: string }
   | { type: 'run'; key: string; with: { vol: Float64Array; tti: Float64Array; vht: number; trips?: number }; without: { vol: Float64Array; tti: Float64Array; vht: number }; ms: number }
   | { type: 'hours'; key: string; hours: { mx: number; avg: number }[] }
   | { type: 'years'; key: string; years: { t: number; vc: Float32Array }[] }
   | { type: 'compare'; key: string; base: number; options: { id: string; vht: number; vol: Float64Array; worst?: Worst | null; roadVol?: Record<string, { vol: number; vc: number }>; planTrips?: number[] }[]; baseWorst?: Worst | null }
-  | { type: 'slime'; key: string; cands: RoadCandidate[]; sinks: number; ms: number };
+  | { type: 'slime'; key: string; cands: RoadCandidate[]; sinks: number; ms: number }
+  | { type: 'judge'; key: string; base: number; options: { id: string; vht: number; planTrips?: number[] }[] };
 type Worst = { vc: number; name: string };
 
 let R: Router | null = null, A: ReturnType<typeof createAtlas> | null = null;
@@ -79,6 +81,9 @@ function handle(m: Req) {
     const options = m.options.map(o => { const r = runOne(o.sc); return { id: o.id, vht: r.vht, vol: r.vol, roadVol: r.roadVol, planTrips: r.planTrips,
       worst: m.pos ? R!.localWorst(o.sc, r.vol, m.pos, 10) : null }; });
     post({ type: 'compare', key: m.key, base, options, baseWorst: m.pos ? R!.localWorst(m.sc, runOne(m.sc).vol, m.pos, 10) : null });
+  } else if (m.type === 'judge') {  /* like compare, but queued per key so other panels' compares never drop it */
+    const base = runOne(m.sc).vht;
+    post({ type: 'judge', key: m.key, base, options: m.options.map(o => { const r = runOne(o.sc); return { id: o.id, vht: r.vht, planTrips: r.planTrips }; }) });
   } else if (m.type === 'slime') {
     const t0 = performance.now(), r = slimeRoads(A!, R!, m.site, m.rad, m.skipNode);
     post({ type: 'slime', key: m.key, cands: r.cands, sinks: r.sinks, ms: Math.round(performance.now() - t0) });
@@ -87,7 +92,8 @@ function handle(m: Req) {
 function pump() {
   if (busy || !pending.size || !R) return;
   busy = true;
-  const t = ORDER.find(k => pending.has(k))!, m = pending.get(t)!; pending.delete(t);
+  /* main run, then compares and slime, then queued judge jobs (oldest first), then the year and hour scans */
+  const t = ORDER.slice(0, 3).find(k => pending.has(k)) ?? [...pending.keys()].find(k => k.startsWith('judge:')) ?? ORDER.find(k => pending.has(k))!, m = pending.get(t)!; pending.delete(t);
   try { handle(m); } catch (e) { post({ type: 'error', error: String(e) }); }
   busy = false;
   if (pending.size) setTimeout(pump, 0);
@@ -106,6 +112,6 @@ self.onmessage = async (e: MessageEvent<Req>) => {
     return;
   }
   if (m.type === 'projects') { extra = m.extra; if (files) build(); return; }
-  pending.set(m.type, m);
+  pending.set(m.type === 'judge' ? 'judge:' + m.key : m.type, m);
   setTimeout(pump, 0);
 };

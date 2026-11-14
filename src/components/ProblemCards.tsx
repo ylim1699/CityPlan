@@ -9,10 +9,14 @@ import type { CalibFile } from './AccuracyPanel';
 import { send, useWorkerMessages } from '../hooks/useTraffic';
 import { CCOL, FIXES, fmt, hourLabel, pct } from '../ui';
 
-type Props = { A: Atlas; s: State; c: Computed; sc: Scenario; tti: Float64Array | null; cal: CalibFile | null; n: number; onFly: (pos: [number, number]) => void; planner?: boolean };
+type Props = { A: Atlas; s: State; c: Computed; sc: Scenario; tti: Float64Array | null; cal: CalibFile | null; n: number; onFly: (pos: [number, number]) => void; planner?: boolean;
+  /* Planner actions: apply a compared fix (its scenario's fixes and widenings), or ask for suggested sites for a shortfall */
+  onApply?: (sc: Scenario) => void; onSuggest?: (kind: 'student' | 'homes' | 'parking', n: number, why: string) => void;
+  /* beds, homes and spaces the planner's own projects add this year (counted against the shortfalls) */
+  added?: { beds: number; units: number; spaces: number } };
 type Prob = { road: string; segs: number[]; vc: number; delta: number; mid: [number, number]; near: string; tti: number };
 
-export function ProblemCards({ A, s, c, sc, tti, cal, n, onFly, planner }: Props) {
+export function ProblemCards({ A, s, c, sc, tti, cal, n, onFly, planner, onApply, onSuggest, added }: Props) {
   const probs: Prob[] = useMemo(() => {
     const by: Record<string, Prob> = {};
     c.shown.forEach((r, i) => {
@@ -50,7 +54,7 @@ export function ProblemCards({ A, s, c, sc, tti, cal, n, onFly, planner }: Props
   const cmpKey = (p: Prob) => JSON.stringify({ ...sc, k: 'cmp', road: p.road });
   useWorkerMessages(m => { if (m.type === 'compare') setCmp(cur => cur && cur.key === m.key ? { ...cur, base: m.base, options: m.options } : cur); });
   function compare(p: Prob) {
-    const options = FIXES.map(f => ({ id: f.k, sc: { ...sc, fixes: sc.fixes.filter(x => x.road !== p.road).concat([{ road: p.road, at: p.mid, factor: f.f, label: f.l }]) } }));
+    const options = FIXES.map(f => ({ id: f.k, sc: { ...sc, fixes: sc.fixes.filter(x => x.road !== p.road).concat([{ road: p.road, at: p.mid, factor: f.f, label: f.l + ', ' + p.road + ' near ' + p.near }]) } }));
     A.WIDEN.forEach(w => { if (p.segs.some(i => w.set[i]) && !sc.widen.includes(w.id)) options.push({ id: w.id, sc: { ...sc, widen: sc.widen.concat([w.id]) } }); });
     const key = cmpKey(p);
     setCmp({ key, road: p.road, base: 0, scs: Object.fromEntries(options.map(o => [o.id, o.sc])), options: [] });
@@ -58,12 +62,14 @@ export function ProblemCards({ A, s, c, sc, tti, cal, n, onFly, planner }: Props
   }
   const label = (id: string) => FIXES.find(f => f.k === id)?.l || ('Build: ' + (A.WIDEN.find(w => w.id === id)?.name || id));
 
-  const g = A.gaps(c.t, s.prm, c.pop);
+  const g0 = A.gaps(c.t, s.prm, c.pop), ad = added || { beds: 0, units: 0, spaces: 0 };
+  const less = (x: { supply: number; need: number }, add: number) => { const supply = x.supply + add; return { supply, need: x.need, ratio: supply / x.need, short: Math.max(0, x.need - supply) }; };
+  const g = { ...g0, beds: less(g0.beds, ad.beds), homes: less(g0.homes, ad.units), parking: g0.parking ? less(g0.parking, ad.spaces) : null };
   const gapsShort = [
-    g.beds.ratio < 1 && { t: 'Student beds run short', d: fmt(g.beds.short) + ' more students want to live here than there are beds' },
-    g.homes.ratio < 1 && { t: 'Homes for residents run short', d: 'about ' + fmt(g.homes.short) + ' homes short of need' },
-    g.parking && g.parking.ratio < 1 && { t: 'Campus-area parking is tight (rough)', d: 'very roughly ' + fmt(g.parking.short) + ' more student cars than mapped spaces' }
-  ].filter(Boolean) as { t: string; d: string }[];
+    g.beds.ratio < 1 && { t: 'Student beds run short', d: fmt(g.beds.short) + ' more students want to live here than there are beds', k: 'student' as const, n: Math.ceil(g.beds.short / 500) },
+    g.homes.ratio < 1 && { t: 'Homes for residents run short', d: 'about ' + fmt(g.homes.short) + ' homes short of need', k: 'homes' as const, n: Math.ceil(g.homes.short / 250) },
+    g.parking && g.parking.ratio < 1 && { t: 'Campus-area parking is tight (rough)', d: 'very roughly ' + fmt(g.parking.short) + ' more student cars than mapped spaces', k: 'parking' as const, n: Math.ceil(g.parking.short / 600) }
+  ].filter(Boolean) as { t: string; d: string; k: 'student' | 'homes' | 'parking'; n: number }[];
 
   return <div><p className="sec">Problems · {hourLabel(s.hour)}{c.routed ? '' : ' · routing…'}</p>
     {probs.length === 0 && <p className="note">No main street reaches 90% of its capacity at {hourLabel(s.hour)} in this scenario.</p>}
@@ -80,17 +86,20 @@ export function ProblemCards({ A, s, c, sc, tti, cal, n, onFly, planner }: Props
           <small><b>How sure:</b> <span className="conf" data-c={cf.c}>{cf.c}</span> {cf.why}</small>
           {planner && <div style={{ marginTop: 6 }}>
             {!open && <button className="mini" onClick={() => compare(p)}>Compare fixes</button>}
-            {open && (open.options.length ? <table style={{ marginTop: 4 }}><thead><tr><th>Option</th><th>Delay saved</th><th>This street</th></tr></thead><tbody>
+            {open && (open.options.length ? <table style={{ marginTop: 4 }}><thead><tr><th>Option</th><th>Delay saved</th><th>This street</th>{onApply && <th></th>}</tr></thead><tbody>
               {open.options.map(o => {
                 const os = open.scs[o.id], caps = A.capacities(c.tp, { widen: os.widen, fixes: os.fixes });
                 return { o, saved: open.base - o.vht, vc: Math.max(...p.segs.map(i => o.vol[i] / caps[i])) };
               }).sort((a, b) => b.saved - a.saved).map(({ o, saved, vc }) =>
-                <tr key={o.id}><td>{label(o.id)}</td><td className="num">{saved > 0 ? fmt(saved) + ' veh-h' : '—'}</td><td className="num">{pct(vc)}</td></tr>)}
+                <tr key={o.id}><td>{label(o.id)}</td><td className="num">{saved > 0 ? fmt(saved) + ' veh-h' : '—'}</td><td className="num">{pct(vc)}</td>
+                  {onApply && <td><button className="mini act" onClick={() => onApply(open.scs[o.id])}>Apply</button></td>}</tr>)}
             </tbody></table> : <small>Routing each option…</small>)}
           </div>}
         </div></div>;
     })}
     {planner && probs.length > 0 && <p className="note">Delay saved is vehicle-hours across the whole network in that hour, from re-routing with each option. "This street" is its busiest point with that option. Options are preset capacity changes; cost, land and safety are outside the model.</p>}
-    {gapsShort.map(x => <div className="hot" key={x.t}><span className="stripe" style={{ background: CCOL[3] }}></span><div><b>{x.t}</b><small>{x.d}</small></div><span className="lv" style={{ background: CCOL[3] }}>Gap</span></div>)}
+    {gapsShort.map(x => <div className="hot" key={x.t}><span className="stripe" style={{ background: CCOL[3] }}></span><div><b>{x.t}</b><small>{x.d}</small>
+      {planner && onSuggest && <button className="mini act" style={{ marginTop: 4 }} onClick={() => onSuggest(x.k, Math.min(3, Math.max(1, x.n)), x.t)}>Suggest sites</button>}</div>
+      <span className="lv" style={{ background: CCOL[3] }}>Gap</span></div>)}
   </div>;
 }

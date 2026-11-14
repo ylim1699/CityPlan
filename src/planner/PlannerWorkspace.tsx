@@ -9,6 +9,7 @@ import type { Computed } from '../components/Panels';
 import { send, useWorkerMessages } from '../hooks/useTraffic';
 import { CCOL, TODAY_I, fmt, hourLabel, pct } from '../ui';
 import './planner.css';
+import type { SuggestState } from './suggest';
 import { GHOST_TYPES, KINDS, YEARS, ghostActive, ghostPlans, ghostSupply, newGhost, type Ghost, type GhostKind } from './ghosts';
 
 export const tiOfYear = (y: number) => (y - 2024) * 4 + 3;  /* fall (Q4) of year y */
@@ -61,8 +62,9 @@ type ToolsProps = {
   A: Atlas; s: State; c: Computed; sc: Scenario; dispatch: Dispatch<Action>;
   ghosts: Ghost[]; setGhosts: (g: Ghost[]) => void; selId: string | null; setSel: (id: string | null) => void;
   pick: (cb: ((pos: XZ) => void) | null) => void; flyTo: (pos: XZ) => void; target: () => XZ | null;
+  suggest: (kind: GhostKind, n: number, year: number) => void; suggestSt: SuggestState;
 };
-export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, setSel, pick, flyTo, target }: ToolsProps) {
+export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, setSel, pick, flyTo, target, suggest, suggestSt }: ToolsProps) {
   const [kind, setKind] = useState<GhostKind>(A.CITY.collegeTown ? 'student' : 'homes');
   const [picking, setPicking] = useState(false);
   const shownYear = s.ti === TODAY_I ? 2030 : Math.max(2027, yearOf(c.t));
@@ -91,7 +93,9 @@ export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, se
         <select value={year} onChange={e => setYear(+e.target.value)} aria-label="Year the project opens">{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select></label>
       <button className="mini act" onClick={startPick} aria-pressed={picking}>{picking ? 'Click the map… (cancel)' : '+ Place on map'}</button>
       <button className="mini" onClick={() => { const p = target(); if (p) add(p); }}>+ Place in view</button>
+      <button className="mini act" disabled={!!suggestSt.busy} onClick={() => suggest(kind, 3, year)}>Suggest best spots</button>
     </div>
+    {(suggestSt.busy || suggestSt.msg) && <p className="note" style={{ margin: 0 }}>{suggestSt.busy || suggestSt.msg}</p>}
     {ghosts.length > 0 && <div className="list" style={{ marginTop: 8 }}>{ghosts.map(g => {
       const t = GHOST_TYPES[g.kind], act = ghostActive(g, c.t);
       return <div key={g.id} className={'hot ghostrow' + (selId === g.id ? ' on' : '')} onClick={() => setSel(g.id)}>

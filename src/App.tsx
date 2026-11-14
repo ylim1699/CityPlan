@@ -17,7 +17,8 @@ import { AccuracyPanel, type CalibFile } from './components/AccuracyPanel';
 import { ProblemCards } from './components/ProblemCards';
 import { DemoViews, Placement } from './components/Placement';
 import { GhostTools, YearStrip } from './planner/PlannerWorkspace';
-import { GHOST_TYPES, ghostActive, ghostPlans, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
+import { GHOST_TYPES, ghostActive, ghostPlans, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
+import { useSuggest } from './planner/suggest';
 
 type Lay = { ctl: boolean; pan: boolean; left: boolean };
 function loadLayout(): Lay {
@@ -75,6 +76,9 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
     return out;
   }, [A, c.t, c.pop, s.spring, s.fixes, s.widen, s.withProjects, routing, !!tr.hours]);
   const hours = (routing && s.withProjects && tr.hours) || countHours || [];
+  /* AI suggestions: open land screened, then judged by the router; they arrive as Suggested ghosts */
+  const { suggest, st: suggestSt } = useSuggest(A, sc, c.shown, ghosts, setGhosts);
+  const suggestYear = s.ti === TODAY_I ? 2030 : Math.max(2027, Math.floor(c.t));
 
   useEffect(() => { view.current?.apply(c.shown, c.tp); }, [c, s.layers, s.sel]);
   /* ghosts on the map: planner mode only; double-click one to move it */
@@ -132,12 +136,15 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
     <div><p className="sec">Traffic method</p><div className="seg" role="group" aria-label="Traffic method" style={{ marginBottom: 6 }}>
       <button aria-pressed={s.method === 'routed'} onClick={() => dispatch({ type: 'view', patch: { method: 'routed' } })} disabled={!zones}>Routed trips</button>
       <button aria-pressed={s.method === 'counts'} onClick={() => dispatch({ type: 'view', patch: { method: 'counts' } })}>Count-based</button></div>{methodNote}</div>
-    {routing && <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner />}
+    {routing && <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner added={ghostSupply(ghosts, c.t)}
+      onApply={o => dispatch({ type: 'view', patch: { fixes: o.fixes, widen: o.widen } })}
+      onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); setLay(l => ({ ...l, pan: true })); }} />}
     {routing && cal && <AccuracyPanel cal={cal} />}
     {routing && zones && <Placement A={A} sc={sc} zones={zones} />}
   </>;
   const ghostTools = routing ? <GhostTools A={A} s={s} c={c} sc={sc} dispatch={dispatch} ghosts={ghosts} setGhosts={setGhosts} selId={ghostSel} setSel={setGhostSel}
-    pick={cb => view.current?.pick(cb)} flyTo={fly} target={() => view.current ? view.current.target() : null} />
+    pick={cb => view.current?.pick(cb)} flyTo={fly} target={() => view.current ? view.current.target() : null}
+    suggest={suggest} suggestSt={suggestSt} />
     : <div className="zoning-banner err" role="status"><b>Ghost projects need routed trips.</b> Switch the traffic method to Routed trips (zones.json must load).</div>;
   const cls = [!lay.ctl && 'ctl-folded', !lay.pan && 'pan-folded', lay.left && 'dock-left'].filter(Boolean).join(' ');
 
