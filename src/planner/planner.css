@@ -5,30 +5,29 @@
 .ys-ctl input:disabled{opacity:.35}
 .ys-year{font:700 16px/1 var(--display);white-space:nowrap;min-width:110px;text-align:right}
 .ys-counters{display:flex;gap:6px;flex-wrap:wrap}
-.ys-c{flex:1 1 100px;background:#f1f4f1;border-radius:7px;padding:5px 8px;border-left:3px solid #c4cdc8}
+.ys-c{flex:1 1 100px;background:rgba(255,255,255,.05);border-radius:7px;padding:5px 8px;border-left:3px solid #c4cdc8}
 .ys-c b{display:block;font-size:16px;font-weight:700}
 .ys-c small{color:var(--muted);font-size:11px;line-height:1.2;display:block}
-.ys-c[data-tone="ok"]{border-left-color:#0e8a79}
+.ys-c[data-tone="ok"]{border-left-color:#d8c49a}
 .ys-c[data-tone="warn"]{border-left-color:#e29a3c}
 .ys-c[data-tone="bad"]{border-left-color:#d0532e}
 .ghosttools{display:grid;gap:6px}
-.zoning-banner{background:#fff1d6;border:1px solid #e2a23c;color:#6b4508;border-radius:8px;padding:8px 10px;font-size:12.5px}
-.zoning-banner.err{background:#fde3dc;border-color:#d0532e;color:#7a1f10}
+.zoning-banner{border:1.5px solid #cf552d;background:repeating-linear-gradient(135deg,rgba(207,85,45,.16) 0 10px,rgba(207,85,45,.08) 10px 20px);color:#f3c2ad;border-radius:8px;padding:9px 11px;font-size:12px;line-height:1.4}
+.zoning-banner b{color:#ff9a6e;letter-spacing:.02em}
+.zoning-banner.err{background:rgba(208,83,46,.22);border-color:#ff5a2a;color:#ffd0bd}
 .seg.wrap{flex-wrap:wrap}
-.mini.act{border-color:#d4861c;color:#8a530c}
-.mini[aria-pressed="true"]{background:#fff1d6}
+.mini[aria-pressed="true"]{background:rgba(233,178,95,.22)}
 .ghostrow{cursor:pointer}
-.ghostrow.on{background:#fff7e8}
+.ghostrow.on{background:rgba(240,140,58,.1);outline:1px solid rgba(240,140,58,.6)}
 .impact{border-top:1px solid var(--line);padding-top:8px;margin-top:4px}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
-.tile{background:#f1f4f1;border-radius:7px;padding:6px 8px}
-.tile small{display:block;color:var(--muted);font-size:11px}
-.tile b{font-size:15px}
-.chg{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid var(--line);font-size:12.5px}
+.tiles{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
 .planlabel{position:absolute;transform:translate(-50%,-100%);background:#1c2a2d;color:#ffd98f;font:600 11px/1.2 var(--body);padding:3px 7px;border-radius:5px;white-space:nowrap;border:1px solid #d4861c}
 .planlabel.ghost{background:rgba(28,42,45,.85);border-style:dashed}
 .planlabel.future{opacity:.7;border-style:dashed}
 .planlabel.sel{border-color:#fff;color:#fff}
 @media (max-width:760px){.yearstrip{left:8px;right:8px;bottom:calc(40% + 96px)}.ys-c{flex-basis:30%}}
-.warnline{color:#a3361c!important;font-weight:600}
+.warnline{color:#ff9a6e!important;font-weight:600}
 .planlabel.road{font-size:10px;padding:2px 5px;transform:translate(-50%,-50%)}
+.yearstrip.closed{gap:3px;padding:6px 12px}
+.ys-mini{color:var(--muted);font-size:12px}
+.planlabel.hl{background:#3a1410;color:#ffd0bd;border-color:#ff5a2a;font-size:11px;padding:2px 6px;transform:translate(-50%,-50%)}

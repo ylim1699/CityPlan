@@ -10,6 +10,7 @@ import { send, useWorkerMessages } from '../hooks/useTraffic';
 import { CCOL, TODAY_I, fmt, hourLabel, pct } from '../ui';
 import './planner.css';
 import { snapSite, type SuggestState } from './suggest';
+import type { Highlight } from './ghostLayer';
 import { GHOST_TYPES, KINDS, YEARS, ghostActive, ghostPlans, ghostSupply, newGhost, type Ghost, type GhostKind, type GhostRoad } from './ghosts';
 
 export const tiOfYear = (y: number) => (y - 2024) * 4 + 3;  /* fall (Q4) of year y */
@@ -31,7 +32,9 @@ export function YearStrip({ A, s, c, dispatch, ghosts, trips }: { A: Atlas; s: S
   }, [A, c.shown]);
   const tone = (r: number) => r >= 1 ? 'ok' : r >= 0.95 ? 'warn' : 'bad';
   const nPlanned = ghosts.filter(gh => gh.status === 'planned' && ghostActive(gh, c.t)).length;
-  return <div className="card yearstrip" role="region" aria-label="Planning year">
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem('atlas-yearstrip') !== 'closed'; } catch { return true; } });
+  const toggle = () => { const o = !open; setOpen(o); try { localStorage.setItem('atlas-yearstrip', o ? 'open' : 'closed'); } catch { /* storage off */ } };
+  return <div className={'card yearstrip' + (open ? '' : ' closed')} role="region" aria-label="Planning year">
     <div className="ys-ctl">
       <div className="seg" role="group" aria-label="Now or a future year">
         <button aria-pressed={now} onClick={() => dispatch({ type: 'view', patch: { ti: TODAY_I } })}>Now</button>
@@ -40,8 +43,10 @@ export function YearStrip({ A, s, c, dispatch, ghosts, trips }: { A: Atlas; s: S
       <input type="range" min={2027} max={2034} step={1} value={now ? lastYear : Math.max(2027, y)} aria-label="Planning year"
         onChange={e => go(+e.target.value)} disabled={now} />
       <strong className="ys-year">{now ? '2026 · today' : 'Fall ' + y}</strong>
+      <button className="mini" aria-expanded={open} onClick={toggle} title={open ? 'Hide the numbers' : 'Show the numbers'}>{open ? '▾ Numbers' : '▸ Numbers'}</button>
     </div>
-    <div className="ys-counters">
+    {!open && <small className="ys-mini">Beds {pct(beds)} · Homes {pct(homes)}{park != null ? ' · Parking ' + pct(park) : ''} · {overNames.length} streets over capacity · {nPlanned} of your projects</small>}
+    {open && <div className="ys-counters">
       <Counter k="People" v={(g.pop.total / 1000).toFixed(1) + 'k'} />
       <Counter k="Students" v={fmt(g.pop.S)} />
       <Counter k="Student beds vs need" v={pct(beds)} tone={tone(beds)} />
@@ -50,7 +55,7 @@ export function YearStrip({ A, s, c, dispatch, ghosts, trips }: { A: Atlas; s: S
       <Counter k="Car trips a day" v={trips != null ? fmt(trips) : '…'} />
       <Counter k={'Streets over capacity · ' + hourLabel(s.hour)} v={String(overNames.length)} tone={overNames.length ? 'bad' : 'ok'} title={overNames.join(', ')} />
       <Counter k="Your projects counted" v={String(nPlanned)} />
-    </div>
+    </div>}
   </div>;
 }
 function Counter({ k, v, tone, rough, title }: { k: string; v: string; tone?: string; rough?: boolean; title?: string }) {
@@ -63,8 +68,9 @@ type ToolsProps = {
   ghosts: Ghost[]; setGhosts: (g: Ghost[]) => void; selId: string | null; setSel: (id: string | null) => void;
   pick: (cb: ((pos: XZ) => void) | null) => void; flyTo: (pos: XZ) => void; target: () => XZ | null;
   suggest: (kind: GhostKind, n: number, year: number) => void; suggestSt: SuggestState;
+  highlight: (list: Highlight[]) => void;
 };
-export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, setSel, pick, flyTo, target, suggest, suggestSt }: ToolsProps) {
+export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, setSel, pick, flyTo, target, suggest, suggestSt, highlight }: ToolsProps) {
   const [kind, setKind] = useState<GhostKind>(A.CITY.collegeTown ? 'student' : 'homes');
   const [picking, setPicking] = useState(false);
   const shownYear = s.ti === TODAY_I ? 2030 : Math.max(2027, yearOf(c.t));
@@ -76,6 +82,7 @@ export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, se
   const add = (pos: XZ) => {  /* placement rules: snap to the nearest legal spot */
     const pl = snapSite(A, kind, pos, ghosts), g = { ...newGhost(kind, pl.pos, year), place: { moved: pl.moved, ok: pl.ok, lot: pl.lot } };
     setGhosts(ghosts.concat([g])); setSel(g.id);
+    if (pl.moved > 200) flyTo(pl.pos);  /* you're already looking here; follow it only if the rules moved it far */
   };
   const startPick = () => {
     if (picking) { pick(null); setPicking(false); return; }
@@ -114,12 +121,13 @@ export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, se
         </span></div>;
     })}</div>}
     {ghosts.length > 0 && <p className="note" style={{ marginTop: 6 }}>Double-click a ghost on the map to pick it up, then click where it should go.</p>}
-    {sel && <Impact A={A} s={s} c={c} sc={sc} g={sel} ghosts={ghosts} dispatch={dispatch} setGhosts={setGhosts} />}
+    {sel ? <Impact A={A} s={s} c={c} sc={sc} g={sel} ghosts={ghosts} dispatch={dispatch} setGhosts={setGhosts} highlight={highlight} /> : <ClearHl highlight={highlight} />}
   </div>;
 }
 
 /* ---------- Before → after for one ghost: route the year with and without it ---------- */
-function Impact({ A, s, c, sc, g, ghosts, dispatch, setGhosts }: { A: Atlas; s: State; c: Computed; sc: Scenario; g: Ghost; ghosts: Ghost[]; dispatch: Dispatch<Action>; setGhosts: (g: Ghost[]) => void }) {
+function ClearHl({ highlight }: { highlight: (l: Highlight[]) => void }) { useEffect(() => { highlight([]); }, []); return null; }
+function Impact({ A, s, c, sc, g, ghosts, dispatch, setGhosts, highlight }: { A: Atlas; s: State; c: Computed; sc: Scenario; g: Ghost; ghosts: Ghost[]; dispatch: Dispatch<Action>; setGhosts: (g: Ghost[]) => void; highlight: (l: Highlight[]) => void }) {
   const act = g.status === 'planned' && ghostActive(g, c.t);
   const without = useMemo<Scenario>(() => { const rest = ghostPlans(ghosts.filter(x => x.id !== g.id), sc.t), o: Scenario = { ...sc }; if (rest.length) o.plans = rest; else delete o.plans; return o; }, [sc, ghosts, g.id]);
   const key = JSON.stringify({ k: 'ghost-impact', sc, without: without.plans || [] });
@@ -131,6 +139,21 @@ function Impact({ A, s, c, sc, g, ghosts, dispatch, setGhosts }: { A: Atlas; s: 
     if (w && wo) setRes({ key, w, wo });
   });
   useEffect(() => { if (act) send({ type: 'compare', key, sc, pos: g.pos, options: [{ id: 'with', sc }, { id: 'without', sc: without }] }); }, [key, act]);
+  /* glow the streets it loads up on the map: main streets within 2 km gaining 2+ points, one "+N pts" label per street */
+  useEffect(() => {
+    const r = act && res && res.key === key ? res : null;
+    if (!r) { highlight([]); return; }
+    const by: Record<string, { segs: [XZ, XZ][]; at: XZ; gain: number }> = {};
+    c.shown.forEach((x, i) => {
+      const sg = A.SEGS[i]; if (sg.road.cls === 'local' || !sg.road.name || Math.hypot(sg.mid[0] - g.pos[0], sg.mid[1] - g.pos[1]) > 10) return;
+      const gain = (r.w.vol[i] - r.wo.vol[i]) / x.cap; if (gain < 0.02) return;
+      const h = by[sg.road.name] || (by[sg.road.name] = { segs: [], at: sg.mid, gain: 0 });
+      h.segs.push([sg.a, sg.b]); if (gain > h.gain) { h.gain = gain; h.at = sg.mid; }
+    });
+    highlight(Object.values(by).sort((p, q) => q.gain - p.gain).slice(0, 6)
+      .map(h => ({ segs: h.segs, at: h.at, color: h.gain >= 0.1 ? '#e8231a' : '#ff5a1f', label: '+' + Math.round(h.gain * 100) + ' pts' })));
+  }, [res, key, act, c.shown]);
+  useEffect(() => () => highlight([]), []);
   const t = GHOST_TYPES[g.kind];
   if (g.status === 'suggested') return <p className="note" style={{ marginTop: 8 }}>Suggested projects are not counted. Accept it to see its effect.</p>;
   if (!act) return <div className="impact"><p className="sec">Before → after</p>

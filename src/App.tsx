@@ -78,7 +78,7 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   }, [A, c.t, c.pop, s.spring, s.fixes, s.widen, s.withProjects, routing, !!tr.hours]);
   const hours = (routing && s.withProjects && tr.hours) || countHours || [];
   /* AI suggestions: open land screened, then judged by the router; they arrive as Suggested ghosts */
-  const { suggest, st: suggestSt } = useSuggest(A, sc, c.shown, ghosts, setGhosts);
+  const { suggest, st: suggestSt } = useSuggest(A, sc, c.shown, ghosts, setGhosts, p => view.current?.flyTo(p));
   const suggestYear = s.ti === TODAY_I ? 2030 : Math.max(2027, Math.floor(c.t));
 
   useEffect(() => { view.current?.apply(c.shown, c.tp); }, [c, s.layers, s.sel]);
@@ -150,7 +150,7 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   </>;
   const ghostTools = routing ? <GhostTools A={A} s={s} c={c} sc={sc} dispatch={dispatch} ghosts={ghosts} setGhosts={setGhosts} selId={ghostSel} setSel={setGhostSel}
     pick={cb => view.current?.pick(cb)} flyTo={fly} target={() => view.current ? view.current.target() : null}
-    suggest={suggest} suggestSt={suggestSt} />
+    suggest={suggest} suggestSt={suggestSt} highlight={l => view.current?.setHighlight(l)} />
     : <div className="zoning-banner err" role="status"><b>Ghost projects need routed trips.</b> Switch the traffic method to Routed trips (zones.json must load).</div>;
   const cls = [!lay.ctl && 'ctl-folded', !lay.pan && 'pan-folded', lay.left && 'dock-left'].filter(Boolean).join(' ');
 

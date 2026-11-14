@@ -5,11 +5,16 @@ import type { XZ } from '../model/types';
 
 export type GhostDraw = { id: string; pos: XZ; w: number; d: number; h: number; n: number; label: string; status: 'planned' | 'suggested'; active: boolean;
   roads?: { pts: XZ[]; status: 'planned' | 'suggested'; label: string }[] };
+/* streets a project loads up: glowing ribbons with one "+N pts" label per street */
+export type Highlight = { segs: [XZ, XZ][]; label: string; at: XZ; color: string };
 export type GhostEvent = { type: 'move'; id: string; pos: XZ } | { type: 'select'; id: string };
 
 export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: HTMLCanvasElement; overlay: HTMLElement; S: number; VEX: number }) {
   const { scene, camera, canvas, overlay, S, VEX } = o;
   const group = new T.Group(); scene.add(group);
+  const hlGroup = new T.Group(); scene.add(hlGroup);
+  let hlMats: T.MeshBasicMaterial[] = [], hlEls: { el: HTMLElement; v: T.Vector3 }[] = [];
+  function clearHl() { hlEls.forEach(h => h.el.remove()); hlEls = []; hlGroup.children.forEach(ch => (ch as T.Mesh).geometry?.dispose()); hlMats.forEach(m => m.dispose()); hlMats = []; hlGroup.clear(); }
   type Item = { g: T.Group; mats: (T.MeshBasicMaterial | T.LineBasicMaterial | T.LineDashedMaterial)[]; el: HTMLElement; v: T.Vector3; d: GhostDraw; roadMats: T.MeshBasicMaterial[]; roadEls: { el: HTMLElement; v: T.Vector3 }[] };
   let items: Item[] = [], sel: string | null = null, carrying: string | null = null, cb: ((e: GhostEvent) => void) | null = null, t0 = 0;
 
@@ -98,10 +103,28 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
   return {
     set(list: GhostDraw[], selId: string | null) { sel = selId; clear(); list.forEach(build); },
     onEvent(f: ((e: GhostEvent) => void) | null) { cb = f; },
+    highlight(list: Highlight[]) {
+      clearHl();
+      list.forEach(h => {
+        const pos: number[] = [], w = 26 * S / 2;
+        h.segs.forEach(([a, b]) => {
+          const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1e-6, nx = -dz / L * w, nz = dx / L * w, y = 0.07;
+          pos.push(a[0] + nx, y, a[1] + nz, b[0] + nx, y, b[1] + nz, b[0] - nx, y, b[1] - nz, a[0] + nx, y, a[1] + nz, b[0] - nx, y, b[1] - nz, a[0] - nx, y, a[1] - nz);
+        });
+        const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+        const m = new T.MeshBasicMaterial({ color: h.color, transparent: true, opacity: 0.85, depthWrite: false, side: T.DoubleSide });  /* solid, not additive: additive washes out on the warm road colors */
+        hlMats.push(m); hlGroup.add(new T.Mesh(geo, m));
+        const el = document.createElement('div'); el.className = 'planlabel hl'; el.textContent = h.label; overlay.appendChild(el);
+        hlEls.push({ el, v: new T.Vector3(h.at[0], 0.25, h.at[1]) });
+      });
+    },
     /* call once per frame after rendering, with the canvas size in CSS pixels */
     frame(W: number, H: number, dt: number) {
       t0 += dt;
       const pulse = 0.5 + 0.5 * Math.sin(t0 * 3);
+      hlMats.forEach(m => { m.opacity = 0.6 + 0.35 * pulse; });
+      hlEls.forEach(h => { vt.copy(h.v).project(camera); const hd = vt.z > 1 || vt.z < -1; h.el.style.display = hd ? 'none' : '';
+        if (!hd) { h.el.style.left = ((vt.x * 0.5 + 0.5) * W).toFixed(1) + 'px'; h.el.style.top = ((-vt.y * 0.5 + 0.5) * H).toFixed(1) + 'px'; } });
       items.forEach(it => {
         if (it.d.status === 'suggested') (it.mats[0] as T.MeshBasicMaterial).opacity = 0.2 + 0.25 * pulse;
         if (carrying === it.d.id) (it.mats[0] as T.MeshBasicMaterial).opacity = 0.25 + 0.4 * pulse;
@@ -116,6 +139,6 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
         else if (it.el.textContent !== it.d.label) it.el.textContent = it.d.label;
       });
     },
-    dispose() { clear(); scene.remove(group); canvas.removeEventListener('dblclick', onDbl); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); }
+    dispose() { clear(); clearHl(); scene.remove(group); scene.remove(hlGroup); canvas.removeEventListener('dblclick', onDbl); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); }
   };
 }

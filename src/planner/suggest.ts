@@ -98,7 +98,7 @@ export function screen(A: Atlas, kind: GhostKind, pos: XZ, shown: SegResult[]) {
 export type SuggestState = { busy: string | null; msg: string | null };
 /* Hook: suggest(kind, n, year) screens open land, routes the year with each of the best 8 sites, and adds the
    n that add the least delay as Suggested ghosts. Uses its own 'judge' worker request so other panels can't drop it. */
-export function useSuggest(A: Atlas, sc: Scenario, shown: SegResult[], ghosts: Ghost[], setGhosts: (g: Ghost[]) => void) {
+export function useSuggest(A: Atlas, sc: Scenario, shown: SegResult[], ghosts: Ghost[], setGhosts: (g: Ghost[]) => void, onFly?: (p: XZ) => void) {
   const [st, setSt] = useState<SuggestState>({ busy: null, msg: null });
   const job = useRef<{ key: string; kind: GhostKind; n: number; year: number; picks: { pos: XZ; km: number }[]; why?: string } | null>(null);
   const ghostsRef = useRef(ghosts); ghostsRef.current = ghosts;
@@ -111,6 +111,7 @@ export function useSuggest(A: Atlas, sc: Scenario, shown: SegResult[], ghosts: G
     const add = ranked.map((r, i) => newGhost(j.kind, r.pos, j.year, 'suggested',
       (j.why ? j.why + ' · ' : i === 0 && j.n === 1 ? 'Best spot · ' : '') + 'Router: ' + (r.dv >= 0 ? '+' : '−') + Math.abs(r.dv).toFixed(1) + ' veh-h at ' + hourLabel(sc.hour) + ' · ' + r.km.toFixed(1) + ' km to campus'));
     setGhosts(keep.concat(add));
+    if (add[0]) onFly?.(add[0].pos);  /* suggestions can land anywhere in town: show the best one */
     setSt({ busy: null, msg: add.length ? 'Tested ' + m.options.length + ' open sites with the router; ' + add.length + ' suggested (dashed on the map).' : 'No open site found.' });
   });
   const suggest = useCallback((kind: GhostKind, n: number, year: number, why?: string) => {
@@ -125,6 +126,7 @@ export function useSuggest(A: Atlas, sc: Scenario, shown: SegResult[], ghosts: G
       if (kind === 'parking') {  /* no trips of its own, so the router can't rank it: keep the screen's order */
         const keep = ghostsRef.current.filter(g => !(g.status === 'suggested' && g.kind === kind));
         setGhosts(keep.concat(picks.slice(0, n).map((p, i) => newGhost(kind, p.pos, year, 'suggested', (why ? why + ' · ' : i === 0 ? 'Best spot · ' : '') + p.km.toFixed(1) + ' km to campus'))));
+        if (picks[0]) onFly?.(picks[0].pos);
         setSt({ busy: null, msg: 'Parking adds no trips of its own, so sites are ranked by distance to campus and street access.' });
         return;
       }
@@ -135,7 +137,7 @@ export function useSuggest(A: Atlas, sc: Scenario, shown: SegResult[], ghosts: G
       setSt({ busy: 'Routing fall ' + year + ' with each of ' + picks.length + ' open sites…', msg: null });
       send({ type: 'judge', key: k, sc: base, options: picks.map((p, i) => ({ id: String(i), sc: { ...base, plans: (base.plans || []).concat([{ id: 'cand', pos: p.pos, beds: ty.beds || 0, units: ty.units || 0, attract: ty.trips || 0 }]) } })) });
     }, 30);
-  }, [A, sc, shown, setGhosts]);
+  }, [A, sc, shown, setGhosts, onFly]);
   return { suggest, st };
 }
 

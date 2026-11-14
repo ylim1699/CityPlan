@@ -6,12 +6,13 @@ import type { Atlas } from '../model/atlas';
 import type { SegResult, XZ } from '../model/types';
 import type { State } from '../state';
 import { CCOL, daylight, pStatus } from '../ui';
-import { createGhostLayer, type GhostDraw, type GhostEvent } from '../planner/ghostLayer';
+import { createGhostLayer, type GhostDraw, type GhostEvent, type Highlight } from '../planner/ghostLayer';
 
 export type ViewEls = { canvas: HTMLCanvasElement; overlay: HTMLElement; app: HTMLElement; compass: HTMLElement };
 export type View = { apply: (shown: SegResult[], tp: number) => void; flyTo: (pos: XZ) => void; pick: (cb: ((pos: XZ) => void) | null) => void; dispose: () => void;
   /* Planner ghosts (src/planner) */
-  setGhosts: (list: GhostDraw[], sel: string | null) => void; onGhost: (cb: ((e: GhostEvent) => void) | null) => void; target: () => XZ };
+  setGhosts: (list: GhostDraw[], sel: string | null) => void; onGhost: (cb: ((e: GhostEvent) => void) | null) => void; target: () => XZ;
+  setHighlight: (list: Highlight[]) => void };
 
 export function createView(els: ViewEls, A: Atlas, getState: () => State, onSelect: (id: string) => void): View | null {
   const canvas = els.canvas;
@@ -65,14 +66,15 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   }
   function polyLines(fl: number[], w: number): Ln[] { const p = flatPts(fl), o: Ln[] = []; for (let k = 0; k < p.length - 1; k++) o.push({ a: p[k], b: p[k + 1], w }); return o; }
 
-  const ground = new T.Mesh(new T.PlaneGeometry(200, 200), reg(new T.MeshBasicMaterial({ color: 0xdfe5df }), 0xdfe5df));
+  /* ground and land use in the sandbox's warm, darker palette, so light labels and the warm road scale read on it */
+  const ground = new T.Mesh(new T.PlaneGeometry(200, 200), reg(new T.MeshBasicMaterial({ color: 0xa39368 }), 0xa39368));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; scene.add(ground);
-  polys([C.campus], 0xe8e1cf, 0.002, 1);
-  polys(C.parks, 0xc3dbbd, 0.004, 1);
-  polys(C.lots, 0xcfd3cf, 0.005, 1);
-  polys(C.water, 0xa9cfe0, 0.006, 1);
+  polys([C.campus], 0xab9a72, 0.002, 1);
+  polys(C.parks, 0x7d8a52, 0.004, 1);
+  polys(C.lots, 0x6f6a60, 0.005, 1);
+  polys(C.water, 0x4f6f80, 0.006, 1);
   let wl: Ln[] = []; C.waterways.forEach(w => { wl = wl.concat(polyLines(w.slice(1), Math.max(w[0], 6) * S * 1.4)); });
-  scene.add(new T.Mesh(ribbons(wl, 0.007), reg(new T.MeshBasicMaterial({ color: 0xa9cfe0 }), 0xa9cfe0)));
+  scene.add(new T.Mesh(ribbons(wl, 0.007), reg(new T.MeshBasicMaterial({ color: 0x4f6f80 }), 0x4f6f80)));
   let rl: Ln[] = []; C.rail.forEach(r => { rl = rl.concat(polyLines(r, 5 * S * 1.4)); });
   scene.add(new T.Mesh(ribbons(rl, 0.008), reg(new T.MeshBasicMaterial({ color: 0x8d8478 }), 0x8d8478)));
 
@@ -90,33 +92,83 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   });
   scene.add(widLayer);
 
-  /* Streets: one mesh, colored per segment */
+  /* Streets (from the UI sandbox): a light curb/sidewalk edge (not on highways), dark asphalt,
+     and the load color as a band down the middle of the driving lanes */
   const EXW = 1.5;
-  const roadGeo = ribbons(A.SEGS.map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW })), 0.03, true);
-  const roadMat = new T.MeshBasicMaterial({ vertexColors: true });
-  scene.add(new T.Mesh(roadGeo, roadMat));
+  const curbGeo = ribbons(A.SEGS.filter(s => s.road.cls !== 'highway' && s.road.cls !== 'ramp').map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW * 1.4 })), 0.024);
+  const curb = new T.Mesh(curbGeo, reg(new T.MeshLambertMaterial({ color: 0x8b867c, depthWrite: false }), 0x8b867c)); curb.renderOrder = 2; scene.add(curb);
+  const asphaltGeo = ribbons(A.SEGS.map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW })), 0.027);
+  const asphalt = new T.Mesh(asphaltGeo, reg(new T.MeshLambertMaterial({ color: 0x3b3936, depthWrite: false }), 0x3b3936)); asphalt.renderOrder = 3; scene.add(asphalt);
+  const roadGeo = ribbons(A.SEGS.map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW * 0.58 })), 0.03, true);
+  const roadMat = new T.MeshBasicMaterial({ vertexColors: true, depthWrite: false });
+  const roadMesh = new T.Mesh(roadGeo, roadMat); roadMesh.renderOrder = 4; scene.add(roadMesh);
   const roadCol = roadGeo.getAttribute('color') as T.BufferAttribute;
 
+  /* Windows drawn by the shader (from the UI sandbox): a grid of panes on every wall above 0.7 m,
+     glass by day; at night a share of them lights up (uNight, uLit are set by apply()). */
+  const NIGHT = { uNight: { value: 0 }, uLit: { value: 0.35 } };
+  function windowMaterial() {
+    const m = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
+    m.onBeforeCompile = (sh: any) => {
+      sh.uniforms.uNight = NIGHT.uNight; sh.uniforms.uLit = NIGHT.uLit;
+      sh.vertexShader = 'attribute vec3 wuv;\nvarying vec3 vWuv;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWuv = wuv;');
+      sh.fragmentShader = 'uniform float uNight;\nuniform float uLit;\nvarying vec3 vWuv;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', [
+        '#include <emissivemap_fragment>',
+        'if (vWuv.y > 0.7) {',
+        '  float cw = vWuv.z > 1500.0 ? 2.6 : 3.4;',
+        '  vec2 cell = vec2(floor(vWuv.x / cw), floor((vWuv.y - 0.7) / 3.1));',
+        '  vec2 f = vec2(fract(vWuv.x / cw), fract((vWuv.y - 0.7) / 3.1));',
+        '  float win = step(0.2, f.x) * step(f.x, 0.8) * step(0.28, f.y) * step(f.y, 0.8);',
+        '  float h = fract(sin(dot(vec3(cell, mod(vWuv.z, 1000.0)), vec3(12.9898, 78.233, 37.719))) * 43758.5453);',
+        '  float share = uLit * (vWuv.z > 1500.0 ? 1.15 : 0.85);',
+        '  float lit = step(h, share) * win;',
+        '  vec3 warm = mix(vec3(1.0, 0.74, 0.42), vec3(0.86, 0.93, 1.0), step(0.82, h));',
+        '  totalEmissiveRadiance += warm * lit * uNight * (1.1 + 0.6 * fract(h * 7.0));',
+        '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.36, 0.42), win * 0.5);',
+        '}'].join('\n'));
+    };
+    return m;
+  }
+
   /* Existing buildings from OpenStreetMap: walls and roofs merged into one mesh */
-  const BCOL = [0xf4f5f1, 0xefe6d6, 0xe9dcc4, 0xe2e7ea, 0xf1ece4, 0xe6e8e4, 0xdde2e4].map(h => new T.Color(h));
-  const bp: number[] = [], bc: number[] = [];
-  C.buildings.forEach(b => {
-    const t = b[0], h = b[1] * A.VEX * S, pts = flatPts(b.slice(2)), n = pts.length, col = BCOL[t] || BCOL[0];
-    function push(x: number, y: number, z: number) { bp.push(x, y, z); bc.push(col.r, col.g, col.b); }
+  /* Buildings (from the UI sandbox): wall colors by type with a small per-building shade, flat light roofs on
+     campus, commercial and industrial buildings, a few brown/terracotta/slate house roofs, darker wall bases.
+     wuv = (meters along the wall, meters up, seed) for the window shader; seed > 1500 = apartments, campus, commercial. */
+  const cols = (l: number[]) => l.map(h => new T.Color(h));
+  const WALLS = [cols([0xe6dcc6, 0xd8c8a8, 0xece9e2, 0xb7bfa3, 0xb9c3c9, 0xcdb48e, 0xe3d49e, 0x9b5a43, 0xc9b9a6]),
+    cols([0xd6c9b2, 0xc7b9a0, 0xb8afa4, 0x9c6a52, 0xe0ddd5, 0xa9b3b8, 0xcfc2ac]), cols([0x9b5a43, 0xb8865f, 0xd7cdbd, 0xa86e52]),
+    cols([0xc9c6bf, 0xa8a49b, 0xd9d4c8, 0x8f9aa3, 0xb5a58a, 0x7d8890, 0xe2ded4]), cols([0xe8e2d6, 0xc9b89a, 0x9b5a43]),
+    cols([0xa39d92, 0x8f8a80, 0xb3ab9c]), cols([0xa3a7ab, 0x8e959b, 0xb8b2a5, 0x9a8f80])];
+  const ROOF_GREY = new T.Color(0x7b7b79), ROOF_ALT = cols([0x5a4a3e, 0x9a5b45, 0x5d6670, 0x4f4a45]), ROOF_FLAT = cols([0xcfcdc6, 0xa9a8a3, 0x8f8f8c]);
+  const bp: number[] = [], bc: number[] = [], bw: number[] = [], wallC = new T.Color(), roofC = new T.Color();
+  C.buildings.forEach((b, bi) => {
+    const t = b[0], hm = b[1], h = hm * A.VEX * S, pts = flatPts(b.slice(2)), n = pts.length;
+    const j = ((bi * 2654435761) % 1000) / 1000, j2 = ((bi * 40503 + 12345) % 977) / 977, wl = WALLS[t] || WALLS[0];
+    wallC.copy(wl[Math.floor(j2 * wl.length) % wl.length]).offsetHSL(0, 0, (j - 0.5) * 0.06);
+    if (t === 3 || t === 6 || t === 2) roofC.copy(ROOF_FLAT[Math.floor(j * 3) % 3]);
+    else if (j2 < 0.14) roofC.copy(ROOF_ALT[Math.floor(j * 4) % 4]);
+    else roofC.copy(ROOF_GREY);
+    roofC.offsetHSL(0, 0, (j - 0.5) * 0.08);
+    const seed = Math.floor(j * 997) + (t === 1 || t === 2 || t === 3 ? 2000 : 0);
+    const wv = (x: number, y: number, z: number, uu: number, vv: number) => { const ao = y > 0 ? 1 : 0.68; bp.push(x, y, z); bc.push(wallC.r * ao, wallC.g * ao, wallC.b * ao); bw.push(uu, vv, seed); };
+    const rv = (x: number, y: number, z: number) => { bp.push(x, y, z); bc.push(roofC.r, roofC.g, roofC.b); bw.push(0, -1, seed); };
+    let u = 0;
     for (let k = 0; k < n; k++) {
-      const p = pts[k], q = pts[(k + 1) % n];
-      push(p[0], 0, p[1]); push(q[0], 0, q[1]); push(q[0], h, q[1]);
-      push(p[0], 0, p[1]); push(q[0], h, q[1]); push(p[0], h, p[1]);
+      const p = pts[k], q = pts[(k + 1) % n], L = Math.hypot(q[0] - p[0], q[1] - p[1]) / S;
+      wv(p[0], 0, p[1], u, 0); wv(q[0], 0, q[1], u + L, 0); wv(q[0], h, q[1], u + L, hm);
+      wv(p[0], 0, p[1], u, 0); wv(q[0], h, q[1], u + L, hm); wv(p[0], h, p[1], u, hm);
+      u += L;
     }
     let tri: number[][];
     try { tri = T.ShapeUtils.triangulateShape(pts.map(p => new T.Vector2(p[0], p[1])), []); } catch (e) { tri = []; }
-    tri.forEach(tr => { tr.forEach(i => { push(pts[i][0], h, pts[i][1]); }); });
+    tri.forEach(tr => { tr.forEach(i => { rv(pts[i][0], h, pts[i][1]); }); });
   });
   const bGeo = new T.BufferGeometry();
   bGeo.setAttribute('position', new T.Float32BufferAttribute(bp, 3));
   bGeo.setAttribute('color', new T.Float32BufferAttribute(bc, 3));
+  bGeo.setAttribute('wuv', new T.Float32BufferAttribute(bw, 3));
   bGeo.computeVertexNormals();
-  const bMat = reg(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide }), 0xffffff);
+  const bMat = reg(windowMaterial(), 0xffffff);
   scene.add(new T.Mesh(bGeo, bMat));
 
   /* Projects */
@@ -263,7 +315,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   };
   canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp);
 
-  const tmpc = new T.Color(), grey = new T.Color(0xb9c2bd);
+  const tmpc = new T.Color(), grey = new T.Color(0x3f3a35);  /* dark warm asphalt when traffic colors are off */
   return {
     apply(shown, tp) {
       const st = getState();
@@ -272,6 +324,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
       (scene.fog as T.Fog).color.copy(scene.background as T.Color);
       hemi.intensity = 0.2 + 0.7 * d; sun.intensity = 0.04 + 0.46 * d;
       tints.forEach(t => { t.m.color.copy(t.c).multiplyScalar(dim); });
+      NIGHT.uNight.value = Math.max(0, Math.min(1, (0.55 - d) / 0.45));  /* windows start lighting up at dusk */
       (carPts.material as T.PointsMaterial).color.set(d < 0.5 ? '#ffe7a0' : '#22343a');
       overlay.classList.toggle('night', d < 0.5);
       roadMat.color.setScalar(st.layers.traffic ? 1 : dim);
@@ -310,6 +363,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     pick(cb) { picker = cb; canvas.style.cursor = cb ? 'crosshair' : ''; },
     setGhosts(list, sel) { ghosts.set(list, sel); },
     onGhost(cb) { ghosts.onEvent(cb); },
+    setHighlight(list) { ghosts.highlight(list); },
     target() { return [controls.target.x, controls.target.z]; },
     dispose() { ghosts.dispose(); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); overlay.innerHTML = ''; }
   };

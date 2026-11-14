@@ -2,7 +2,8 @@
 import type { Atlas } from './model/atlas';
 import type { Project } from './model/types';
 
-export const CCOL = ['#86b9a5', '#d6c75a', '#e29a3c', '#d0532e', '#8c1c2b'];
+/* road load colors, light to over capacity: warm sand → amber → orange → red (from the UI sandbox) */
+export const CCOL = ['#d8c49a', '#e8b65a', '#e88e3a', '#cf552d', '#8f1f2a'];
 export const TODAY_I = 11, LAST_I = 43;
 export const FIXES = [
   { k: 'turn', l: 'Turn lanes (+15%)', f: 1.15 },

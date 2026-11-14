@@ -1,0 +1,55 @@
+/* Dark console theme, ported from the UI sandbox (index.html). Loaded after styles.css so it wins.
+   The 3D scene keeps a pale sky by day; panels are dark glass so the lit city is the brightest thing on screen. */
+:root{
+  color-scheme: dark;
+  --paper:#0b0b0a; --panel:#141310; --ink:#ece9e2; --muted:#9b968b; --line:rgba(255,255,255,.1);
+  --accent:#e9b25f; --accent-soft:rgba(233,178,95,.14);
+  --build:#d4861c; --approved:#2e6bc9; --planned:#8557c2; --new:#0e8a79;
+}
+.card{background:rgba(20,19,16,.78);-webkit-backdrop-filter:blur(14px) saturate(1.1);backdrop-filter:blur(14px) saturate(1.1);border:1px solid rgba(255,255,255,.08);color:var(--ink);border-radius:var(--r);box-shadow:var(--shadow);transition:background .8s,color .8s,border-color .8s}
+/* night theme: panels turn to dark glass so the lit city stays the brightest thing on screen */
+body.night .card{background:rgba(10,11,13,.8)}
+.proj,.hot,.gap,table,select,.seg button,.mini,.tog,.chip,.slider input,.cc{background-color:rgba(255,255,255,.04);color:var(--ink);border-color:rgba(255,255,255,.12)}
+.seg button[aria-pressed="true"],.tog[aria-pressed="true"]{background:#ece9e2;color:#14130f;border-color:#ece9e2}
+.note{background:rgba(255,255,255,.05);color:#c9c4b8}
+.osm-credit{background:rgba(20,19,16,.7)!important;color:#9b968b!important}
+.osm-credit a,.card a{color:#a8c7e6}
+.hint{color:#b4ae9f!important;text-shadow:none!important}
+.place{color:#e6e1d6!important;text-shadow:0 0 3px #000,0 0 3px #000,0 0 6px #000!important}
+th{color:var(--muted)}
+.num{font-family:var(--mono)}
+/* ---------- dark console theme (after the base rules so it wins) ---------- */
+.seg{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
+.seg button{background:transparent;color:var(--muted)}
+.seg button[aria-pressed="true"],.tog[aria-pressed="true"]{background:#ece9e2;color:#14130f;border-color:#ece9e2;box-shadow:none}
+.chip,.tog{background:rgba(20,19,16,.78);border-color:rgba(255,255,255,.1);color:var(--ink);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.mini,.close,select,.fixchip{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14);color:var(--ink)}
+select option{background:#1b1a17;color:#ece9e2}
+.proj{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1);color:var(--ink)}
+.proj:hover{border-color:rgba(233,178,95,.5)}
+.pill{background:rgba(255,255,255,.08);color:var(--ink)}
+.bar,.meter{background:rgba(255,255,255,.1)}
+.note{background:rgba(255,255,255,.05);color:#c9c4b8}
+.note.warn{background:rgba(226,154,60,.12);color:#f0c98e}
+.conf{background:rgba(255,255,255,.08);color:var(--ink)}
+.conf[data-c="low"]{background:rgba(208,83,46,.18);color:#f3a68c}
+.conf[data-c="medium"]{background:rgba(226,154,60,.15);color:#f0c98e}
+.conf[data-c="high"]{background:rgba(233,178,95,.15);color:#a8e6c0}
+.fixchip button{background:rgba(255,255,255,.12);color:var(--ink)}
+dialog{background:#141310;color:var(--ink);border-color:rgba(255,255,255,.1)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.pvbadge{color:#f0c98e;background:rgba(226,154,60,.14);border-color:rgba(226,154,60,.35)}
+.right-head{border-color:rgba(255,255,255,.08)}
+td,th{border-color:rgba(255,255,255,.08)!important}
+.compass svg path:last-child{fill:#4a4740}
+.compass svg path:first-child{fill:#e9b25f}
+input[type=range]{accent-color:#e9b25f!important}
+/* tiles and change rows (before → after) */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tile{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:7px 9px;display:grid;gap:3px}
+.tile small{color:var(--muted);font-size:11px;line-height:1.25}
+.tile b{font:600 15px/1.1 var(--mono)}
+.chg{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px}
+.chg small{color:#f0a24b}
+/* on-screen error box (shown by main.tsx when something fails) */
+#errbox{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;max-width:min(680px,90vw);background:#3a1410;color:#ffd7c9;border:1px solid #c0512e;border-radius:8px;padding:8px 12px;font:12px/1.4 var(--mono);display:none;white-space:pre-wrap}
