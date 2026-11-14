@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { extractWithClaude } from '../agent/extract';
 import { extractWithGemini } from '../agent/gemini';
 
-const item = (quote: string) => ({ name: 'Test Flats', type: 'Student housing', status: 'approved', where: '300 S 2nd W', units: 120, beds: 480, sqft: null, acres: 2,
+const item = (quote: string) => ({ name: 'Test Flats', type: 'Student housing', category: 'housing', status: 'approved', where: '300 S 2nd W', units: 120, beds: 480, sqft: null, acres: 2,
   startYear: null, endYear: null, plain: 'New student apartments.', quote, page: 3, confidence: 'medium', flags: ['No completion date in the record'] });
 const good = 'Council approved the Test Flats project with 120 units and 480 beds at 300 S 2nd W.';
 

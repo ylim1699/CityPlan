@@ -29,9 +29,18 @@ with gzip.open(os.path.join(LODES, 'id_xwalk.csv.gz'), 'rt') as f:
         lat, lon = float(row['blklatdd']), float(row['blklondd'])
         bpos[row['tabblk2020']] = P(lon, lat)
         if row['cty'] == '16065' and S <= lat <= N and W <= lon <= E: blocks[row['tabblk2020']] = row['bgrp']
+def lodes(fn):
+    with gzip.open(os.path.join(LODES, fn), 'rt') as f: yield from csv.DictReader(f)
+wac = {row['w_geocode']: row for row in lodes('id_wac_S000_JT00_2023.csv.gz') if row['w_geocode'] in blocks}
+# Shopping and eating places: a block with 40 or more store (CNS07) plus restaurant (CNS18) jobs is its own small zone, so its
+# trips arrive at the stores and not at the middle of a large block group zone (Walmart was landing 440 m away, by the WinCo site).
+SHOP_JOBS = 40
+def shop_jobs(b): r = wac.get(b); return int(r['CNS07']) + int(r['CNS18']) if r else 0
 for b, bg in blocks.items():
     p = bpos[b]
-    bzone[b] = 'campus' if inside(p, campus) else '%s-%d-%d' % (bg[-4:], math.floor(p[0] / GRID), math.floor(p[1] / GRID))
+    if inside(p, campus): bzone[b] = 'campus'
+    elif shop_jobs(b) >= SHOP_JOBS: bzone[b] = 'shop-' + b[-7:]
+    else: bzone[b] = '%s-%d-%d' % (bg[-4:], math.floor(p[0] / GRID), math.floor(p[1] / GRID))
 
 # ---------- residents and students from building floor area ----------
 H = collections.defaultdict(list)
@@ -52,6 +61,7 @@ def area(r):
     for i in range(len(r)): x1, z1 = r[i]; x2, z2 = r[(i + 1) % len(r)]; s += x1 * z2 - x2 * z1
     return abs(s) / 2
 res_w, stu_w = collections.Counter(), collections.Counter()
+shop_at = collections.defaultdict(lambda: [0.0, 0.0, 0.0])  # shop zone: commercial floor area, and its x and z sums
 for bld in C['buildings']:
     t, h, r = bld[0], bld[1], ring(bld[2:])
     if t not in (0, 1, 3): continue
@@ -61,6 +71,7 @@ for bld in C['buildings']:
     b = nearest_block((cx, cz))
     if not b: continue
     z = bzone[b]
+    if t == 3 and z.startswith('shop-'): s = shop_at[z]; s[0] += fa; s[1] += cx * fa; s[2] += cz * fa
     if inside((cx, cz), ped) and t in (1, 3): stu_w[z] += fa       # apartments and large untagged buildings in the walk district: student housing (ASSUMED)
     elif t in (0, 1): res_w[z] += fa
 
@@ -103,14 +114,27 @@ if os.path.exists(os.path.join(ACS, 'B08301_bg.json')):
 rs, ss = sum(res_w.values()), sum(stu_w.values())
 
 # ---------- LODES: workers by home, jobs by work place, home-to-work pairs ----------
-def lodes(fn):
-    with gzip.open(os.path.join(LODES, fn), 'rt') as f: yield from csv.DictReader(f)
-workers, jobs = collections.Counter(), collections.defaultdict(lambda: [0, 0, 0])
+workers, jobs = collections.Counter(), collections.defaultdict(lambda: [0, 0, 0, 0])  # retail, edu, other, food
 for row in lodes('id_rac_S000_JT00_2023.csv.gz'):
     if row['h_geocode'] in blocks: workers[bzone[row['h_geocode']]] += int(row['C000'])
-for row in lodes('id_wac_S000_JT00_2023.csv.gz'):
-    if row['w_geocode'] in blocks:
-        j = jobs[bzone[row['w_geocode']]]; j[0] += int(row['CNS07']); j[1] += int(row['CNS15']); j[2] += int(row['C000']) - int(row['CNS07']) - int(row['CNS15'])
+for b, row in wac.items():
+    j = jobs[bzone[b]]; ret, edu, food = int(row['CNS07']), int(row['CNS15']), int(row['CNS18'])
+    j[0] += ret; j[1] += edu; j[3] += food; j[2] += int(row['C000']) - ret - edu - food
+
+# ---------- named stores and restaurants (OpenStreetMap shop=* and amenity=restaurant, fast_food, cafe): map search, and shop zone names ----------
+shop_names, stores = collections.defaultdict(list), []
+OSM_RAW = os.path.join(os.path.dirname(LODES), 'export.geojson')
+if os.path.exists(OSM_RAW):
+    for f in json.load(open(OSM_RAW))['features']:
+        p, g = f['properties'], f['geometry']
+        if not p.get('name') or not (p.get('shop') or p.get('amenity') in ('restaurant', 'fast_food', 'cafe')): continue
+        c = g['coordinates']
+        pts = [c] if g['type'] == 'Point' else c[0] if g['type'] == 'Polygon' else c[0][0] if g['type'] == 'MultiPolygon' else None
+        if not pts: continue
+        q = P(sum(v[0] for v in pts) / len(pts), sum(v[1] for v in pts) / len(pts))
+        stores.append([p['name'], 'food' if p.get('amenity') else 'shop', round(q[0]), round(q[1])])
+        b = nearest_block(q)
+        if b and bzone[b].startswith('shop-'): shop_names[bzone[b]].append((area([P(*v) for v in pts]) if len(pts) > 2 else 0, p['name']))
 
 # ---------- gateways: road ends on main roads near the edge of the map ----------
 cls = C['cls']; ncls = collections.defaultdict(set); deg = collections.Counter()
@@ -166,14 +190,15 @@ for b, z in bzone.items(): zb[z].append(bpos[b])
 road_nodes = [i for i in range(len(nxy)) if ncls[i] - {'highway', 'ramp'}]
 main_nodes = [i for i in range(len(nxy)) if ncls[i] & {'arterial', 'minor', 'collector'}]
 def connector(x, z, main=False): return min(main_nodes if main else road_nodes, key=lambda i: (nxy[i][0] - x) ** 2 + (nxy[i][1] - z) ** 2)
-def connectors(x, z):  # up to 3 street points within 700 m, so a zone's trips can leave by more than one street
-    near = sorted(road_nodes, key=lambda i: (nxy[i][0] - x) ** 2 + (nxy[i][1] - z) ** 2)
+def connectors(x, z, main=False):  # up to 3 street points within 700 m, so a zone's trips can leave by more than one street
+    near = sorted(main_nodes if main else road_nodes, key=lambda i: (nxy[i][0] - x) ** 2 + (nxy[i][1] - z) ** 2)
+    if main and math.hypot(nxy[near[0]][0] - x, nxy[near[0]][1] - z) > 700: return connectors(x, z)
     return [near[0]] + [i for i in near[1:3] if math.hypot(nxy[i][0] - x, nxy[i][1] - z) < 700]
 zones = []
 for z, pts in sorted(zb.items()):
     x = sum(p[0] for p in pts) / len(pts); zz = sum(p[1] for p in pts) / len(pts)
     if z == 'campus': x, zz = sum(p[0] for p in campus) / len(campus), sum(p[1] for p in campus) / len(campus)
-    j = jobs.get(z, [0, 0, 0])
+    j = jobs.get(z, [0, 0, 0, 0])
     if z == 'campus':
         # Campus is split by its parking lots (by direction from the campus center), each part connected to the nearest street
         # that is not a local street, so campus traffic enters from several sides as it does in reality.
@@ -187,23 +212,27 @@ for z, pts in sorted(zb.items()):
         for k, (a, sx, sz) in sorted(parts.items()):
             px, pz = sx / a, sz / a
             zones.append({'id': 'campus-' + k, 'kind': 'campus', 'share': round(a / tot, 3), 'x': round(px), 'z': round(pz), 'node': connector(px, pz, main=True),
-                          'residents': 0, 'students': 0, 'workers': 0, 'jobs': {'retail': round(j[0] * a / tot), 'edu': round(j[1] * a / tot), 'other': round(j[2] * a / tot)},
+                          'residents': 0, 'students': 0, 'workers': 0, 'jobs': {'retail': round(j[0] * a / tot), 'edu': round(j[1] * a / tot), 'other': round(j[2] * a / tot), 'food': round(j[3] * a / tot)},
                           'inPed': True, 'blocks': len(pts)})
         continue
-    cn = connectors(x, zz)
+    shop = z.startswith('shop-')
+    if shop and shop_at[z][0]: x, zz = shop_at[z][1] / shop_at[z][0], shop_at[z][2] / shop_at[z][0]  # at its stores, by floor area
+    cn = connectors(x, zz, main=True) if shop else connectors(x, zz)
+    names = [n for _, n in sorted(set(shop_names[z]), key=lambda v: -v[0])][:4]
     zones.append({'id': z, 'kind': 'town', 'x': round(x), 'z': round(zz), 'node': cn[0], 'nodes': cn,
+                  **({'shop': True, 'name': ', '.join(names)} if shop else {}),
                   'residents': round(R0 * res_w[z] / rs, 1), 'students': round(S0 * stu_w[z] / ss, 1), 'workers': workers[z],
                   **({'acs': {k: v for k, v in acs[zbg[z]].items() if k != 'pop'}} if acs and zbg.get(z) in acs else {}),
-                  'jobs': {'retail': j[0], 'edu': j[1], 'other': j[2]}, 'inPed': inside((x, zz), ped), 'blocks': len(pts)})
+                  'jobs': {'retail': j[0], 'edu': j[1], 'other': j[2], 'food': j[3]}, 'inPed': inside((x, zz), ped), 'blocks': len(pts)})
 for g in gws:
     zones.append({'id': g['id'], 'kind': 'gateway', 'x': round(g['x']), 'z': round(g['z']), 'node': g['node'], 'road': g['road'], 'aadt': g['aadt'],
-                  'residents': 0, 'students': 0, 'workers': 0, 'jobs': {'retail': 0, 'edu': 0, 'other': 0}, 'inPed': False, 'blocks': 0})
+                  'residents': 0, 'students': 0, 'workers': 0, 'jobs': {'retail': 0, 'edu': 0, 'other': 0, 'food': 0}, 'inPed': False, 'blocks': 0})
 ids = {z['id']: i for i, z in enumerate(zones)}
 out = {'meta': {'source': 'LEHD LODES 2023 (OD main + aux, WAC, RAC, block crosswalk); Census ACS 5-year 2020-2024 (B01003, B08301, B25044) by block group; OpenStreetMap building floor area',
                 'url': 'https://lehd.ces.census.gov/data/', 'fetched': '2026-11-14', 'type': 'real'},
        'notes': 'Residents/students per zone: ACS 2020-2024 block group population spread by building floor area (student/resident split is an ESTIMATE from building types), scaled to city totals; commute mode per zone from ACS B08301; workers, jobs and commute pairs are LODES counts.',
        'acsCounty': acs.get('county'),
-       'zones': zones, 'work': []}
+       'zones': zones, 'work': [], 'stores': sorted(stores)}
 camp = [(ids[z['id']], z['share']) for z in zones if z['kind'] == 'campus']
 work = collections.Counter()
 for (h, w), n in od.items():
@@ -213,6 +242,6 @@ for (h, w), n in od.items():
         for wi, b in ws: work[(hi, wi)] += n * a * b
 out['work'] = [[h, w, round(n, 2)] for (h, w), n in sorted(work.items())]
 open(os.path.join(OUT, 'zones.json'), 'w').write(json.dumps(out, separators=(',', ':')))
-print(len(zones), 'zones:', sum(z['kind'] == 'town' for z in zones), 'town,', len(gws), 'gateways', [(g['id'], g['aadt']) for g in gws])
+print(len(stores), 'named stores and restaurants;', len(zones), 'zones:', sum(z['kind'] == 'town' for z in zones), 'town,', len(gws), 'gateways', [(g['id'], g['aadt']) for g in gws])
 print('residents', round(sum(z['residents'] for z in zones)), 'students', round(sum(z['students'] for z in zones)), 'workers', sum(workers.values()),
       'jobs', sum(sum(j) for j in jobs.values()), 'work pairs', len(out['work']), 'commuters', sum(n for (h, w), n in od.items()))

@@ -6,9 +6,9 @@ import type { Fix, Params, XZ } from './types';
 
 export type GraphFile = { nodes: number[]; edges: [number, number, number, number, number, number, number, number][] };
 export type ZoneAcs = { drive: number; occ: number; wfh: number; walk: number; vehPerHH: number; zeroCar: number };
-export type Zone = { id: string; kind: 'town' | 'campus' | 'gateway'; share?: number; x: number; z: number; node: number; nodes?: number[]; acs?: ZoneAcs; residents: number; students: number; workers: number;
-  jobs: { retail: number; edu: number; other: number }; inPed: boolean; road?: string; aadt?: number };
-export type ZonesFile = { zones: Zone[]; work: [number, number, number][]; acsCounty?: { drive: number; occ: number; wfh: number; walk: number } };
+export type Zone = { id: string; kind: 'town' | 'campus' | 'gateway'; share?: number; shop?: boolean; name?: string; x: number; z: number; node: number; nodes?: number[]; acs?: ZoneAcs; residents: number; students: number; workers: number;
+  jobs: { retail: number; edu: number; other: number; food?: number }; inPed: boolean; road?: string; aadt?: number };
+export type ZonesFile = { zones: Zone[]; work: [number, number, number][]; stores?: [string, 'shop' | 'food', number, number][]; acsCounty?: { drive: number; occ: number; wfh: number; walk: number } };
 export type Calib = { alpha: number; beta: number; studentTrips: number; throughShare: number };
 export const CALIB0: Calib = { alpha: 1, beta: 0.1, studentTrips: 3, throughShare: 0.5 };
 
@@ -24,7 +24,9 @@ export const RATES = {
   studentOcc: 1.3,    // people per car, students
   toCampus: 0.70,     // share of student car trips to campus
   hhSize: 3.3,        // people per resident household
-  attr: { retail: 4, other: 1, edu: 1, hh: 0.5 }  // attraction weights per job / household
+  shopShare: 0.4,     // share of home-based other trips that are shopping (ASSUMED; NHTS puts shopping and errands near 40%)
+  walmartShare: 0.6,  // share of those shopping trips that go to Walmart, from every zone (ASSUMED: it is where most of town shops)
+  attr: { retail: 4, food: 4, other: 1, edu: 1, hh: 0.5 }  // attraction weights per job / household (food: restaurants, ASSUMED to pull like stores)
 };
 export const BATCHES = [0.4, 0.3, 0.2, 0.1];
 /* Planner additions, ported from the UI sandbox's router.js:
@@ -43,7 +45,12 @@ export type Scenario = { t: number; hour: number; withProjects: boolean; prm: Pa
   plans?: PlanSite[]; roads?: NewRoad[];
   rev?: string };  /* rev: which confirmed agent projects are loaded; only part of the cache key */
 export type RouteResult = { vol: Float64Array; tti: Float64Array; vht: number; trips: number; through: number;
-  planTrips?: number[]; planNode?: number[]; roadVol?: Record<string, { vol: number; vc: number }> };
+  planTrips?: number[]; planNode?: number[]; roadVol?: Record<string, { vol: number; vc: number }>; zone?: ZoneStats;
+  /* daily car trips arriving at each shop zone, by the zone they leave from (the Shopping filter) */
+  flows?: { zone: number; from: Float32Array }[] };
+/* per zone for the trip-zone map layer: residents and students in the scenario year, daily car trips leaving and
+   arriving (trips within the zone are not routed, so not counted), and the hour's share of the day */
+export type ZoneStats = { res: Float64Array; stu: Float64Array; out: Float64Array; in: Float64Array; share: number; hour: number };
 
 /* Binary heap keyed on float distances (node ids as payload) */
 class Heap {
@@ -127,6 +134,9 @@ export function createRouter(A: Atlas, G: GraphFile, Z: ZonesFile, calib: Calib 
   }
   const projZone: Record<string, number> = {};
   A.PROJECTS.forEach(p => { if (p.pos && p.trips) projZone[p.id] = zoneAt(p.pos); });
+  /* the Walmart shop zone (build_zones.py names it from OpenStreetMap), else the shop zone nearest the store */
+  const wm = A.OSM.places.walmart, shops = zones.map((z, i) => z.shop ? i : -1).filter(i => i >= 0);
+  const walmart = shops.find(i => /walmart/i.test(zones[i].name || '')) ?? (wm && shops.length ? shops.reduce((b, i) => Math.hypot(zones[i].x - wm[0], zones[i].z - wm[1]) < Math.hypot(zones[b].x - wm[0], zones[b].z - wm[1]) ? i : b) : -1);
   const workRows: Record<number, [number, number][]> = {};
   Z.work.forEach(([h, w, n]) => { (workRows[h] = workRows[h] || []).push([w, n]); });
 
@@ -220,7 +230,7 @@ export function createRouter(A: Atlas, G: GraphFile, Z: ZonesFile, calib: Calib 
       if (p.attract) { Aj[k] += p.attract; visits.push([k, p.attract]); }
     });
     const at = RATES.attr;
-    town.forEach(j => { const z = zones[j]; Aj[j] += at.retail * z.jobs.retail + at.other * z.jobs.other + at.edu * z.jobs.edu + at.hh * R[j] / RATES.hhSize; });
+    town.forEach(j => { const z = zones[j]; Aj[j] += at.retail * z.jobs.retail + at.food * (z.jobs.food || 0) + at.other * z.jobs.other + at.edu * z.jobs.edu + at.hh * R[j] / RATES.hhSize; });
     net.plans.forEach((_, m) => { Aj[nz + m] += at.hh * R[nz + m] / RATES.hhSize; });
     const beta = calib.beta;
     function gravity(i: number, trips: number, half: boolean) {
@@ -246,7 +256,9 @@ export function createRouter(A: Atlas, G: GraphFile, Z: ZonesFile, calib: Calib 
       /* work: LODES home-to-work shares */
       const rows = workRows[i] || []; let tot = 0; rows.forEach(r => { tot += r[1]; });
       if (tot) rows.forEach(([j, n]) => { if (j === i) return; const v = W * cw * n / tot; OD[i * NZ + j] += v / 2; OD[j * NZ + i] += v / 2; });
-      gravity(i, HBO * co, true);
+      const toW = walmart >= 0 && walmart !== i ? HBO * co * RATES.shopShare * RATES.walmartShare : 0;
+      if (toW) { OD[i * NZ + walmart] += toW / 2; OD[walmart * NZ + i] += toW / 2; }
+      gravity(i, HBO * co - toW, true);
       nhbTotal += NHB * co;
       /* students: campus rules */
       const d = Math.hypot(z.x - campusXZ[0], z.z - campusXZ[1]), m = z.inPed ? 0.25 : d < 2500 ? 0.5 : 0.7;
@@ -279,8 +291,8 @@ export function createRouter(A: Atlas, G: GraphFile, Z: ZonesFile, calib: Calib 
     /* stores, temple, offices: their own daily car trips, to and from homes by the gravity rule */
     visits.forEach(([zi, n]) => gravity(zi, n, true));
     /* not-home-based trips start where the jobs and stores are */
-    let jsum = 0; town.forEach(i => { const z = zones[i]; jsum += z.jobs.retail + z.jobs.other; });
-    if (jsum) town.forEach(i => { const z = zones[i]; gravity(i, nhbTotal * (z.jobs.retail + z.jobs.other) / jsum, false); });
+    let jsum = 0; town.forEach(i => { const z = zones[i]; jsum += z.jobs.retail + (z.jobs.food || 0) + z.jobs.other; });
+    if (jsum) town.forEach(i => { const z = zones[i]; gravity(i, nhbTotal * (z.jobs.retail + (z.jobs.food || 0) + z.jobs.other) / jsum, false); });
     for (let k = 0; k < OD.length; k++) OD[k] *= calib.alpha;
     /* Gateways: traffic counted there minus the model's local trips is outside traffic (Step 7).
        On highways half of it passes straight through (ASSUMED); the rest, and all of it on smaller roads,
@@ -297,7 +309,10 @@ export function createRouter(A: Atlas, G: GraphFile, Z: ZonesFile, calib: Calib 
     zones.forEach((z, g) => { if (ext[g]) gravity(g, ext[g] * (hw.includes(g) ? 1 - calib.throughShare : 1), true); });
     let trips = 0; for (let k = 0; k < OD.length; k++) trips += OD[k];
     const planTrips = net.plans.map((_, m) => { const k = nz + m; let t = 0; for (let j = 0; j < NZ; j++) t += OD[k * NZ + j] + OD[j * NZ + k]; return t; });
-    return { OD, trips, through, planTrips };
+    const zout = new Float64Array(nz), zin = new Float64Array(nz);
+    for (let i = 0; i < nz; i++) for (let j = 0; j < NZ; j++) if (i !== j) { zout[i] += OD[i * NZ + j]; if (j < nz) zin[j] += OD[i * NZ + j]; }
+    for (let m = nz; m < NZ; m++) for (let j = 0; j < nz; j++) zin[j] += OD[m * NZ + j];  /* trips from planned sites */
+    return { OD, trips, through, planTrips, zone: { res: R.slice(0, nz), stu: S_.slice(0, nz), out: zout, in: zin } };
   }
 
   /* Hourly assignment: 4 batches, fastest paths on current times, BPR after each batch.
@@ -347,6 +362,9 @@ export function createRouter(A: Atlas, G: GraphFile, Z: ZonesFile, calib: Calib 
     const caps = A.capacities(tp, { widen: sc.widen, fixes: sc.fixes });
     const net = buildNet(sc), tt = tripTable(sc, net), r = assign(tt.OD, sc.hour, caps, sc.closed, sc.day, net);
     r.trips = tt.trips; r.through = tt.through; r.planTrips = tt.planTrips; r.planNode = net.plans.map(q => q.drive);
+    r.zone = { ...tt.zone, share: shareAt(sc.hour, sc.day), hour: sc.hour };
+    const NZ = Math.round(Math.sqrt(tt.OD.length));
+    r.flows = shops.map(j => ({ zone: j, from: Float32Array.from({ length: nz }, (_, i) => i === j ? 0 : tt.OD[i * NZ + j]) }));
     return r;
   }
 

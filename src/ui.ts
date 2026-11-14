@@ -2,8 +2,9 @@
 import type { Atlas } from './model/atlas';
 import type { Project } from './model/types';
 
-/* road load colors, light to over capacity: warm sand → amber → orange → red (from the UI sandbox) */
-export const CCOL = ['#d8c49a', '#e8b65a', '#e88e3a', '#cf552d', '#8f1f2a'];
+/* road load colors by level (Light, Steady, Busy, Heavy, Over): three contrasting traffic colors.
+   Green under 70%, yellow 70 to 85%, red from 85%, a deeper red over capacity. */
+export const CCOL = ['#22c55e', '#22c55e', '#facc15', '#ef4444', '#b91c1c'];
 export const TODAY_I = 11, LAST_I = 43;
 export const FIXES = [
   { k: 'turn', l: 'Turn lanes (+15%)', f: 1.15 },

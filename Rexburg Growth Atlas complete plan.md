@@ -206,6 +206,7 @@ Step 5 adds no trips. It decides where each of Step 4's trips goes: work trips b
 ### Zones
 
 - **40–60 zones in town:** Census block groups, with big ones split along main roads.
+- **Shop zones:** any Census block with 40+ store or restaurant jobs (LODES CNS07 + CNS18) is its own zone, placed at its commercial buildings and joined to the nearest main streets, so shoppers arrive at Walmart, Broulim's or the 2nd East strips, not at the middle of a big block group.
 - **Campus zone:** BYU-I (or 2–3 zones for its main parking areas).
 - **Gateway zones:** US-20 north and south, SH-33 east and west, and other roads out of town, for trips to Idaho Falls, Rigby or Sugar City.
 
@@ -229,7 +230,7 @@ F\_ij = workers living in zone i who work in zone j (LODES). Morning trips go ho
 ### Attractions and gravity
 
 ```latex
-A_j = a_{\text{ret}} \cdot \text{RetailJobs}_j + a_{\text{oth}} \cdot \text{OtherJobs}_j + a_{\text{hh}} \cdot \text{Households}_j + \text{ProjectTrips}_j
+A_j = a_{\text{ret}} \cdot \text{RetailJobs}_j + a_{\text{food}} \cdot \text{FoodJobs}_j + a_{\text{oth}} \cdot \text{OtherJobs}_j + a_{\text{hh}} \cdot \text{Households}_j + \text{ProjectTrips}_j
 ```
 
 ```latex

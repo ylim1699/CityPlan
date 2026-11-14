@@ -2,7 +2,7 @@
 Usage: python -I scripts/build_city.py data/raw/export.geojson public/data data/raw
        (second argument: a folder for city-rexburg.json, or a .js path for the legacy window.OSM_CITY file;
         coordinates become integer meters from the origin)"""
-import json, math, sys, collections, re as _re
+import json, math, os, sys, collections, re as _re
 SRC, OUT = sys.argv[1], sys.argv[2]
 EXTRA = sys.argv[3] if len(sys.argv) > 3 else None   # folder with ped.json, trafficcounts.json, projects.json, streetplan.json
 LON0, LAT0 = -111.783826, 43.8260632          # Main St x Center St
@@ -327,21 +327,70 @@ for ri, r in enumerate(roads):
         gedges.append([gn(r['pts'][a]), gn(r['pts'][b]), ri, segbase[ri] + a, segbase[ri] + b, round(max(L, 1)), round(r['mph'] * 0.44704, 2), 1 if r['ow'] else 0])
 graph = {'meta': {'source': 'Road graph built from OpenStreetMap intersections; speeds from maxspeed tags, else assumed by road type', 'url': 'https://www.openstreetmap.org/copyright', 'fetched': '2026-11-14', 'type': 'real'},
          'nodes': [v for q in gnodes for v in q], 'edges': gedges, 'speedBasis': {'osm': sum(1 for r in roads if r['mphb'] == 'osm'), 'assumed': sum(1 for r in roads if r['mphb'] == 'assumed')}}
+# ---------- named places for map search: buildings and parks from the export, plus shopping centers, parks,
+# schools, churches and neighborhoods from areas.json (Overpass: named landuse=retail|commercial, shop=mall, place,
+# leisure, and amenity=school|college|university|hospital|library|townhall|community_centre|place_of_worship; out center) ----------
+BKIND = {'university': 'campus', 'church': 'church', 'temple': 'church', 'chapel': 'church', 'school': 'school', 'apartments': 'apartments',
+         'dormitory': 'apartments', 'hospital': 'civic', 'government': 'civic', 'retail': 'shop', 'commercial': 'business', 'hotel': 'business'}
+def poi_kind(p):
+    if p.get('shop') == 'mall' or p.get('landuse') in ('retail', 'commercial'): return 'center'
+    if 'place' in p: return 'place'
+    if p.get('leisure') in ('park', 'garden', 'playground', 'nature_reserve'): return 'park'
+    if 'leisure' in p: return 'rec'
+    a = p.get('amenity')
+    if a == 'place_of_worship': return 'church'
+    if a in ('school', 'college', 'university'): return 'school' if a == 'school' else 'campus'
+    if a: return 'civic'
+    if 'building' in p: return BKIND.get(p['building'], 'building')
+    if p.get('natural') == 'water': return 'water'
+    return None
+pois = []
+def add_poi(name, kind, pt):
+    if not name or not kind or _re.match(r'^Building \d+$', name): return  # numbered blocks of one complex say nothing alone
+    for q in pois:  # the same place mapped twice (outline and point, or two outlines)
+        if q[0].lower() == name.lower() and math.hypot(q[2] - pt[0], q[3] - pt[1]) < 250: return
+    pois.append([name, kind, round(pt[0]), round(pt[1])])
+for f in F:
+    p, g = f['properties'], f['geometry']
+    if 'highway' in p or 'railway' in p or 'waterway' in p or not p.get('name'): continue
+    if g['type'] == 'Polygon': c = cen(ring(f))
+    elif g['type'] == 'MultiPolygon': c = cen([P(x, y) for x, y in g['coordinates'][0][0]])
+    elif g['type'] == 'Point': c = P(*g['coordinates'])
+    else: continue
+    add_poi(p['name'], poi_kind(p), c)
+if EXTRA and os.path.exists(os.path.join(EXTRA, 'areas.json')):
+    for e in json.load(open(os.path.join(EXTRA, 'areas.json'), encoding='utf-8'))['elements']:
+        c = e.get('center') or ({'lat': e['lat'], 'lon': e['lon']} if 'lat' in e else None)
+        if c: add_poi(e['tags'].get('name'), poi_kind(e['tags']), LL(c['lat'], c['lon']))
+
+# ---------- traffic signals: OSM highway=traffic_signals nodes, one per approach at some intersections ----------
+# signals.json is an Overpass answer: [out:json];node["highway"="traffic_signals"](43.775,-111.845,43.865,-111.74);out;
+signals = []
+if EXTRA and os.path.exists(os.path.join(EXTRA, 'signals.json')):
+    groups = []  # nodes within 60 m of a group's center are the same intersection
+    for e in json.load(open(os.path.join(EXTRA, 'signals.json')))['elements']:
+        p = LL(e['lat'], e['lon'])
+        g = next((g for g in groups if math.hypot(cen(g)[0]-p[0], cen(g)[1]-p[1]) < 60), None)
+        if g: g.append(p)
+        else: groups.append([p])
+    signals = [[round(cen(g)[0]), round(cen(g)[1]), len(g)] for g in groups]
 city = {
   'name': 'Rexburg, Idaho', 'origin': [LAT0, LON0], 'kx': KX, 'kz': KZ,
   'bbox': [43.775, -111.845, 43.865, -111.740], 'fetched': '2026-11-14',
   'names': names, 'cls': CLSN,
   'roads': [[CLSN.index(r['c']), ni(r['n']), (r['ov'][0] if r['ov'] else 0), (ni(r['ov'][1]) if r['ov'] else ni('')), [v for q in r['pts'] for v in q], r['near'],
-             r['thr'], 1 if r['ow'] else 0, ni(r['lb']), r['sadt'], [ni(b) for b in r['sbasis']]] for r in roads],
+             r['thr'], 1 if r['ow'] else 0, ni(r['lb']), r['sadt'], [ni(b) for b in r['sbasis']], r['mph'], 1 if r['mphb'] == 'osm' else 0] for r in roads],
   'classAdt': med, 'counts': {'used': len(counts_used), 'records': counts_all, 'growth': GROW,
              'pts': [[c['pt'][0], c['pt'][1], c['aadt'], c['year'], segbase[c['ri']] + c['k'], c['adj']] for c in counts_used],
              'approach': approach},  # x, z, approach count, year, leg segment, two-way leg estimate grown to 2026, direction, label
   'buildings': B, 'lots': [[v for q in r for v in q] for r in lots], 'parks': [[v for q in r for v in q] for r in parks],
   'water': [[v for q in r for v in q] for r in water], 'waterways': lines_w, 'rail': rail,
   'campus': [v for q in campus for v in q], 'walk': walk, 'ped': [v for q in ped for v in q] if ped else None, 'widenings': widen, 'streetplan': lids, 'foot': FOOT, 'strips': STRIPS,
+  'signals': signals,  # x, z, OSM signal nodes at the intersection
+  'pois': pois,  # name, kind, x, z: named buildings, parks, shopping centers and areas for map search
   'places': {'campus': cc, 'walmart': walmart, 'porter': porter, 'river': rv, 'exit333': LL(43.82614, -111.8114), 'exit332': LL(43.8045659, -111.8129931)},
   'parking': {'lots': len(lots), 'spacesAll': spaces_all, 'lotsNear': lots_near, 'spacesNear': spaces_near, 'perSpace': 30},
-  'stats': {'roads': len(roads), 'segments': nseg, 'buildings': len(B), 'heightsEstimated': est, 'hidden': dict(hidden)}
+  'stats': {'roads': len(roads), 'segments': nseg, 'signals': len(signals), 'buildings': len(B), 'heightsEstimated': est, 'hidden': dict(hidden)}
 }
 city['meta'] = {'source': 'OpenStreetMap via Overpass Turbo (c) OpenStreetMap contributors, ODbL; Madison County / Rexburg GIS layers',
                 'url': 'https://www.openstreetmap.org/copyright', 'fetched': '2026-11-14', 'type': 'real'}

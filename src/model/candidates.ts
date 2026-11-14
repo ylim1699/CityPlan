@@ -1,9 +1,10 @@
 /* What the AI agent returns for one project, and how a person-confirmed candidate becomes an atlas project.
    Shared by the planner panel (upload + confirm) and scripts/run_agent.ts. No SDK imports here. */
 import type { Project, Source } from './types';
+import type { Category, QuoteCheck } from './review';
 
 export type Candidate = {
-  name: string; type: string; status: 'construction' | 'approved' | 'planned'; where: string;
+  name: string; type: string; category?: Category | null; check?: QuoteCheck; status: 'construction' | 'approved' | 'planned'; where: string;
   units: number | null; beds: number | null; sqft: number | null; acres: number | null;
   startYear: number | null; endYear: number | null; plain: string; quote: string; page: number | null;
   confidence: 'high' | 'medium' | 'low'; flags: string[];

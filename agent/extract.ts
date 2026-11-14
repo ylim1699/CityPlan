@@ -5,6 +5,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
+import { CATEGORIES } from '../src/model/review';
 
 export const CLAUDE_MODEL = 'claude-opus-5-5';
 
@@ -12,6 +13,7 @@ export const Found = z.object({
   projects: z.array(z.object({
     name: z.string().describe('Project name as the record gives it'),
     type: z.string().describe('Short type, e.g. "Student housing", "Grocery store", "Road work", "Subdivision"'),
+    category: z.enum(CATEGORIES).describe('housing / commercial / mixed use / public building = a building is planned; subdivision = new lots, use not stated; road or trail, utility (sewer, water, cell tower), zoning only (rezone, annexation, plat vacation, no building named), study or plan; other'),
     status: z.enum(['construction', 'approved', 'planned']).describe('approved = approved by council or P&Z; planned = proposed or under review; construction = the record says work has started'),
     where: z.string().describe('Location as stated: address, cross streets or parcel description'),
     units: z.number().nullable().describe('Homes or apartment units, if stated'),
