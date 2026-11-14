@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Req, Res } from '../worker/route.worker';
 import type { Scenario } from '../model/routing';
+import type { ModelEdits } from '../model/datafile';
 
 type Run = Extract<Res, { type: 'run' }>;
 let worker: Worker | null = null;
@@ -22,6 +23,8 @@ function getWorker() {
 export function send(m: Req) { getWorker().postMessage(m); }
 /* projects confirmed from the AI agent: the worker rebuilds its model with them */
 export function setExtraProjects(list: unknown[]) { send({ type: 'projects', extra: list } as Req); }
+/* the open data file's numbers: the worker rebuilds its router with them (send before the run that needs them) */
+export function setDataEdits(edits: ModelEdits | null) { send({ type: 'data', edits }); }
 export function useWorkerMessages(fn: (m: Res) => void) {
   const ref = useRef(fn); ref.current = fn;
   useEffect(() => { const l = (m: Res) => ref.current(m); listeners.add(l); getWorker(); return () => { listeners.delete(l); }; }, []);

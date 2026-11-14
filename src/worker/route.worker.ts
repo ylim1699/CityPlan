@@ -6,10 +6,12 @@ import { createRouter, type Router, type Scenario, type ZoneStats } from '../mod
 import { slimeRoads, type RoadCandidate } from '../model/physarum';
 import { measures, type Series } from '../model/overview';
 import type { XZ } from '../model/types';
+import { applyZones, type ModelEdits } from '../model/datafile';
 
 export type Req =
   | { type: 'init'; base: string }
   | { type: 'projects'; extra: any[] }
+  | { type: 'data'; edits: ModelEdits | null }
   | { type: 'run'; key: string; sc: Scenario; hours?: boolean }
   | { type: 'hours'; key: string; sc: Scenario }
   | { type: 'years'; key: string; sc: Scenario; from: number; to: number }
@@ -30,11 +32,11 @@ type Jump = { pts: number; name: string; vc: number };
 type Worst = { vc: number; name: string };
 
 let R: Router | null = null, A: ReturnType<typeof createAtlas> | null = null;
-let files: any = null, extra: any[] = [];
+let files: any = null, extra: any[] = [], edits: ModelEdits | null = null;
 function build() {
   const [city, projects, graph, zones, cal, hourly] = files, ids = new Set(extra.map(p => p.id));
   A = createAtlas(city, { ...projects, projects: projects.projects.filter((p: any) => !ids.has(p.id)).concat(extra) });
-  R = createRouter(A, graph, zones, cal.calib, hourly);
+  R = createRouter(A, graph, applyZones(zones, edits), cal.calib, hourly);
   cache.clear();
 }
 const ORDER = ['run', 'compare', 'slime', 'years', 'hours', 'overview'] as const;
@@ -141,6 +143,7 @@ self.onmessage = async (e: MessageEvent<Req>) => {
     return;
   }
   if (m.type === 'projects') { extra = m.extra; if (files) build(); return; }
+  if (m.type === 'data') { edits = m.edits; if (files) build(); return; }
   pending.set(m.type === 'judge' ? 'judge:' + m.key : m.type, m);
   setTimeout(pump, 0);
 };

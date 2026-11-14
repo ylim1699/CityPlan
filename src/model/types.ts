@@ -30,6 +30,7 @@ export type Project = {
   source: Source; confidence: 'high' | 'medium' | 'low'; flags: string[];
   trips?: number; tripBasis?: string; units?: number; beds?: number; sqft?: number; parkRate?: number;
   phased?: boolean; unconfirmed?: boolean; fid?: string; hM?: number; n?: number; sid?: string; ll?: [number, number];
+  footM?: [number, number];  /* footprint in meters for a project placed by a reviewer (no mapped footprint): drawn as n blocks hM tall */
   lines?: number[][]; effects?: Effect[];
   foundBy?: 'agent' | 'person'; reviewed?: boolean; foundIn?: Source;
   /* filled in by createAtlas */

@@ -232,3 +232,39 @@ input[type=range]{accent-color:#e9b25f!important}
 .flowlist li span{flex:1;min-width:0}
 .flowlist li b{flex:none}
 @media (max-width:900px){.left,.dock-left .left{left:8px;right:8px;width:auto}}
+
+/* data files (Filter > People, Shopping) and the number boxes that edit them */
+.datafile{display:grid;gap:6px;padding:10px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)}
+.datafile .sec{margin:0}
+.datafile small{font-size:11.5px;color:var(--muted)}.datafile small.warn{color:#f2c14e}
+.df-acts,.df-name{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.df-name input{flex:1 1 140px;min-width:0;font:inherit;font-size:12.5px;border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:4px 8px;background:transparent;color:inherit}
+.mini.danger{border-color:#e0605a;color:#ffb3ae}
+.mini:disabled{opacity:.45;cursor:default}
+.numfield{display:inline-flex;align-items:center;gap:3px}
+.numfield input{width:76px;font:inherit;font-size:12.5px;text-align:right;border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:2px 6px;background:transparent;color:inherit;-moz-appearance:textfield}
+.numfield input::-webkit-inner-spin-button,.numfield input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.numfield.edited input,.flowlist li.edited .numfield input{border-color:#f2c14e;color:#f8d980}
+.numfield i{font-style:normal;font-size:12px;color:var(--muted)}
+.undo{border:0;background:none;color:#f2c14e;cursor:pointer;font-size:13px;padding:0 2px;line-height:1}
+.flowlist.edit li{align-items:center}
+.flowlist.edit .numfield input{width:62px;padding:1px 5px}
+
+/* the planner's way into Build from Details */
+.build-cta{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;text-align:left;width:100%;padding:10px 12px;margin-bottom:10px;border-radius:10px;border:1px solid rgba(242,193,78,.35);background:rgba(242,193,78,.08);color:inherit;cursor:pointer;font:inherit}
+.build-cta b{font-size:13.5px}.build-cta small{grid-column:1;color:var(--muted);font-size:12px}.build-cta span{grid-row:1/3;grid-column:2;font-size:16px;color:#f2c14e}
+.build-cta:hover{background:rgba(242,193,78,.14)}
+.datafile.editing{border-color:rgba(242,193,78,.55);background:rgba(242,193,78,.07)}
+.df-head{display:flex;align-items:center;gap:6px}.df-head b{font-size:13px}.df-head small{margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.df-dot{width:8px;height:8px;border-radius:50%;background:#f2c14e;box-shadow:0 0 0 3px rgba(242,193,78,.25)}
+.df-input{width:100%;box-sizing:border-box;font:inherit;font-size:12.5px;border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:5px 8px;background:transparent;color:inherit}
+.df-acts .df-input{flex:1 1 140px;width:auto}
+.mini.primary{background:#f2c14e;border-color:#f2c14e;color:#1b1a16;font-weight:600}
+.mini.primary:disabled{background:rgba(242,193,78,.3);color:#1b1a16}
+.num.edited{color:#f8d980;border-bottom:1px dashed #f2c14e}
+
+/* review cards: hide or delete, and the in-card "are you sure" */
+.card-acts{display:flex;gap:6px;justify-content:flex-end;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,.08)}
+.confirm-del{display:grid;gap:6px;margin-top:8px;padding:10px;border:1px solid rgba(224,96,90,.6);border-radius:10px;background:rgba(200,70,63,.12)}
+.confirm-del b{font-size:13px;color:#ffd0cc}.confirm-del small{font-size:11.5px;color:var(--muted)}
+.confirm-del div{display:flex;gap:6px}

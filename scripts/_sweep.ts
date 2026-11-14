@@ -1,0 +1,30 @@
+import puppeteer from 'puppeteer-core';
+const browser = await puppeteer.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage(); await page.setViewport({ width: 1440, height: 900 });
+const errors: string[] = []; let step = 'load';
+page.on('pageerror', e => errors.push('[' + step + '] pageerror: ' + (e as Error).message + '\n' + ((e as Error).stack || '').split('\n').slice(0, 4).join('\n')));
+page.on('console', m => { if (m.type() === 'error') errors.push('[' + step + '] console: ' + m.text()); });
+const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+const btn = (t: string) => page.evaluate(t => { const b = [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === t) as HTMLElement | undefined; b?.click(); return !!b; }, t);
+const legacy = process.argv[2] === 'legacy';
+await page.goto('http://localhost:5199/', { waitUntil: 'networkidle0', timeout: 60000 });
+if (legacy) await page.evaluate(() => {
+  localStorage.setItem('atlas-data-open', JSON.stringify({ id: null, edits: { blocks: {}, shops: { 'shop-1031017': { total: 900 } } } }));
+  localStorage.setItem('atlas-data-files', JSON.stringify([{ id: 'f1', name: 'old', saved: '2026-11-14T00:00:00Z', edits: { blocks: { '160659501011': { pop: 3000 } }, shops: {} } }]));
+  localStorage.setItem('atlas-records-last', JSON.stringify([{ r: { id: 1, kind: 'council', title: 't', label: 'City Council minutes, Nov 5 2026', date: '2026-11-05', url: '', edoc: false }, st: 'reading' }]));
+});
+await page.reload({ waitUntil: 'networkidle0' }); await wait(2500);
+step = 'start'; await page.keyboard.press('Escape'); await wait(1500);
+step = 'resident details'; await btn('Details'); await wait(2500);
+step = 'planner'; await btn('Planner'); await wait(3000);
+step = 'records'; await page.evaluate(() => { const d = document.getElementById('records-review') as HTMLDetailsElement; if (d) d.open = true; }); await wait(1000);
+step = 'build'; await btn('Build'); await wait(2000); await btn('+ In view'); await wait(3000);
+step = 'build tabs'; await btn('Better spot'); await wait(1500); await btn('Roads'); await wait(1500); await btn('Impact'); await wait(1000);
+step = 'filter'; await btn('Filter'); await wait(800);
+for (const t of ['Traffic', 'Places', 'People', 'Shopping']) { step = 'filter ' + t; await btn(t); await wait(1500); }
+step = 'blocks'; await btn('People'); await page.evaluate(() => { const l = [...document.querySelectorAll('label.check')].find(l => /Census blocks/.test(l.textContent || '')); (l?.querySelector('input') as HTMLElement)?.click(); }); await wait(1000);
+await page.mouse.click(700, 450); await wait(1500);
+step = 'edit numbers'; await btn('Edit numbers'); await wait(800);
+step = 'overview'; await page.evaluate(() => (document.querySelector('.topcard button[aria-expanded], .ovstrip, [class*=overview] button') as HTMLElement)?.click()); await wait(2500);
+console.log(errors.length ? errors.join('\n---\n') : 'NO ERRORS');
+await browser.close();

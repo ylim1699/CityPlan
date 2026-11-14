@@ -3,8 +3,11 @@ import { createAtlas } from './model/atlas';
 import type { BlockGroupsFile, OsmCity, Project, ProjectsFile } from './model/types';
 import { CloseButton } from './components/CloseButton';
 import { BlockDetail, blockSub } from './components/BlockPanel';
-import { AgentPanel } from './components/AgentPanel';
-import { setExtraProjects } from './hooks/useTraffic';
+import { useDataFiles } from './hooks/useDataFiles';
+import { useShopEdits } from './hooks/useShopEdits';
+import { applyBlocks, editsKey, modelEdits } from './model/datafile';
+import { AgentPanel, REVIEW_CHANGED, waiting } from './components/AgentPanel';
+import { setDataEdits, setExtraProjects } from './hooks/useTraffic';
 import type { Scenario, ZonesFile } from './model/routing';
 import { initialState, reducer } from './state';
 import { LAST_I, TODAY_I, tOf } from './ui';
@@ -23,14 +26,14 @@ import { GHOST_TYPES, ghostActive, ghostCounts, ghostPlans, ghostRoads, ghostSup
 import { snapSite, useSuggest } from './planner/suggest';
 import { OverviewPanel, OverviewStrip, useOverview, useOverviewSeries } from './components/Overview';
 import { RecordPill, StartScreen } from './components/StartScreen';
-import { useRecords } from './hooks/useRecords';
+import { REVIEW_EVENT, useRecords } from './hooks/useRecords';
 import { MapSearch } from './components/MapSearch';
 import { flowsTo, walmartId } from './model/flows';
 
-type Lay = { ctl: boolean; pan: boolean; left: boolean };
+type Lay = { ctl: boolean; pan: boolean; left: boolean; build?: boolean };  /* build: the right slot shows Build instead of Details */
 function loadLayout(): Lay {
-  const lay = { ctl: true, pan: true, left: false };
-  try { const sv = JSON.parse(localStorage.getItem('atlas-layout') || 'null'); if (sv) { lay.ctl = !!sv.ctl; lay.pan = !!sv.pan; } } catch (e) {}
+  const lay: Lay = { ctl: true, pan: true, left: false };
+  try { const sv = JSON.parse(localStorage.getItem('atlas-layout') || 'null'); if (sv) { lay.ctl = !!sv.ctl; lay.pan = !!sv.pan; lay.build = !!sv.build; } } catch (e) {}
   if (window.innerWidth < 1180) lay.ctl = false;
   if (lay.ctl && lay.pan) lay.ctl = false;  /* Filter and Details share the left side: one at a time */
   return lay;
@@ -41,7 +44,7 @@ function loadConfirmed(): Project[] { try { return JSON.parse(localStorage.getIt
 export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCity; projects: ProjectsFile; cal: CalibFile | null; zones: ZonesFile | null; blocks?: BlockGroupsFile | null }) {
   const [s, dispatch] = useReducer(reducer, initialState);
   /* the start screen over the loading city, and the live check for new city records it starts */
-  const rec = useRecords(projects), [start, setStart] = useState(true);
+  const recRaw = useRecords(projects), [start, setStart] = useState(true);
   /* Projects a person confirmed from the AI agent's findings (this browser), on top of projects.json */
   const [confirmed, setConfirmed] = useState<Project[]>(loadConfirmed);
   const saveConfirmed = (list: Project[]) => { setConfirmed(list); try { localStorage.setItem('atlas-agent-projects', JSON.stringify(list)); } catch (e) {} };
@@ -50,6 +53,16 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
     return createAtlas(city, { ...projects, projects: projects.projects.filter(p => !ids.has(p.id)).concat(confirmed) });
   }, [city, projects, confirmed]);
   const rev = confirmed.map(p => p.id).join(',');
+  /* "N to review" counts what the last check found that is still waiting: confirmed, hidden and screened-out items drop out */
+  const [reviewTick, setReviewTick] = useState(0);
+  useEffect(() => {
+    const f = () => setReviewTick(n => n + 1);
+    window.addEventListener('atlas-found', f); window.addEventListener(REVIEW_CHANGED, f);
+    return () => { window.removeEventListener('atlas-found', f); window.removeEventListener(REVIEW_CHANGED, f); };
+  }, []);
+  const lastLabels = recRaw.rows.filter(r => r.st === 'done').map(r => r.r.label).join('\n');
+  const left = useMemo(() => lastLabels ? waiting(A, new Set(lastLabels.split('\n'))) : [], [A, lastLabels, reviewTick]);
+  const rec = { ...recRaw, foundCount: left.length, buildingCount: left.filter(g => g.building).length };
   /* Planner ghosts: projects a planner places for a year (this browser). Only counted in Planner mode. */
   const [ghosts, setGhostsRaw] = useState<Ghost[]>(loadGhosts), [ghostSel, setGhostSel] = useState<string | null>(null);
   const setGhosts = (g: Ghost[]) => { setGhostsRaw(g); saveGhosts(g); };
@@ -58,10 +71,13 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   const getState = useCallback(() => sRef.current, []);
   const appRef = useRef<HTMLDivElement>(null), view = useRef<View | null>(null), body = useRef<HTMLDivElement>(null);
   const [lay, setLay] = useState(loadLayout);
-  const setLayout = (l: Lay) => { setLay(l); try { localStorage.setItem('atlas-layout', JSON.stringify(l)); } catch (e) {} };
+  const patchLay = (p: Partial<Lay>) => setLay(l => { const n = { ...l, ...p }; try { localStorage.setItem('atlas-layout', JSON.stringify(n)); } catch (e) {} return n; });
   /* Filter and Details open in the same place on the left: opening one closes the other */
-  const showFilter = (on: boolean) => setLayout({ ...lay, ctl: on, pan: on ? false : lay.pan });
-  const showDetails = (on: boolean) => setLayout({ ...lay, pan: on, ctl: on ? false : lay.ctl });
+  const showFilter = (on: boolean) => patchLay(on ? { ctl: true, pan: false } : { ctl: false });
+  const showDetails = (on: boolean) => patchLay(on ? { pan: true, build: false, ctl: false } : { pan: false });
+  /* Build: placing your own buildings, in the right slot instead of Details (planner mode) */
+  const showBuild = (on: boolean) => patchLay(on ? { pan: true, build: true, ctl: false } : { pan: false });
+  const buildOpen = !!lay.build && s.mode === 'planner', detailsOpen = lay.pan && !buildOpen;
 
   /* Routed volumes from the worker (with and without projects); the count-based method fills in until they arrive. */
   const t = tOf(s.ti);
@@ -69,7 +85,11 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   const allPlans = useMemo(() => s.mode === 'planner' ? ghostPlans(ghosts, t, ghostSel) : [], [s.mode, ghosts, t, ghostSel]);
   const allRoads = useMemo(() => s.mode === 'planner' ? ghostRoads(ghosts, t, ghostSel) : [], [s.mode, ghosts, t, ghostSel]);
   const plans = s.withNew ? allPlans : [], roads = s.withNew ? allRoads : [];
-  const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev, ...(plans.length ? { plans } : {}), ...(roads.length ? { roads } : {}) }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev, plans, roads]);
+  /* the open data file: edited Census and shopping numbers, for the map, the panels and the routing worker */
+  const data = useDataFiles(), dataKey = editsKey(data.edits), shop = useShopEdits(), shops = Object.keys(shop.shops).length ? shop.shops : null;
+  const blockList = useMemo(() => blocks ? applyBlocks(blocks.groups, data.edits) : null, [blocks, dataKey]);
+  useEffect(() => { setDataEdits(blocks && zones && dataKey ? modelEdits(blocks.groups, zones.zones.map(z => z.id), data.edits) : null); }, [blocks, zones, dataKey]);
+  const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev, ...(dataKey ? { data: dataKey } : {}), ...(shops ? { shops } : {}), ...(plans.length ? { plans } : {}), ...(roads.length ? { roads } : {}) }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev, dataKey, shops, plans, roads]);
   /* the Details analyses always count your new projects, whatever the map shows */
   const scAll: Scenario = useMemo(() => s.withNew ? sc : { ...sc, ...(allPlans.length ? { plans: allPlans } : {}), ...(allRoads.length ? { roads: allRoads } : {}) }, [sc, s.withNew, allPlans, allRoads]);
   const routing = s.method === 'routed' && !!zones;
@@ -113,10 +133,10 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   const shopFlows = run?.with.flows ?? null;
   useEffect(() => {
     const id = zones && (s.flow || walmartId(zones));
-    const f = s.layers.flows && zones && shopFlows && id ? flowsTo(zones, shopFlows, id, blocks?.groups ?? null, A.S) : null;
+    const f = s.layers.flows && zones && shopFlows && id ? flowsTo(zones, shopFlows, id, blockList, A.S) : null;
     view.current?.setFlows(f ? f.rows.slice(0, 40).map(r => ({ a: r.pos, b: f.pos, n: r.n })) : null);
-  }, [A, zones, blocks, shopFlows, s.flow, s.layers.flows]);
-  /* ghosts on the map: planner mode only; double-click one to move it */
+  }, [A, zones, blockList, shopFlows, s.flow, s.layers.flows]);
+  /* ghosts on the map: planner mode only; drag one to move it, click it to select (and delete) it */
   useEffect(() => {
     const list = s.mode !== 'planner' || !s.withNew ? [] : ghosts.map(g => { const ty = GHOST_TYPES[g.kind], open = ghostActive(g, c.t), act = ghostCounts(g, c.t, ghostSel);
       return { id: g.id, pos: g.pos, w: ty.w, d: ty.d, h: ty.h, n: ty.n, status: g.status, active: act,
@@ -125,9 +145,21 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
     view.current?.setGhosts(list, ghostSel);
   }, [A, ghosts, ghostSel, s.mode, s.withNew, c.t]);
   const ghostsRef = useRef(ghosts); ghostsRef.current = ghosts;
+  /* delete one of your projects: its button on the map, or the Delete key while it is selected */
+  const deleteGhost = (id: string) => { setGhosts(ghostsRef.current.filter(g => g.id !== id)); setGhostSel(sel => sel === id ? null : sel); };
+  const selRef = useRef(ghostSel); selRef.current = ghostSel;
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if ((e.key !== 'Delete' && e.key !== 'Backspace') || !selRef.current || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return;
+      e.preventDefault(); deleteGhost(selRef.current);
+    };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  }, []);
   useEffect(() => {
     view.current?.onGhost(e => {
-      setGhostSel(e.id);
+      if (e.type === 'delete') { deleteGhost(e.id); return; }
+      setGhostSel(e.id); patchLay({ pan: true, build: true, ctl: false });
       if (e.type !== 'move') return;
       const list = ghostsRef.current, me = list.find(g => g.id === e.id); if (!me) return;
       const pl = snapSite(A, me.kind, e.pos, list.filter(g => g.id !== e.id));  /* placement rules */
@@ -138,13 +170,13 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
 
   const select = (id: string | null) => {
     dispatch({ type: 'select', id });
-    if (id && !lay.pan) showDetails(true);
+    if (id && !detailsOpen) showDetails(true);
     if (id) { const p = A.byId(id); if (p?.pos) view.current?.flyTo(p.pos); }
   };
   /* a Census block group clicked on the map (blocks layer) opens in the panel */
-  const block = s.block && blocks ? blocks.groups.find(b => b.id === s.block) ?? null : null;
-  const pickBlock = (id: string | null) => { dispatch({ type: 'block', id }); if (id && !lay.pan) showDetails(true); };
-  const panelKey = s.sel ? 'd:' + s.sel : block ? 'b:' + block.id : s.mode;
+  const block = s.block && blockList ? blockList.find(b => b.id === s.block) ?? null : null;
+  const pickBlock = (id: string | null) => { dispatch({ type: 'block', id }); if (id && !detailsOpen) showDetails(true); };
+  const panelKey = buildOpen ? 'build' : s.sel ? 'd:' + s.sel : block ? 'b:' + block.id : s.mode;
   useEffect(() => { if (body.current) body.current.scrollTop = 0; }, [panelKey]);
 
   /* Play the day (hour by hour) and play through time (quarter by quarter) */
@@ -163,6 +195,15 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
     }, 1500 / (s.speed || 1));
     return () => clearInterval(id);
   }, [playing, s.speed]);
+  /* Start screen "Review": Planner, Details open on the planner list, the city-records section unfolded and scrolled to */
+  const openReview = () => {
+    setStart(false); dispatch({ type: 'mode', mode: 'planner' }); dispatch({ type: 'block', id: null }); showDetails(true);
+    setTimeout(() => {
+      const el = document.getElementById('records-review') as HTMLDetailsElement | null; if (!el) return;
+      el.open = true; window.dispatchEvent(new Event(REVIEW_EVENT));
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 350);
+  };
   const onPlay = () => { if (playing) { setPlaying(false); return; } if (s.ti >= LAST_I) dispatch({ type: 'ti', ti: TODAY_I }); setPlaying(true); };
 
   const g = A.gaps(c.t, s.prm, c.pop);
@@ -174,15 +215,14 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   const residentExtra = routing ? <><ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={3} onFly={fly} />{methodNote}</> : undefined;
   /* Planner: the 4-step flow first; everything else is evidence and settings, folded away until wanted */
   const plannerExtra = <>
-    <More title="City records · what the city has approved" sub="The AI agent reads council and P&Z records; a person confirms each project">
-      <AgentPanel A={A} base={projects} confirmed={confirmed} pick={cb => view.current?.pick(cb)} flyTo={fly} highlight={l => view.current?.setHighlight(l)}
-        onSaved={() => { saveConfirmed([]); location.reload(); }}
-        onConfirm={p => { saveConfirmed(confirmed.filter(x => x.id !== p.id).concat([p])); setTimeout(() => select(p.id), 300); }}
+    <More id="records-review" title="City records · what the city has approved" sub="The AI agent reads council and P&Z records; a person confirms each project">
+      <AgentPanel A={A} confirmed={confirmed} pick={cb => view.current?.pick(cb)} flyTo={fly} highlight={l => view.current?.setHighlight(l)}
+        onConfirm={p => saveConfirmed(confirmed.filter(x => x.id !== p.id).concat([p]))}
         onRemove={id => { if (s.sel === id) dispatch({ type: 'select', id: null }); saveConfirmed(confirmed.filter(x => x.id !== id)); }} /></More>
     {routing && <More title="Problems the city already has" sub="Overloaded streets and housing gaps, with fixes to test">
       <ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={5} onFly={fly} planner added={ghostSupply(ghosts, c.t, ghostSel)}
         onApply={o => dispatch({ type: 'view', patch: { fixes: o.fixes, widen: o.widen } })}
-        onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); setLay(l => ({ ...l, pan: true, ctl: false })); }} /></More>}
+        onSuggest={(k, n, why) => { suggest(k, n, suggestYear, why); showBuild(true); }} /></More>}
     <More title="Numbers and assumptions" sub="Population, supply against need, growth settings, pressure points">
       <PlannerPanel {...props} /></More>
     <More title="How the numbers are made" sub="Traffic method, accuracy against city counts, demo views">
@@ -199,9 +239,10 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
     mark={(pos, label) => view.current?.mark(pos, label)} select={select} />
     : <div className="zoning-banner err" role="status"><b>Ghost projects need routed trips.</b> Switch the traffic method to Routed trips (zones.json must load).</div>;
   const cls = [!lay.ctl && 'ctl-folded', !lay.pan && 'pan-folded'].filter(Boolean).join(' ');
+  const head = buildOpen ? { title: 'Build', sub: 'Place your own buildings and roads, then see what they do to traffic' } : { title, sub };
 
   return <div id="app" ref={appRef} className={cls}>
-    <CityScene ref={view} A={A} getState={getState} onSelect={id => select(id)} appRef={appRef} blocks={blocks?.groups ?? null} onBlock={pickBlock}
+    <CityScene ref={view} A={A} getState={getState} onSelect={id => select(id)} appRef={appRef} blocks={blockList} onBlock={pickBlock}
       zones={zones} zoneStats={run ? (s.withProjects ? run.with.zone : run.without.zone) ?? null : null} />
     <div className="topbar">
       <div className="card topcard">
@@ -219,21 +260,27 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
       <MapSearch A={A} zones={zones} onPick={(pos, label) => { view.current?.mark(pos, label); if (pos) view.current?.flyTo(pos); }} />
       {/* panel toggles, in their own card at the top right */}
       <div className="card topcard panels">
+        {s.mode === 'planner' && <button className="tog" aria-pressed={lay.pan && buildOpen} onClick={() => showBuild(!(lay.pan && buildOpen))}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13.5V7l5-4 5 4v6.5zM6.5 13.5v-4h3v4" /></svg>Build</button>}
+        <button className="tog" aria-pressed={detailsOpen} onClick={() => showDetails(!detailsOpen)}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="2" /><path d="M10 2.5v11" /></svg>Details</button>
         <button className="tog" aria-pressed={lay.ctl} onClick={() => showFilter(!lay.ctl)}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M4.5 8h7M7 12h2" /></svg>Filter</button>
-        <button className="tog" aria-pressed={lay.pan} onClick={() => showDetails(!lay.pan)}>
-          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="2" /><path d="M10 2.5v11" /></svg>Details</button>
       </div>
     </div>
     <LeftControls s={s} dispatch={dispatch} onFold={() => showFilter(false)} hasBlocks={!!blocks} hasZones={!!zones && !!blocks}
-      zones={zones} blocks={blocks?.groups ?? null} flows={routing ? shopFlows : null} S={A.S}
+      zones={zones} blocks={blockList} flows={routing ? shopFlows : null} S={A.S} data={data} snapshot={blocks?.meta.fetched} shop={shop}
       mix={routing && s.mode === 'planner' ? <PlanMix sc={sc} plans={allPlans} roads={allRoads} today={A.TODAY} open={lay.ctl} /> : null} />
     <section className="card right" aria-live="polite">
       <div className="right-head"><div className="row" style={{ justifyContent: 'flex-end', marginBottom: 6 }}>
-        <CloseButton label="Hide details" onClick={() => showDetails(false)} /></div>
-        <h2 key={title}>{title}</h2><p key={sub}>{sub}</p></div>
+        <CloseButton label={buildOpen ? 'Hide build' : 'Hide details'} onClick={() => patchLay({ pan: false })} /></div>
+        <h2 key={head.title}>{head.title}</h2><p key={head.sub}>{head.sub}</p></div>
       <div className="scroll" ref={body}>
-        {s.sel ? <ProjectDetail {...props} /> : block && blocks ? <BlockDetail b={block} meta={blocks.meta} onClose={() => pickBlock(null)} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <>{ghostTools}{plannerExtra}</>}
+        {buildOpen ? ghostTools
+          : s.sel ? <ProjectDetail {...props} />
+          : block && blocks ? <BlockDetail b={block} def={blocks.groups.find(b => b.id === block.id)!} meta={blocks.meta} data={data} onClose={() => pickBlock(null)} />
+          : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} />
+          : <>{s.mode === 'planner' && <button className="build-cta" onClick={() => showBuild(true)}><b>Build</b><small>Place your own buildings and roads and test them</small><span aria-hidden="true">→</span></button>}{plannerExtra}</>}
       </div>
     </section>
     {ovShown && <OverviewPanel closing={!ovOpen} A={A} o={ov} stale={ovS.stale} t={c.t} hour={s.hour} onPeak={() => { setDayPlaying(false); dispatch({ type: 'hour', hour: 17 }); }}
@@ -245,7 +292,7 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
       speed={s.speed} onSpeed={v => dispatch({ type: 'view', patch: { speed: v } })} />
     {!start && <RecordPill rec={rec} onOpen={() => setStart(true)} />}
     {start && <StartScreen rec={rec} onEnter={() => setStart(false)}
-      onReview={() => { setStart(false); dispatch({ type: 'mode', mode: 'planner' }); showDetails(true); }} />}
+      onReview={openReview} />}
   </div>;
 }
 function qLabel2(c: Computed, withProjects: boolean) {
@@ -254,6 +301,6 @@ function qLabel2(c: Computed, withProjects: boolean) {
 }
 
 /* a folded section in the planner panel */
-function More({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
-  return <details className="more"><summary><b>{title}</b><small>{sub}</small></summary><div className="more-body">{children}</div></details>;
+function More({ id, title, sub, children }: { id?: string; title: string; sub: string; children: React.ReactNode }) {
+  return <details className="more" id={id}><summary><b>{title}</b><small>{sub}</small></summary><div className="more-body">{children}</div></details>;
 }

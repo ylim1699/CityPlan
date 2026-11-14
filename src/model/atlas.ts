@@ -164,6 +164,7 @@ export function createAtlas(C: OsmCity, PF: ProjectsFile) {
       const al = ([] as XZ[]).concat(...p.strips); p.pos = al[Math.floor(al.length / 2)]; p.h = 0.02;
     }
     if (p.fid) { const f = C.foot[p.fid]; p.pos = M(f[0]); p.foot = [f[1][0] * S, f[1][1] * S]; p.h = p.hM! * VEX * S; }
+    else if (p.footM) { p.foot = [p.footM[0] * S, p.footM[1] * S]; p.h = (p.hM || 10) * VEX * S; }
     else if (!p.lines) { p.h = 0.02; }
     if (p.sid) {
       p.strips = C.strips[p.sid].map(flat);

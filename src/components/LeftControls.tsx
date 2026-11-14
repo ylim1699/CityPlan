@@ -2,20 +2,22 @@ import { useState, type Dispatch, type ReactNode } from 'react';
 import type { Action, Layers, State } from '../state';
 import { DENSITY } from '../scene/blockLayer';
 import { CloseButton } from './CloseButton';
-import { ZONE_EMPTY, ZONE_PEOPLE } from '../scene/zoneLayer';
 import type { ZonesFile } from '../model/routing';
 import type { BlockGroup } from '../model/types';
 import { flowsTo, storeList, walmartId, type ShopFlows } from '../model/flows';
 import { fmt } from '../ui';
+import type { DataFiles } from '../hooks/useDataFiles';
+import { DataFileBar, NumField } from './DataFiles';
+import type { ShopEdits } from '../hooks/useShopEdits';
 
 type Tab = 'traffic' | 'places' | 'people' | 'shopping';
 type Props = { s: State; dispatch: Dispatch<Action>; onFold: () => void; hasBlocks?: boolean; hasZones?: boolean;
-  zones?: ZonesFile | null; blocks?: BlockGroup[] | null; flows?: ShopFlows | null; S?: number; mix?: ReactNode };
+  zones?: ZonesFile | null; blocks?: BlockGroup[] | null; flows?: ShopFlows | null; S?: number; mix?: ReactNode; data: DataFiles; snapshot?: string; shop: ShopEdits };
 const TABS: [Tab, string][] = [['traffic', 'Traffic'], ['places', 'Places'], ['people', 'People'], ['shopping', 'Shopping']];
 function loadTab(): Tab { try { const t = localStorage.getItem('atlas-filter-tab'); if (t && TABS.some(x => x[0] === t)) return t as Tab; } catch (e) {} return 'traffic'; }
 
 /* Filter panel: what the map shows and how, in tabs of related settings. Time (year and hour) lives in the bottom dock. */
-export function LeftControls({ s, dispatch, onFold, hasBlocks = false, hasZones = false, zones = null, blocks = null, flows = null, S = 1, mix = null }: Props) {
+export function LeftControls({ s, dispatch, onFold, hasBlocks = false, zones = null, blocks = null, flows = null, S = 1, mix = null, data, snapshot = '', shop }: Props) {
   const [tab, setTabRaw] = useState<Tab>(loadTab);
   const setTab = (t: Tab) => { setTabRaw(t); try { localStorage.setItem('atlas-filter-tab', t); } catch (e) {} };
   const check = (k: keyof Layers, l: string, on = !!s.layers[k]) =>
@@ -74,40 +76,46 @@ export function LeftControls({ s, dispatch, onFold, hasBlocks = false, hasZones 
       </details>
     </>}
 
-    {tab === 'people' && <div><p className="sec">Show on map</p>
-      {!hasBlocks && !hasZones && <small style={{ color: 'var(--muted)' }}>Census data did not load.</small>}
+    {tab === 'people' && <>{hasBlocks && <DataFileBar d={data} snapshot={snapshot} />}<div><p className="sec">Show on map</p>
+      {!hasBlocks && <small style={{ color: 'var(--muted)' }}>Census data did not load.</small>}
       {hasBlocks && check('blocks', 'Census blocks (people)')}
       {hasBlocks && s.layers.blocks && <div style={{ margin: '4px 0 8px 24px' }}>
-        <small style={{ color: 'var(--muted)' }}>People per km², Census estimate 2020–2024</small>
+        <small style={{ color: 'var(--muted)' }}>People per km²{data.changes ? ', with your data file numbers' : ', Census 2020–2024'}</small>
         <div className="legend">{DENSITY.map(c => <div key={c.label}><span className="sw box" style={{ background: c.color }}></span>{c.label}</div>)}</div>
-        <small style={{ color: 'var(--muted)' }}>Hover a block for its count; click it for details</small></div>}
-      {hasZones && check('zones', 'Trip zones (people, trips)')}
-      {hasZones && s.layers.zones && <div style={{ margin: '4px 0 0 24px' }}>
-        <small style={{ color: 'var(--muted)' }}>People living in each traffic-model zone, for the year shown</small>
-        <div className="legend">{ZONE_PEOPLE.map(c => <div key={c.label}><span className="sw box" style={{ background: c.color }}></span>{c.label}</div>)}
-          <div><span className="sw box" style={{ background: ZONE_EMPTY }}></span>No one lives here (campus, roads into town)</div></div>
-        <small style={{ color: 'var(--muted)' }}>Hover a zone for its people, jobs and car trips</small></div>}
-    </div>}
+        <small style={{ color: 'var(--muted)' }}>Hover a block for its count; click it to see and edit its numbers</small></div>}
+    </div></>}
 
-    {tab === 'shopping' && <ShoppingTab s={s} dispatch={dispatch} zones={zones} blocks={blocks} flows={flows} S={S} />}
+    {tab === 'shopping' && <ShoppingTab s={s} dispatch={dispatch} zones={zones} blocks={blocks} flows={flows} S={S} shop={shop} />}
   </aside>;
 }
 
 /* Shopping: arcs on the map from where a store's shoppers live, with the top areas listed */
-function ShoppingTab({ s, dispatch, zones, blocks, flows, S }: { s: State; dispatch: Dispatch<Action>; zones: ZonesFile | null; blocks: BlockGroup[] | null; flows: ShopFlows | null; S: number }) {
+function ShoppingTab({ s, dispatch, zones, blocks, flows, S, shop }: { s: State; dispatch: Dispatch<Action>; zones: ZonesFile | null; blocks: BlockGroup[] | null; flows: ShopFlows | null; S: number; shop: ShopEdits }) {
+  const [all, setAll] = useState(false);
   if (!zones) return <small style={{ color: 'var(--muted)' }}>Trip zones did not load, so shopping trips can't be shown.</small>;
   if (!flows) return <small style={{ color: 'var(--muted)' }}>Routing trips… shopping trips appear when it finishes. (Needs the Routed trips method.)</small>;
   const stores = storeList(zones, flows), id = s.flow && stores.some(x => x.id === s.flow) ? s.flow : walmartId(zones) ?? stores[0]?.id;
   const f = id ? flowsTo(zones, flows, id, blocks, S) : null;
+  const ed = id ? shop.ui[id] : undefined;
   return <>
     <div><p className="sec">Show on map</p>{<label className="check"><input type="checkbox" checked={!!s.layers.flows} onChange={e => dispatch({ type: 'layer', key: 'flows', on: e.target.checked })} />Trips to a store</label>}</div>
     <div><p className="sec">Store</p>
       <select aria-label="Store" value={id ?? ''} style={{ width: '100%' }} onChange={e => dispatch({ type: 'view', patch: { flow: e.target.value, layers: { ...s.layers, flows: true } } })}>
         {stores.map(x => <option key={x.id} value={x.id}>{x.name} · {fmt(x.n)} a day</option>)}
       </select></div>
-    {f && <div><p className="sec">Where its shoppers come from</p>
-      <p className="sub" style={{ margin: '0 0 6px' }}><b>{fmt(f.total)}</b> car trips a day arrive at {f.name}.</p>
-      <ol className="flowlist">{f.rows.slice(0, 8).map(r => <li key={r.i}><span>{r.name}</span><b>{fmt(r.n)}</b><i style={{ width: Math.round(100 * r.n / f.rows[0].n) + '%' }} /></li>)}</ol>
-      <small style={{ color: 'var(--muted)' }}>Model estimate, not tracked trips: shoppers go to closer, bigger stores, and 60% of shopping trips go to Walmart (assumed). Includes the store's workers.</small></div>}
+    {f && id && <div><div className="row"><p className="sec" style={{ margin: 0 }}>Where its shoppers come from</p>
+        {ed && <button className="back" onClick={() => shop.reset(id)}>↺ Reset all</button>}</div>
+      <div className="row" style={{ margin: '6px 0' }}><small>Car trips a day arriving</small>
+        <NumField label={'Car trips a day to ' + f.name} value={ed?.total?.v ?? Math.round(f.total)} def={ed?.total?.was ?? Math.round(f.total)} step={10}
+          onSet={v => shop.set(id, 'total', v, Math.round(f.total))} /></div>
+      <ol className="flowlist edit">{f.rows.slice(0, all ? f.rows.length : 8).map(r => {
+        const zid = zones.zones[r.i].id, mine = ed?.from?.[zid];
+        return <li key={r.i} className={mine ? 'edited' : ''}><span>{r.name}</span>
+          <NumField label={'Trips a day from ' + r.name} value={mine?.v ?? Math.round(r.n)} def={mine?.was ?? Math.round(r.n)} step={1}
+            onSet={v => shop.set(id, zid, v, Math.round(r.n))} />
+          <i style={{ width: Math.round(100 * r.n / f.rows[0].n) + '%' }} /></li>;
+      })}</ol>
+      {f.rows.length > 8 && <button className="back" onClick={() => setAll(!all)}>{all ? 'Show the top 8' : 'Show all ' + f.rows.length + ' areas'}</button>}
+      <small style={{ color: 'var(--muted)', display: 'block' }}>Type a number and press Enter to try it; ↺ puts it back. These changes are only for this visit. The starting numbers are model estimates: shoppers go to closer, bigger stores, and 60% of shopping trips go to Walmart (assumed). Includes the store's workers.</small></div>}
   </>;
 }

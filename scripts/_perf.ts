@@ -1,0 +1,30 @@
+import puppeteer from 'puppeteer-core';
+const port = process.argv[2];
+const browser = await puppeteer.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage(); await page.setViewport({ width: 1440, height: 900 });
+await page.evaluateOnNewDocument(() => {
+  const w = window as any; w.__lt = []; w.__msgs = {}; w.__runs = 0;
+  new PerformanceObserver(l => l.getEntries().forEach(e => w.__lt.push([Math.round(e.startTime), Math.round(e.duration)]))).observe({ type: 'longtask', buffered: true });
+  const post = Worker.prototype.postMessage;
+  Worker.prototype.postMessage = function (m: any, ...r: any[]) { const t = m?.type || '?'; w.__msgs[t] = (w.__msgs[t] || 0) + 1; return post.call(this, m, ...r); };
+});
+const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+const btn = (t: string) => page.evaluate(t => { const b = [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === t) as HTMLElement | undefined; b?.click(); return !!b; }, t);
+const t0 = Date.now();
+await page.goto('http://localhost:' + port + '/', { waitUntil: 'load', timeout: 90000 });
+await page.evaluate(() => { localStorage.clear(); }); await page.reload({ waitUntil: 'load' });
+const t1 = Date.now();
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => document.body.innerText.includes('Street loads come from routing every trip'), { timeout: 120000, polling: 200 });
+const ready = Date.now() - t1;
+const fps = async () => page.evaluate(() => new Promise<number>(res => { let n = 0; const s = performance.now(); const f = () => { n++; if (performance.now() - s < 4000) requestAnimationFrame(f); else res(Math.round(n / 4)); }; requestAnimationFrame(f); }));
+const lt = async (since: number) => page.evaluate((s) => (window as any).__lt.filter((x: number[]) => x[0] >= s), since);
+const now = async () => page.evaluate(() => Math.round(performance.now()));
+await wait(2000);
+let m = await now(); const idleFps = await fps(); const idleLt = await lt(m);
+m = await now(); await btn('Planner'); await wait(6000); const plLt = await lt(m);
+m = await now(); for (let h = 0; h < 5; h++) { await page.keyboard.press('ArrowRight'); await wait(150); }
+await page.evaluate(() => { const b = [...document.querySelectorAll('.dock button, .timedock button, button')].filter(b => /^’?'?\d\d$/.test(b.textContent?.trim() || '')); (b[3] as HTMLElement)?.click(); }); await wait(6000); const yearLt = await lt(m);
+const sum = (a: number[][]) => a.reduce((s, x) => s + x[1], 0);
+console.log(JSON.stringify({ port, readyMs: ready, idleFps, idleBlockMs: sum(idleLt), plannerBlockMs: sum(plLt), plannerLongest: Math.max(0, ...plLt.map(x => x[1])), yearBlockMs: sum(yearLt), workerMsgs: await page.evaluate(() => (window as any).__msgs) }));
+await browser.close();

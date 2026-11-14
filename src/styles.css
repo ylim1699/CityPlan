@@ -91,6 +91,12 @@ a{color:var(--accent)}
 .hot{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 .hot:first-child{border-top:0}
 .hot .stripe{width:6px;align-self:stretch;border-radius:3px}
+.place-form{display:grid;gap:6px;margin-top:8px;padding:8px;border:1px solid #f2c14e66;border-radius:8px;background:#f2c14e0f}
+.place-form label{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px;font-size:12.5px}
+.place-form select,.place-form input{font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:transparent;color:inherit;min-width:0}
+.place-form label span{display:flex;align-items:center;gap:6px}
+.place-form input{width:110px}
+.place-form option{color:#111}
 .hot b{font-weight:600}.hot small{color:var(--muted);display:block}
 .lv{font:600 12px/1 var(--body);padding:4px 7px;border-radius:5px;color:#fff;white-space:nowrap}
 .note{font-size:12.5px;color:var(--muted);background:#f1f4f1;border-radius:8px;padding:9px 11px}

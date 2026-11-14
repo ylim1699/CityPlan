@@ -75,6 +75,26 @@ export function categoryOf(c: Pick<Candidate, 'name' | 'type'> & { category?: Ca
   return 'other';
 }
 
+/* ---------- worth reviewing ---------- */
+/* Only items that put something new at a place reach the review list: a new building, a new or widened road, or new zoning
+   on a parcel. The agent's own verdict (worth, stage) wins; older candidates without one get a word screen. Returns why an
+   item is screened out, or null when it should be reviewed. Work under way stays in (see underway). */
+const ALREADY_BUILT = /\b(remodel\w*|renovat\w*|addition to|sign permit|signage|liquor|beer|alcohol|business licen[cs]e|ribbon cutting|existing building)\b/;
+const NOTHING_BUILT = /\b(naming|renam\w*|historic (designation|preservation|register|district)|ballot|election|bond|levy|proclamation|lease|purchase|budget|fee schedule)\b/;
+const REVIEWED: Category[] = [...BUILDING, 'road or trail', 'zoning only'];
+export function screenOf(c: Candidate & { category?: Category | null }): string | null {
+  if (c.stage === 'already built') return c.why || 'Already built';
+  if (c.worth === false) return c.why || 'Nothing new is built at a place';
+  const cat = categoryOf(c);
+  if (!REVIEWED.includes(cat)) return cat === 'utility' ? 'Utility work, not a building, road or zone' : cat === 'study or plan' ? 'A study or plan; nothing is built yet' : 'Not a building, road or zone';
+  if (c.worth === true) return null;
+  const text = (c.name + ' ' + c.type + ' ' + c.plain).toLowerCase();
+  if (ALREADY_BUILT.test(text)) return 'About something already built (' + text.match(ALREADY_BUILT)![0] + ')';
+  if (NOTHING_BUILT.test(text)) return 'A vote or decision that builds nothing at a place (' + text.match(NOTHING_BUILT)![0] + ')';
+  return null;
+}
+export const underway = (c: Candidate) => c.stage === 'under construction' || c.status === 'construction';
+
 /* ---------- same project in several records ---------- */
 const STOP = new Set(['the', 'a', 'of', 'and', 'at', 'for', 'to', 'in', 'on', 'project', 'subdivision', 'plat', 'final', 'preliminary', 'pud', 'planned',
   'unit', 'development', 'division', 'div', 'phase', 'approximately', 'design', 'contract', 'agreement', 'cup', 'conditional', 'use', 'permit']);
@@ -100,7 +120,8 @@ export function sameProject(a: { name: string; where: string }, b: { name: strin
 }
 
 export type Found = Candidate & { foundIn: Source };
-export type Group = { id: string; c: Found; members: Found[]; category: Category; building: boolean; check: QuoteCheck; conflicts: string[] };
+export type Group = { id: string; c: Found; members: Found[]; category: Category; building: boolean; check: QuoteCheck; conflicts: string[];
+  screened: string | null; underway: boolean };
 const STATUS_RANK = { construction: 3, approved: 2, planned: 1 }, CONF_RANK = { high: 3, medium: 2, low: 1 }, CHECK_RANK = { exact: 3, close: 2, unchecked: 1, missing: 0 };
 const filled = (c: Candidate) => [c.units, c.beds, c.sqft, c.acres, c.startYear, c.endYear].filter(v => v != null).length;
 
@@ -123,6 +144,8 @@ export function groupFound(list: Found[], idOf: (c: Candidate) => string): Group
     const conflicts = addrs.size > 1 ? ['Records give different locations: ' + [...addrs.values()].join(' / ')] : [];
     const check = ranked.map(m => m.check || 'unchecked').sort((a, b) => CHECK_RANK[b] - CHECK_RANK[a])[0];
     const category = categoryOf(c);
-    return { id: idOf(c), c, members: ranked, category, building: isBuilding(category), check, conflicts };
+    /* reviewed if any record of it is worth reviewing; screened out only when all of them are */
+    const reasons = ranked.map(screenOf), screened = reasons.every(Boolean) ? reasons[0] : null;
+    return { id: idOf(c), c, members: ranked, category, building: isBuilding(category), check, conflicts, screened, underway: ranked.some(underway) };
   });
 }
