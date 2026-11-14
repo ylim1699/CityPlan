@@ -99,73 +99,68 @@ export function GhostTools(p: ToolsProps) {
   const sel = ghosts.find(g => g.id === selId) || null;
   const act = !!sel && sel.status === 'planned' && ghostActive(sel, c.t);
   const mine = ghosts.filter(g => g.status === 'planned'), sugg = ghosts.filter(g => g.status === 'suggested');
-  const [zOpen, setZOpen] = useState(false);
   const [rec, setRec] = useState<{ kind: GhostKind; year: number; n: number } | null>(null);
-  return <div className="ghosttools flow">
-    <YearLine A={A} s={s} c={c} ghosts={ghosts} selId={selId} />
-    <div className="zoning-banner" role="status"><b>ZONING NOT CHECKED</b> · generic placement rules only.{' '}
-      <button className="linkbtn" onClick={() => setZOpen(!zOpen)}>{zOpen ? 'Less' : 'What is checked?'}</button>
-      {zOpen && <><br />Checked: no buildings, parks or water under it (parking lots count as redevelopment), 30 m from your other projects, a street within 400 m. Not checked: zoning, ownership, utilities, cost.</>}</div>
-
-    <Step n={1} title="Place a project" done={!!sel}>
-      <div className="seg wrap" role="group" aria-label="Project type">
-        {kinds.map(k => <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{GHOST_TYPES[k].label}</button>)}
+  /* the selected project's view: Impact first; Better spot and Roads once the map shows the year it opens */
+  const [tab, setTab] = useState<'impact' | 'spot' | 'roads'>('impact');
+  useEffect(() => { setTab('impact'); }, [selId]);
+  const remove = (id: string) => { if (selId === id) setSel(null); setGhosts(ghosts.filter(x => x.id !== id)); };
+  const stOf = (g: Ghost) => g.status === 'suggested' ? 'Suggested' : g.draft ? 'Draft' : 'In plan';
+  return <div className="ghosttools build">
+    {/* always in reach: the year on the map, and adding a project */}
+    <div className="bt-top">
+      <YearLine A={A} s={s} c={c} ghosts={ghosts} selId={selId} />
+      <div className="bt-add">
+        <select aria-label="Project type" value={kind} onChange={e => setKind(e.target.value as GhostKind)}>
+          {kinds.map(k => <option key={k} value={k} title={GHOST_TYPES[k].size}>{GHOST_TYPES[k].label}</option>)}</select>
+        <select aria-label="Year the project opens" value={year} onChange={e => setYear(+e.target.value)}>{YEARS.map(y => <option key={y} value={y}>Opens fall {y}</option>)}</select>
+        <button className="mini act" onClick={startPick} aria-pressed={picking}>{picking ? 'Cancel' : '+ Place on map'}</button>
+        <button className="mini" onClick={() => { const q = target(); if (q) add(q); }} title="Put it in the middle of the map view">+ In view</button>
+        {kind !== 'parking' && <button className="mini ai" onClick={() => { pick(null); setPicking(false); setRec({ kind, year, n: Date.now() }); }} title="Route the best open sites for this project">✦ Best spots</button>}
       </div>
-      <p className="note" style={{ margin: '6px 0' }}>{ty.size}. {ty.note}.</p>
-      <div className="row" style={{ gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-        <label className="mini" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Opens fall
-          <select value={year} onChange={e => setYear(+e.target.value)} aria-label="Year the project opens">{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select></label>
-        <button className="mini act" onClick={startPick} aria-pressed={picking}>{picking ? 'Click the map… (cancel)' : '+ Place on map'}</button>
-        <button className="mini" onClick={() => { const q = target(); if (q) add(q); }}>+ Place in view</button>
-        {kind !== 'parking' && <button className="mini ai" onClick={() => { pick(null); setPicking(false); setRec({ kind, year, n: Date.now() }); }}>✦ AI recommendation</button>}
-      </div>
-      {rec && <AiRec key={rec.n} A={A} c={c} sc={p.sc} kind={rec.kind} year={rec.year} hour={s.hour} ghosts={ghosts} dispatch={dispatch}
-        fly={p.flyClose || flyTo} mark={p.mark} onPlace={q => { setRec(null); add(q); }} onClose={() => setRec(null)} />}
-      {picking && <p className="note" style={{ margin: '6px 0 0' }}>Click where it would go. It snaps to the nearest open land.</p>}
-    </Step>
-
-    <Step n={2} title="See what it does to nearby streets" done={false} off={!sel}>
-      {!sel ? <p className="note" style={{ margin: 0 }}>Place a project, or click one on the map.</p>
-        : <Impact A={A} s={s} c={c} sc={p.sc} g={sel} ghosts={ghosts} dispatch={dispatch} highlight={highlight} select={p.select} />}
-    </Step>
-
-    <Step n={3} title="Try a better spot or a road fix" done={false} off={!act}>
-      {!sel ? <p className="note" style={{ margin: 0 }}>Comes after step 2.</p>
-        : !act ? <p className="note" style={{ margin: 0 }}>Show the year it opens first (step 2).</p>
-        : <><BetterSpot A={A} sc={p.sc} shown={c.shown} g={sel} ghosts={ghosts} setGhosts={setGhosts} flyTo={flyTo} mark={p.mark} hour={s.hour} />
-          {sel.kind !== 'parking' && <AccessRoads s={s} sc={p.sc} g={sel} ghosts={ghosts} setGhosts={setGhosts} />}</>}
-    </Step>
-
-    <Step n={4} title="Decide" done={!!sel && !sel.draft} off={!sel}>
-      {!sel ? <p className="note" style={{ margin: 0 }}>You decide; nothing enters the plan until you add it.</p>
-        : sel.status === 'suggested' ? <div className="row" style={{ gap: 6, justifyContent: 'flex-start' }}>
-            <button className="mini act" onClick={() => patch(sel.id, { status: 'planned', draft: false, place: sel.place || { moved: 0, ok: true } })}>Add to plan</button>
-            <button className="mini" onClick={() => { setSel(null); setGhosts(ghosts.filter(x => x.id !== sel.id)); }}>Dismiss</button></div>
-        : sel.draft ? <div className="row" style={{ gap: 6, justifyContent: 'flex-start' }}>
-            <button className="mini act" onClick={() => patch(sel.id, { draft: false })}>Add to plan</button>
-            <button className="mini" onClick={() => { setSel(null); setGhosts(ghosts.filter(x => x.id !== sel.id)); }}>Discard</button>
-            <small style={{ color: 'var(--muted)' }}>Drafts count only while you test them.</small></div>
-        : <div className="row" style={{ gap: 6, justifyContent: 'flex-start' }}><b className="inplan">✓ In the plan</b>
-            <button className="mini" onClick={() => patch(sel.id, { draft: true })}>Take out</button></div>}
-    </Step>
-
-    <div className="plan-list">
-      <div className="row"><p className="sec" style={{ margin: 0 }}>Your plan · {mine.filter(g => !g.draft).length} in, {mine.filter(g => g.draft).length} draft{sugg.length ? ', ' + sugg.length + ' suggested' : ''}</p>
-        {ghosts.length > 0 && <button className="mini" onClick={() => { setSel(null); setGhosts([]); p.mark(null); }}>Clear all</button>}</div>
-      {ghosts.length === 0 && <p className="note" style={{ margin: '4px 0 0' }}>Nothing yet.</p>}
-      {ghosts.map(g => {
-        const t = GHOST_TYPES[g.kind], st = g.status === 'suggested' ? 'Suggested' : g.draft ? 'Draft' : 'In plan';
-        return <div key={g.id} className={'planrow' + (selId === g.id ? ' on' : '')} onClick={() => { setSel(g.id); flyTo(g.pos); }}>
-          <span className="tag" data-s={st}>{st}</span><span>{t.label} · fall {g.year}{g.place && !g.place.ok ? ' · ⚠ check site' : ''}</span>
-          <button className="mini" aria-label="Remove" onClick={e => { e.stopPropagation(); if (selId === g.id) setSel(null); setGhosts(ghosts.filter(x => x.id !== g.id)); }}>×</button></div>;
-      })}
-      {ghosts.length > 0 && <p className="note" style={{ margin: '6px 0 0' }}>Double-click a project on the map to pick it up, then click where it should go.</p>}
+      {picking && <small className="bt-hint">Click the map where it would go; it snaps to the nearest open land.</small>}
     </div>
+    {rec && <AiRec key={rec.n} A={A} c={c} sc={p.sc} kind={rec.kind} year={rec.year} hour={s.hour} ghosts={ghosts} dispatch={dispatch}
+      fly={p.flyClose || flyTo} mark={p.mark} onPlace={q => { setRec(null); add(q); }} onClose={() => setRec(null)} />}
+
+    {/* your projects as chips: click one to work on it */}
+    <div className="bt-plan">
+      <div className="row"><p className="sec" style={{ margin: 0 }}>Your projects · {mine.filter(g => !g.draft).length} in plan, {mine.filter(g => g.draft).length} draft{sugg.length ? ', ' + sugg.length + ' suggested' : ''}</p>
+        {ghosts.length > 0 && <button className="linkbtn" onClick={() => { if (window.confirm('Delete all ' + ghosts.length + ' of your projects?')) { setSel(null); setGhosts([]); p.mark(null); } }}>Clear all</button>}</div>
+      {ghosts.length === 0 ? <p className="note" style={{ margin: '4px 0 0' }}>None yet. Pick a type above and place it.</p>
+        : <div className="bt-chips">{ghosts.map(g => <button key={g.id} className={'bt-chip' + (selId === g.id ? ' on' : '')} data-s={stOf(g)} onClick={() => { setSel(g.id); flyTo(g.pos); }}>
+            <i />{GHOST_TYPES[g.kind].label}<small>{g.year}{g.place && !g.place.ok ? ' ⚠' : ''}</small></button>)}</div>}
+    </div>
+
+    {!sel ? <p className="note bt-empty">On the map: <b>drag</b> a project to move it, <b>click</b> it to select it, then ✕ Delete (or the Delete key) to remove it.</p>
+      : <section className="bt-sel">
+        <header><div><b>{GHOST_TYPES[sel.kind].label}</b><small>{GHOST_TYPES[sel.kind].size} · opens fall {sel.year} · <span className="tag" data-s={stOf(sel)}>{stOf(sel)}</span></small></div>
+          <button className="mini" onClick={() => setSel(null)} aria-label="Close this project">Done</button></header>
+        {sel.place && !sel.place.ok && <p className="note warn" style={{ margin: '0 0 6px' }}>No open land fits here: check the site.</p>}
+        <div className="seg bt-tabs" role="tablist" aria-label="About this project">
+          <button role="tab" aria-selected={tab === 'impact'} aria-pressed={tab === 'impact'} onClick={() => setTab('impact')}>Impact</button>
+          <button role="tab" aria-selected={tab === 'spot'} aria-pressed={tab === 'spot'} onClick={() => setTab('spot')}>Better spot</button>
+          {sel.kind !== 'parking' && <button role="tab" aria-selected={tab === 'roads'} aria-pressed={tab === 'roads'} onClick={() => setTab('roads')}>Roads</button>}
+        </div>
+        <div className="bt-body">
+          {tab === 'impact' ? <Impact A={A} s={s} c={c} sc={p.sc} g={sel} ghosts={ghosts} dispatch={dispatch} highlight={highlight} select={p.select} />
+            : !act ? <p className="note" style={{ margin: 0 }}>This compares traffic in the year it opens. <button className="mini" onClick={() => dispatch({ type: 'view', patch: { ti: tiOfYear(sel.year), sel: null } })}>Show fall {sel.year}</button></p>
+            : tab === 'spot' ? <BetterSpot A={A} sc={p.sc} shown={c.shown} g={sel} ghosts={ghosts} setGhosts={setGhosts} flyTo={flyTo} mark={p.mark} hour={s.hour} />
+            : <AccessRoads s={s} sc={p.sc} g={sel} ghosts={ghosts} setGhosts={setGhosts} />}
+        </div>
+        {/* the decision stays at the bottom of the panel, whatever is open above */}
+        <footer className="bt-decide">
+          {sel.status === 'suggested' ? <><button className="mini act" onClick={() => patch(sel.id, { status: 'planned', draft: false, place: sel.place || { moved: 0, ok: true } })}>Add to plan</button>
+              <button className="mini" onClick={() => remove(sel.id)}>Dismiss</button></>
+            : sel.draft ? <><button className="mini act" onClick={() => patch(sel.id, { draft: false })}>Add to plan</button>
+              <small>Drafts count only while selected.</small></>
+            : <><b className="inplan">✓ In the plan</b><button className="mini" onClick={() => patch(sel.id, { draft: true })}>Take out</button></>}
+          <button className="mini danger" onClick={() => remove(sel.id)}>✕ Delete</button>
+        </footer>
+      </section>}
+
+    <details className="bt-zoning"><summary>Zoning is not checked</summary>Checked: no buildings, parks or water under it (parking lots count as redevelopment), 30 m from your other projects, a street within 400 m. Not checked: zoning, ownership, utilities, cost.</details>
     {!sel && <ClearHl highlight={highlight} />}
   </div>;
-}
-function Step({ n, title, done, off, children }: { n: number; title: string; done: boolean; off?: boolean; children: React.ReactNode }) {
-  return <section className={'step' + (off ? ' off' : '') + (done ? ' done' : '')}><h3><i>{done ? '✓' : n}</i>{title}</h3><div className="step-body">{children}</div></section>;
 }
 /* one line for the year on the map: is the city keeping up, and how many main streets are over capacity */
 function YearLine({ A, s, c, ghosts, selId }: { A: Atlas; s: State; c: Computed; ghosts: Ghost[]; selId: string | null }) {

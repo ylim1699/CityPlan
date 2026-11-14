@@ -9,6 +9,8 @@ export type ZoneAcs = { drive: number; occ: number; wfh: number; walk: number; v
 export type Zone = { id: string; kind: 'town' | 'campus' | 'gateway'; share?: number; shop?: boolean; name?: string; x: number; z: number; node: number; nodes?: number[]; acs?: ZoneAcs; residents: number; students: number; workers: number;
   jobs: { retail: number; edu: number; other: number; food?: number }; inPed: boolean; road?: string; aadt?: number };
 export type ZonesFile = { zones: Zone[]; work: [number, number, number][]; stores?: [string, 'shop' | 'food', number, number][]; acsCounty?: { drive: number; occ: number; wfh: number; walk: number } };
+/* shopping numbers typed in the Shopping filter: daily arrivals at a store zone, and trips from given zones (by zone id) */
+export type ShopEdit = { total?: number; from?: Record<string, number> };
 export type Calib = { alpha: number; beta: number; studentTrips: number; throughShare: number };
 export const CALIB0: Calib = { alpha: 1, beta: 0.1, studentTrips: 3, throughShare: 0.5 };
 
@@ -43,7 +45,7 @@ export type HourlyFile = { weekday: number[]; saturday: number[]; sunday: number
 export type Scenario = { t: number; hour: number; withProjects: boolean; prm: Params; spring: boolean; widen: string[]; fixes: Fix[];
   closed?: number[]; extra?: { zone: number; students?: number; residents?: number; trips?: number }[]; day?: 'weekday' | 'saturday' | 'sunday';
   plans?: PlanSite[]; roads?: NewRoad[];
-  rev?: string };  /* rev: which confirmed agent projects are loaded; only part of the cache key */
+  rev?: string; data?: string; shops?: Record<string, ShopEdit> };  /* rev: which confirmed agent projects are loaded; data: which data-file numbers; only part of the cache key */
 export type RouteResult = { vol: Float64Array; tti: Float64Array; vht: number; trips: number; through: number;
   planTrips?: number[]; planNode?: number[]; roadVol?: Record<string, { vol: number; vc: number }>; zone?: ZoneStats;
   /* daily car trips arriving at each shop zone, by the zone they leave from (the Shopping filter) */
@@ -137,6 +139,7 @@ export function createRouter(A: Atlas, G: GraphFile, Z: ZonesFile, calib: Calib 
   /* the Walmart shop zone (build_zones.py names it from OpenStreetMap), else the shop zone nearest the store */
   const wm = A.OSM.places.walmart, shops = zones.map((z, i) => z.shop ? i : -1).filter(i => i >= 0);
   const walmart = shops.find(i => /walmart/i.test(zones[i].name || '')) ?? (wm && shops.length ? shops.reduce((b, i) => Math.hypot(zones[i].x - wm[0], zones[i].z - wm[1]) < Math.hypot(zones[b].x - wm[0], zones[b].z - wm[1]) ? i : b) : -1);
+  const zoneIdx = new Map(zones.map((z, i) => [z.id, i] as [string, number]));
   const workRows: Record<number, [number, number][]> = {};
   Z.work.forEach(([h, w, n]) => { (workRows[h] = workRows[h] || []).push([w, n]); });
 
@@ -307,6 +310,19 @@ export function createRouter(A: Atlas, G: GraphFile, Z: ZonesFile, calib: Calib 
     const tsum = thr.reduce((a, b) => a + b, 0); let through = 0;
     hw.forEach((g, a) => hw.forEach((h, b) => { if (a === b || !tsum) return; const v = thr[a] * thr[b] / tsum / 2; OD[g * NZ + h] += v; through += v; }));
     zones.forEach((z, g) => { if (ext[g]) gravity(g, ext[g] * (hw.includes(g) ? 1 - calib.throughShare : 1), true); });
+    /* shopping numbers typed in the Shopping filter (sc.shops), applied last so it shows exactly what was typed:
+       the store's daily arrivals scale every trip to it, then a number for one area replaces the trips from there;
+       the trips home change by the same amount */
+    for (const [sid, e] of Object.entries(sc.shops || {})) {
+      const j = zoneIdx.get(sid); if (j == null) continue;
+      const set = (i: number, n: number) => { const d = n - OD[i * NZ + j]; OD[i * NZ + j] = n; OD[j * NZ + i] = Math.max(0, OD[j * NZ + i] + d); };
+      if (e.total != null) {
+        let cur = 0; for (let i = 0; i < nz; i++) if (i !== j) cur += OD[i * NZ + j];
+        const f = cur ? e.total / cur : 0;
+        for (let i = 0; i < nz; i++) if (i !== j) set(i, OD[i * NZ + j] * f);
+      }
+      Object.entries(e.from || {}).forEach(([oid, n]) => { const i = zoneIdx.get(oid); if (i != null && i !== j) set(i, Math.max(0, n)); });
+    }
     let trips = 0; for (let k = 0; k < OD.length; k++) trips += OD[k];
     const planTrips = net.plans.map((_, m) => { const k = nz + m; let t = 0; for (let j = 0; j < NZ; j++) t += OD[k * NZ + j] + OD[j * NZ + k]; return t; });
     const zout = new Float64Array(nz), zin = new Float64Array(nz);

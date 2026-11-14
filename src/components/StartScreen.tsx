@@ -9,7 +9,7 @@ function day(iso: string) { const d = new Date(iso.length === 10 ? iso + 'T12:00
 
 function RowLine({ row }: { row: Row }) {
   const what = row.st === 'waiting' ? 'Waiting' : row.st === 'reading' ? 'Reading… about a minute' : row.st === 'failed' ? row.err || 'Could not read it'
-    : row.n ? row.n + ' project' + (row.n === 1 ? '' : 's') + (row.buildings ? ' · ' + row.buildings + ' building' + (row.buildings === 1 ? '' : 's') : '') : 'No projects in it';
+    : row.n ? row.n + ' to review' + (row.buildings ? ' · ' + row.buildings + ' building' + (row.buildings === 1 ? '' : 's') : '') : 'Nothing new to build in it';
   return <li className={'st-' + row.st}><i /><div><a href={row.r.url} target="_blank" rel="noopener">{row.r.label}</a><small>{what}</small></div></li>;
 }
 
@@ -43,7 +43,7 @@ export function StartScreen({ rec, onEnter, onReview }: { rec: Records; onEnter:
 
       <div className="start-actions">
         {rec.phase === 'done' && rec.foundCount > 0
-          ? <button className="start-btn ghost" onClick={onReview}>Review {rec.foundCount} new in Planner</button>
+          ? <button className="start-btn ghost" onClick={onReview}>Review {rec.buildingCount ? rec.buildingCount + ' new building' + (rec.buildingCount === 1 ? '' : 's') : rec.foundCount + ' new item' + (rec.foundCount === 1 ? '' : 's')}</button>
           : <button className="start-btn ghost" onClick={rec.check} disabled={busy}>{busy ? 'Checking…' : rec.phase === 'idle' ? 'Check for new records' : 'Check again'}</button>}
         <button className="start-btn" onClick={onEnter} autoFocus>Start planning <span aria-hidden="true">→</span></button>
       </div>

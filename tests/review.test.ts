@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, loadAtlas, readJson } from './load';
 import { candidateId } from '../src/model/candidates';
-import { categoryOf, checkQuote, groupFound, sameProject, type Found } from '../src/model/review';
+import { categoryOf, checkQuote, groupFound, sameProject, screenOf, type Found } from '../src/model/review';
 import { createGeocoder, gridOf } from '../src/model/geocode';
 import { guessLabel, laserficheFile } from '../agent/pdftext';
 
@@ -108,5 +108,29 @@ describe('records from the city archive', () => {
   });
   it('names a record from its heading', () => {
     expect(guessLabel(minutes('pz-2026-07-16.txt'))).toBe('P&Z minutes, July 16 2026');
+  });
+});
+
+describe('worth reviewing', () => {
+  const c = (o: Partial<Found>): Found => ({ name: 'X', type: 'Apartments', status: 'approved', where: '300 S 2nd W', units: null, beds: null, sqft: null, acres: null,
+    startYear: null, endYear: null, plain: '', quote: '', page: null, confidence: 'medium', flags: [], foundIn: { label: 'r', url: '' }, ...o });
+  it('keeps new buildings, roads and rezonings', () => {
+    expect(screenOf(c({ name: 'Test Flats' }))).toBeNull();
+    expect(screenOf(c({ name: '7th S widening', type: 'Road work' }))).toBeNull();
+    expect(screenOf(c({ name: 'Rezone 509 S 5th W', type: 'Rezone' }))).toBeNull();
+  });
+  it("follows the agent's verdict", () => {
+    expect(screenOf(c({ worth: false, why: 'Vote to name the library' }))).toBe('Vote to name the library');
+    expect(screenOf(c({ stage: 'already built', worth: true }))).toMatch(/built/i);
+    expect(screenOf(c({ name: 'Bond for a new school', worth: true }))).toBeNull();
+  });
+  it('screens older candidates by their words', () => {
+    expect(screenOf(c({ name: 'Library naming', type: 'Public building' }))).toMatch(/vote/);
+    expect(screenOf(c({ name: 'Main St Diner remodel', type: 'Commercial' }))).toMatch(/already built/);
+    expect(screenOf(c({ name: 'Sewer master plan', type: 'Study' }))).not.toBeNull();
+  });
+  it('keeps work under way, marked', () => {
+    const g = groupFound([c({ name: 'Test Flats', stage: 'under construction' })], candidateId)[0];
+    expect(g.screened).toBeNull(); expect(g.underway).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 /* 3D layer for planner ghosts: translucent amber blocks with a label.
-   Double-click a ghost to pick it up; the next click on the ground drops it there. */
+   Drag a ghost to move it (the map doesn't pan while you do); click one to select it, and the selected one's label
+   has a delete button. */
 import * as T from 'three';
 import type { XZ } from '../model/types';
 
@@ -7,7 +8,7 @@ export type GhostDraw = { id: string; pos: XZ; w: number; d: number; h: number; 
   roads?: { pts: XZ[]; status: 'planned' | 'suggested'; label: string }[] };
 /* streets a project loads up: glowing ribbons with one "+N pts" label per street */
 export type Highlight = { segs: [XZ, XZ][]; label: string; at: XZ; color: string };
-export type GhostEvent = { type: 'move'; id: string; pos: XZ } | { type: 'select'; id: string };
+export type GhostEvent = { type: 'move'; id: string; pos: XZ } | { type: 'select'; id: string } | { type: 'delete'; id: string };
 
 export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: HTMLCanvasElement; overlay: HTMLElement; S: number; VEX: number }) {
   const { scene, camera, canvas, overlay, S, VEX } = o;
@@ -16,7 +17,9 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
   let hlMats: T.MeshBasicMaterial[] = [], hlEls: { el: HTMLElement; v: T.Vector3 }[] = [];
   function clearHl() { hlEls.forEach(h => h.el.remove()); hlEls = []; hlGroup.children.forEach(ch => (ch as T.Mesh).geometry?.dispose()); hlMats.forEach(m => m.dispose()); hlMats = []; hlGroup.clear(); }
   type Item = { g: T.Group; mats: (T.MeshBasicMaterial | T.LineBasicMaterial | T.LineDashedMaterial)[]; el: HTMLElement; v: T.Vector3; d: GhostDraw; roadMats: T.MeshBasicMaterial[]; roadEls: { el: HTMLElement; v: T.Vector3 }[] };
-  let items: Item[] = [], sel: string | null = null, carrying: string | null = null, cb: ((e: GhostEvent) => void) | null = null, t0 = 0;
+  let items: Item[] = [], sel: string | null = null, cb: ((e: GhostEvent) => void) | null = null, t0 = 0;
+  /* the ghost being dragged: where the pointer grabbed it (offset from its center) and whether it has moved yet */
+  let drag: { id: string; it: Item; off: XZ; at: [number, number]; moved: boolean; pid: number } | null = null, grab = false;
 
   function clear() {
     items.forEach(it => {
@@ -74,30 +77,58 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
     });
     group.add(g);
     const el = document.createElement('div'); el.className = 'planlabel' + (sug ? ' ghost' : '') + (future ? ' future' : '') + (on ? ' sel' : '');
-    el.textContent = d.label; overlay.appendChild(el);
+    const txt = document.createElement('span'); txt.textContent = d.label; el.appendChild(txt);
+    if (on) {
+      const del = document.createElement('button'); del.className = 'ghost-del'; del.type = 'button'; del.textContent = '✕ Delete';
+      del.title = 'Delete this project (or press Delete)'; del.setAttribute('aria-label', 'Delete ' + d.label);
+      del.addEventListener('pointerdown', e => e.stopPropagation());
+      del.addEventListener('click', e => { e.stopPropagation(); cb?.({ type: 'delete', id: d.id }); });
+      el.appendChild(del);
+    }
+    overlay.appendChild(el);
     items.push({ g, mats, el, v: new T.Vector3(d.pos[0], h + 0.15, d.pos[1]), d, roadMats, roadEls });
   }
 
   const ray = new T.Raycaster(), ground = new T.Plane(new T.Vector3(0, 1, 0), 0), hit = new T.Vector3(), ndc = new T.Vector2();
   function aim(e: MouseEvent) { const r = canvas.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); }
-  const onDbl = (e: MouseEvent) => {
+  /* the ghost under the pointer: its blocks and site pad carry the id (not its access roads) */
+  function under(e: MouseEvent) {
     aim(e);
-    const h = ray.intersectObjects(group.children, true)[0];
-    const id = h && (h.object.userData.id || h.object.parent?.userData.id);
-    if (!id) return;
-    e.preventDefault(); e.stopPropagation();
-    carrying = id; canvas.style.cursor = 'crosshair';
-    cb?.({ type: 'select', id });
+    const h = ray.intersectObjects(group.children, true).find(x => x.object.userData.id);
+    return h ? items.find(it => it.d.id === h.object.userData.id) ?? null : null;
+  }
+  const groundAt = (e: MouseEvent): XZ | null => { aim(e); return ray.ray.intersectPlane(ground, hit) ? [hit.x, hit.z] : null; };
+  /* capture phase, so the map controls never see a press that lands on a ghost and don't pan while it is dragged */
+  const onDown = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    const it = under(e), at = it && groundAt(e); if (!it || !at) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    drag = { id: it.d.id, it, off: [at[0] - it.d.pos[0], at[1] - it.d.pos[1]], at: [e.clientX, e.clientY], moved: false, pid: e.pointerId };
+    canvas.setPointerCapture(e.pointerId);
   };
-  let down: [number, number] | null = null;
-  const onDown = (e: PointerEvent) => { down = [e.clientX, e.clientY]; };
+  const onMove = (e: PointerEvent) => {
+    if (!drag) {  /* a grab cursor over ghosts, so it's clear they can be moved */
+      const over = e.buttons === 0 && !!under(e);
+      if (over !== grab) { grab = over; if (over) canvas.style.cursor = 'grab'; else if (canvas.style.cursor === 'grab') canvas.style.cursor = ''; }
+      return;
+    }
+    e.stopImmediatePropagation();
+    if (!drag.moved && Math.hypot(e.clientX - drag.at[0], e.clientY - drag.at[1]) < 5) return;
+    drag.moved = true; canvas.style.cursor = 'grabbing';
+    const at = groundAt(e); if (!at) return;
+    const x = at[0] - drag.off[0], z = at[1] - drag.off[1];
+    drag.it.g.position.set(x, 0, z); drag.it.v.set(x, drag.it.v.y, z);
+  };
   const onUp = (e: PointerEvent) => {
-    if (!carrying || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
-    if (e.detail > 1) return;  /* the second click of the double-click that picked it up */
-    aim(e);
-    if (ray.ray.intersectPlane(ground, hit)) { const id = carrying; carrying = null; canvas.style.cursor = ''; cb?.({ type: 'move', id, pos: [hit.x, hit.z] }); }
+    if (!drag) return;
+    e.stopImmediatePropagation();
+    const d = drag; drag = null;
+    try { canvas.releasePointerCapture(d.pid); } catch { /* already released */ }
+    canvas.style.cursor = grab ? 'grab' : '';
+    if (d.moved) cb?.({ type: 'move', id: d.id, pos: [d.it.g.position.x, d.it.g.position.z] });
+    else cb?.({ type: 'select', id: d.id });
   };
-  canvas.addEventListener('dblclick', onDbl); canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp);
+  canvas.addEventListener('pointerdown', onDown, true); canvas.addEventListener('pointermove', onMove, true); canvas.addEventListener('pointerup', onUp, true);
 
   const vt = new T.Vector3();
   return {
@@ -127,7 +158,7 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
         if (!hd) { h.el.style.left = ((vt.x * 0.5 + 0.5) * W).toFixed(1) + 'px'; h.el.style.top = ((-vt.y * 0.5 + 0.5) * H).toFixed(1) + 'px'; } });
       items.forEach(it => {
         if (it.d.status === 'suggested') (it.mats[0] as T.MeshBasicMaterial).opacity = 0.2 + 0.25 * pulse;
-        if (carrying === it.d.id) (it.mats[0] as T.MeshBasicMaterial).opacity = 0.25 + 0.4 * pulse;
+        if (drag?.moved && drag.id === it.d.id) (it.mats[0] as T.MeshBasicMaterial).opacity = 0.25 + 0.4 * pulse;
         vt.copy(it.v).project(camera);
         const hide = vt.z > 1 || vt.z < -1;
         it.el.style.display = hide ? 'none' : '';
@@ -135,10 +166,10 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
         it.roadMats.forEach((m, k) => { if ((it.d.roads || [])[k]?.status === 'suggested') m.opacity = 0.45 + 0.45 * pulse; });
         it.roadEls.forEach(r => { vt.copy(r.v).project(camera); const hd = vt.z > 1 || vt.z < -1; r.el.style.display = hd ? 'none' : '';
           if (!hd) { r.el.style.left = ((vt.x * 0.5 + 0.5) * W).toFixed(1) + 'px'; r.el.style.top = ((-vt.y * 0.5 + 0.5) * H).toFixed(1) + 'px'; } });
-        if (carrying === it.d.id) it.el.textContent = 'Click where it should go';
-        else if (it.el.textContent !== it.d.label) it.el.textContent = it.d.label;
+        const txt = it.el.firstChild as HTMLElement, want = drag?.moved && drag.id === it.d.id ? 'Let go where it should go' : it.d.label;
+        if (txt.textContent !== want) txt.textContent = want;
       });
     },
-    dispose() { clear(); clearHl(); scene.remove(group); scene.remove(hlGroup); canvas.removeEventListener('dblclick', onDbl); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); }
+    dispose() { clear(); clearHl(); scene.remove(group); scene.remove(hlGroup); canvas.removeEventListener('pointerdown', onDown, true); canvas.removeEventListener('pointermove', onMove, true); canvas.removeEventListener('pointerup', onUp, true); }
   };
 }

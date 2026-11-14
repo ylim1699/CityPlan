@@ -15,6 +15,9 @@ export const Found = z.object({
     type: z.string().describe('Short type, e.g. "Student housing", "Grocery store", "Road work", "Subdivision"'),
     category: z.enum(CATEGORIES).describe('housing / commercial / mixed use / public building = a building is planned; subdivision = new lots, use not stated; road or trail, utility (sewer, water, cell tower), zoning only (rezone, annexation, plat vacation, no building named), study or plan; other'),
     status: z.enum(['construction', 'approved', 'planned']).describe('approved = approved by council or P&Z; planned = proposed or under review; construction = the record says work has started'),
+    stage: z.enum(['new', 'under construction', 'already built']).describe('new = not built yet; under construction = the record says work has started; already built = it exists now (remodel, sign, license, naming or anything else about an existing building or road)'),
+    worth: z.boolean().describe('true only if this item puts something new at a specific place: a new building, a new or widened road, or new zoning on a specific parcel. false for votes or decisions that build nothing there (naming, historic designation, bond or ballot votes, budgets, agreements, fee changes), studies, and anything already built'),
+    why: z.string().describe('One short reason for worth, e.g. "New 120-unit apartments on a vacant lot" or "Vote to name the existing library; nothing new is built"'),
     where: z.string().describe('Location as stated: address, cross streets or parcel description'),
     units: z.number().nullable().describe('Homes or apartment units, if stated'),
     beds: z.number().nullable().describe('Student or care beds, if stated'),
@@ -34,8 +37,11 @@ export type { Candidate } from '../src/model/candidates';
 export type ExtractInput = { pdf?: Uint8Array; text?: string; label: string };
 export type ExtractResult = { model: string; tried: string[]; projects: FoundProject[] };
 
-export const SYSTEM = `You read city government records for Rexburg, Idaho and list development projects that will change how many people live, work or shop somewhere, or change a road: new housing (homes, apartments, student housing), commercial buildings, schools, churches, subdivisions, rezonings tied to a specific development, and road widenings or new roads.
-Leave out routine items (minutes approval, budgets, personnel, sewer repairs, proclamations) and anything denied or tabled.
+export const SYSTEM = `You read city government records for Rexburg, Idaho and list development projects that will change how many people live, work or shop somewhere, or change a road: new housing (homes, apartments, student housing), commercial buildings, schools, churches, subdivisions, rezonings of a specific parcel, and road widenings or new roads.
+The question for each item is: will something new stand at a specific place that is not there today? A vote is only a project when it approves building, road work or rezoning at a place. Votes that build nothing there (naming or renaming a building, historic designation, a bond or ballot measure, a purchase or lease, an agreement, fees) are not projects; if you list one, set worth to false and say why.
+Things already built (remodels, signs, business or liquor licenses, conditional uses inside an existing building, ribbon cuttings) get stage "already built" and worth false. Work the record says has started gets stage "under construction".
+Leave out routine items (minutes approval, budgets, personnel, sewer repairs, proclamations) and anything denied, tabled or withdrawn.
+List each project once per record, even when it comes up several times (e.g. a rezone and a plat for the same site): use the most advanced action and one quote.
 Only report what the document says. Copy each quote exactly from the document. Use null for any number the document does not state, and say in flags what is missing or assumed. An empty list is a valid answer.`;
 export const TASK = 'List the development projects in this record.';
 

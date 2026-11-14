@@ -29,7 +29,10 @@ export type View = { apply: (shown: SegResult[], tp: number) => void; flyTo: (po
   /* the map search result: a pin with its name, or null to clear it */
   mark: (pos: XZ | null, label?: string) => void;
   /* Shopping filter: arcs from where shoppers come from to one store, n = car trips a day; null clears them */
-  setFlows: (list: Flow[] | null) => void };
+  setFlows: (list: Flow[] | null) => void;
+  /* where the camera is, so a rebuilt view (new projects) opens where the old one was */
+  getCam: () => Cam; setCam: (c: Cam) => void };
+export type Cam = { p: number[]; t: number[] };
 export type Flow = { a: XZ; b: XZ; n: number };
 
 export function createView(els: ViewEls, A: Atlas, getState: () => State, onSelect: (id: string) => void,
@@ -216,7 +219,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     tip.innerHTML = '<b></b><span><i></i></span><small></small>';
     tip.querySelector('b')!.textContent = b.name;
     (tip.querySelector('i') as HTMLElement).style.background = k >= 0 ? DENSITY[k].color : '#9aa3ad';
-    tip.querySelector('span')!.append(b.pop == null ? 'Population not published' : fmtN(b.pop) + ' people (estimate ±' + fmtN(b.popMoe ?? 0) + ')' + (d != null ? ' · ' + fmtN(d) + ' per km²' : ''));
+    tip.querySelector('span')!.append(b.pop == null ? 'Population not published' : fmtN(b.pop) + ' people' + (d != null ? ' · ' + fmtN(d) + ' per km²' : ''));
     tip.querySelector('small')!.textContent = (b.pop2020 != null ? '2020 Census count: ' + fmtN(b.pop2020) + ' · ' : '') + 'Click for details';
     tip.style.display = 'block'; tip.style.left = hover.x + 'px'; tip.style.top = hover.y + 'px';
   }
@@ -833,6 +836,8 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     onGhost(cb) { ghosts.onEvent(cb); },
     setHighlight(list) { ghosts.highlight(list); },
     target() { return [controls.target.x, controls.target.z]; },
+    getCam() { return { p: camera.position.toArray(), t: controls.target.toArray() }; },
+    setCam(c) { camera.position.fromArray(c.p); controls.target.fromArray(c.t); controls.update(); },
     setZoneStats(z) { zl.setStats(z); if (zoneHover >= 0) showTip(); },
     dispose() { disposed = true; bl.dispose(); zl.dispose(); setFlows(null); flowMat.dispose(); dotMat.dispose(); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('pointermove', onMove); canvas.removeEventListener('pointerleave', onLeave); ghosts.dispose(); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); overlay.innerHTML = ''; }
   };
