@@ -1,0 +1,96 @@
+{
+ "meta": {
+  "source": "AI agent reading city records (unreviewed candidates)",
+  "url": "",
+  "fetched": "2026-11-14",
+  "type": "estimate"
+ },
+ "candidates": [
+  {
+   "name": "Home Depot Subdivision",
+   "type": "Subdivision",
+   "status": "approved",
+   "where": "1600 N 2nd E",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": 40,
+   "startYear": null,
+   "endYear": null,
+   "plain": "A 40-acre property at 1600 North 2nd East is being subdivided into six lots, including a 10-acre parcel for a future Home Depot store and a new public road.",
+   "quote": "Plat – (26-00073) Home Depot Subdivision - Plat - Located at approximately 1600 N 2nd E, the application is to subdivide the property into six (6) lots. – Dan Zoldak (Action)",
+   "page": 3,
+   "confidence": "high",
+   "flags": [
+    "No start year in the record",
+    "No completion date in the record"
+   ],
+   "id": "ag-home-depot-subdivision",
+   "foundIn": {
+    "label": "P&Z minutes, July 16 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=707665&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite"
+  },
+  {
+   "name": "Moody Townhomes Planned Unit Development (PUD)",
+   "type": "Townhome PUD",
+   "status": "planned",
+   "where": "Within the county impact area",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The existing Shirley Subdivision will be vacated and replatted as the Moody Townhomes.",
+   "quote": "Planning and Zoning Administrator Parkinson stated that the Moody Townhome Planned Unit Development (PUD) would come before the Commission. The project involved vacating the existing Shirley Subdivision and replating the area as the Moody Townhomes in a single action.",
+   "page": 7,
+   "confidence": "medium",
+   "flags": [
+    "No unit count in the record",
+    "No acreage in the record",
+    "No start year in the record",
+    "No completion date in the record"
+   ],
+   "id": "ag-moody-townhomes-planned-unit-development",
+   "foundIn": {
+    "label": "P&Z minutes, July 16 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=707665&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite"
+  },
+  {
+   "name": "Summerfield 14 Plat",
+   "type": "Subdivision",
+   "status": "planned",
+   "where": "Summerfield development",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The Summerfield development is submitting its 14th plat for review.",
+   "quote": "Planning and Zoning Administrator Parkinson also reported that the Summerfield development would be submitting its 14th plat for review.",
+   "page": 7,
+   "confidence": "medium",
+   "flags": [
+    "No specific address in the record",
+    "No unit count in the record",
+    "No acreage in the record",
+    "No start year in the record",
+    "No completion date in the record"
+   ],
+   "id": "ag-summerfield-14-plat",
+   "foundIn": {
+    "label": "P&Z minutes, July 16 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=707665&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite"
+  }
+ ]
+}

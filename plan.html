@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Growth Atlas Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light dark;
+  --paper:#eef1ed; --panel:#fbfcfa; --ink:#1c2a2d; --muted:#5a696c; --line:#d3dbd6;
+  --accent:#0d6767; --accent-soft:#dcecea;
+  --must:#0d6767; --should:#2e6bc9; --cut:#8a6a52; --warn:#b5541f; --warn-soft:#fbeee4;
+  --code:#e6ebe6;
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#141b1c; --panel:#1c2526; --ink:#e3ebe8; --muted:#9aaba7; --line:#2f3b3c;
+    --accent:#5cc2b6; --accent-soft:#1f3a38; --must:#5cc2b6; --should:#7fa8ec; --cut:#c4a68d;
+    --warn:#f0a070; --warn-soft:#3a2a20; --code:#232e2f;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#141b1c; --panel:#1c2526; --ink:#e3ebe8; --muted:#9aaba7; --line:#2f3b3c;
+  --accent:#5cc2b6; --accent-soft:#1f3a38; --must:#5cc2b6; --should:#7fa8ec; --cut:#c4a68d;
+  --warn:#f0a070; --warn-soft:#3a2a20; --code:#232e2f;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 var(--body)}
+h1,h2,h3{font-family:var(--display);line-height:1.2;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,5vw,40px)}
+h2{font-size:24px;margin:0 0 12px}
+h3{font-size:17px;margin:20px 0 8px}
+p{margin:0 0 12px}
+a{color:var(--accent)}
+code,pre,.num{font-family:var(--mono);font-size:13px}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;margin:0 0 14px;line-height:1.5}
+pre code{background:none;padding:0}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 16px 80px;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px}
+nav.toc{position:sticky;top:16px;align-self:start;font-size:13.5px}
+nav.toc ol{list-style:none;margin:0;padding:0;border-left:2px solid var(--line)}
+nav.toc a{display:block;padding:4px 12px;color:var(--muted);text-decoration:none}
+nav.toc a:hover{color:var(--ink)}
+.prog{margin:0 0 14px;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.prog b{font-family:var(--mono);font-size:20px}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+main section{margin:0 0 44px}
+.lede{font-size:17px;color:var(--muted);max-width:68ch}
+.meta{color:var(--muted);font-size:13px;margin:8px 0 16px}
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:0 0 14px}
+.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.tablewrap{overflow-x:auto;margin:0 0 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:0}
+.tag{display:inline-block;font:600 11px/1 var(--body);text-transform:uppercase;letter-spacing:.06em;padding:4px 7px;border-radius:4px;color:#fff;vertical-align:2px}
+.tag.must{background:var(--must)} .tag.should{background:var(--should)} .tag.cut{background:var(--cut)} .tag.done{background:var(--muted)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tag{color:#0f1516}}
+:root[data-theme="dark"] .tag{color:#0f1516}
+.phase{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin:0 0 16px}
+.phase header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin:0 0 6px}
+.phase header h3{margin:0;font-size:19px}
+.task{display:grid;grid-template-columns:22px 1fr;gap:8px;padding:8px 0;border-top:1px solid var(--line);align-items:start}
+.task input{margin:4px 0 0;width:16px;height:16px;accent-color:var(--accent)}
+.task label{cursor:pointer}
+.task small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.task.done label{color:var(--muted)}
+.task.done label>b, .task.done label>span.t{text-decoration:line-through;text-decoration-color:var(--line)}
+.donewhen{margin-top:10px;font-size:13.5px;padding:8px 12px;background:var(--accent-soft);border-radius:6px}
+.donewhen b{color:var(--accent)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.stat b{display:block;font-family:var(--mono);font-size:22px;font-weight:500}
+.stat span{color:var(--muted);font-size:13px}
+ul.tight, ol.tight{margin:0 0 12px;padding-left:20px} ul.tight li, ol.tight li{margin:3px 0}
+.theme{position:fixed;top:12px;right:12px;font:500 12px var(--body);padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr;gap:20px;padding-top:56px}
+  nav.toc{position:static}
+  nav.toc ol{display:flex;flex-wrap:wrap;border:0;gap:2px}
+  nav.toc a{padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
+}
+</style>
+</head>
+<body>
+<button class="theme" id="theme" aria-label="Toggle dark mode">Theme</button>
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <div class="prog"><span style="color:var(--muted);font-size:12.5px">Tasks done</span><br><b id="pc">0 / 0</b><div class="bar"><i id="pb"></i></div></div>
+  <ol>
+    <li><a href="#start">1. Start here (Ben)</a></li>
+    <li><a href="#built">2. What's built</a></li>
+    <li><a href="#todo">3. What still needs work</a></li>
+    <li><a href="#pitch">4. Pitch: say / don't say</a></li>
+    <li><a href="#stack">5. Tech stack</a></li>
+    <li><a href="#layout">6. Project layout</a></li>
+    <li><a href="#run">7. Commands and keys</a></li>
+    <li><a href="#data">8. Data snapshots</a></li>
+    <li><a href="#model">9. How the model works</a></li>
+    <li><a href="#accuracy">10. Accuracy</a></li>
+    <li><a href="#phases">11. Build phases</a></li>
+    <li><a href="#open">12. Open questions</a></li>
+  </ol>
+</nav>
+
+<main>
+<header style="margin:0 0 36px">
+  <h1>Rexburg Growth Atlas: build plan</h1>
+  <p class="meta">Updated Nov 14, 2026 · for the team · source docs: <i>Rexburg Growth Atlas complete plan.md</i>, <code>demo-script.md</code></p>
+  <p class="lede">Where the app stands after the Nov 14 build: the atlas moved to React + TypeScript, every trip is now routed through the real street network, an AI agent reads city minutes, and the model uses Census, LODES and ITD data. This page lists what exists, what still needs work, and how to run it. Ticks are saved in your browser.</p>
+</header>
+
+<!-- 1 -->
+<section id="start">
+<h2>1. Start here (Ben)</h2>
+<ol class="tight">
+<li><code>git pull</code> (or check out the branch named in the push message), then <code>pnpm install</code>. Needs Node 20+ and pnpm (<code>npm i -g pnpm</code>).</li>
+<li>Make your own <code>.env</code> in the project folder (it is not in git; never commit it):
+<pre><code>GEMINI_API_KEY=...          # free at aistudio.google.com, for the AI agent
+GEMINI_MODELS=gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.1-flash-lite,gemini-4-hydrogen
+CENSUS_API_KEY=...          # free at api.census.gov/data/key_signup.html; only to re-download ACS data</code></pre>
+The app runs without any keys; only the agent upload and <code>fetch_census.py</code> need them.</li>
+<li><code>pnpm dev</code> → <a href="http://localhost:5173">http://localhost:5173</a>. The old atlas is still at <a href="http://localhost:5173/legacy/index.html">/legacy/index.html</a> for comparison.</li>
+<li><code>pnpm test:run</code> should show 25 passing tests before and after your changes.</li>
+<li>Read section 3 for what to pick up next.</li>
+</ol>
+<div class="note">The model code you wrote (<code>model.js</code>) lives on almost unchanged in <code>src/model/atlas.ts</code>; golden tests check the TypeScript port gives the same numbers as <code>legacy/model.js</code>. The 3D scene from <code>app.js</code> is in <code>src/scene/view.ts</code>.</div>
+</section>
+
+<!-- 2 -->
+<section id="built">
+<h2>2. What's built</h2>
+<div class="grid2" style="margin-bottom:14px">
+  <div class="stat"><b>1,106 / 1,426</b><span>road graph nodes / links, 99% connected</span></div>
+  <div class="stat"><b>122</b><span>zones: 106 town, 4 campus, 12 gateways</span></div>
+  <div class="stat"><b>~0.15 s</b><span>to route one hour (in a Web Worker)</span></div>
+  <div class="stat"><b>25</b><span>tests passing (Vitest)</span></div>
+</div>
+<div class="tablewrap"><table>
+<thead><tr><th>Area</th><th>What it does now</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Atlas port</td><td>Same 3D city, timeline, hour bar, resident / planner views, gaps, widenings, fixes, project register. Visually identical to the old one</td><td><code>src/App.tsx</code>, <code>src/components/*</code>, <code>src/scene/view.ts</code>, <code>src/model/atlas.ts</code></td></tr>
+<tr><td>Routing</td><td>Trips from every household and student → destinations (LODES work trips, gravity for the rest, 70% of student trips to campus) → 4-batch routing with BPR, hour by hour. Through traffic and outside visitors at 12 gateways. Falls back to the old count-based colors while routing runs</td><td><code>src/model/routing.ts</code>, <code>src/worker/route.worker.ts</code>, <code>src/hooks/useTraffic.ts</code></td></tr>
+<tr><td>Traffic method switch</td><td>Planner view: "Routed trips" or "Count-based" (the old method)</td><td>Planner panel</td></tr>
+<tr><td>Problem cards</td><td>Streets at 90%+ of capacity: when it starts (scans 2026–2034), why (growth vs. projects), how sure (matched to city counts), travel-time delay. Housing and parking gaps too</td><td><code>src/components/ProblemCards.tsx</code></td></tr>
+<tr><td>Fix comparison</td><td>"Compare fixes": turn lanes, signal timing, roundabout, nearby widenings, ranked by vehicle-hours saved (re-routes for each)</td><td>ProblemCards (planner)</td></tr>
+<tr><td>Placement test</td><td>The same 500 student beds at 3 preset sites, ranked by delay added</td><td><code>src/components/Placement.tsx</code></td></tr>
+<tr><td>Demo views</td><td>One-click: 5 pm today, 5 pm 2034 with / without projects, 8 am today</td><td>Planner panel</td></tr>
+<tr><td>Accuracy panel</td><td>Counts vs. model scatter, GEH pass rates (tuning, held-out, 2023 counts), correlation</td><td><code>src/components/AccuracyPanel.tsx</code></td></tr>
+<tr><td>AI agent</td><td>Upload minutes (PDF or text) → Gemini lists development projects with verbatim quotes → a person checks the quote and clicks the map to place it → it joins the model. Fallback chain of 4 Gemini models; Claude optional. Also a command-line version</td><td><code>agent/</code>, <code>api/agent.ts</code>, <code>src/components/AgentPanel.tsx</code>, <code>scripts/run_agent.ts</code></td></tr>
+<tr><td>City minutes</td><td>Text of 5 P&amp;Z minutes (Jul 16, Aug 6, Aug 20, Oct 8, Oct 22, 2026) saved from the city archive. The agent's first run (Jul 16) found the Home Depot subdivision at ~1600 N 2nd E, Moody Townhomes PUD and Summerfield plat 14; all quotes verbatim; not yet confirmed on the map</td><td><code>data/raw/minutes/</code>, <code>public/data/projects.candidates.json</code></td></tr>
+<tr><td>Data</td><td>LODES 2023, ACS 2020–2024 by block group (commute mode, carpooling, work from home, population), ITD counter 059 hourly and day-of-week shape, 26 intersection counts from 2023 matched by GPS position</td><td><code>data/raw/</code> → <code>public/data/</code></td></tr>
+<tr><td>Demo script</td><td>3-minute script with the real numbers, limits slide, likely questions</td><td><code>demo-script.md</code></td></tr>
+</tbody></table></div>
+</section>
+
+<!-- 3 -->
+<section id="todo">
+<h2>3. What still needs work</h2>
+<p>In priority order. <span class="tag must">Must</span> before the demo · <span class="tag should">Should</span> if there's time · <span class="tag cut">Later</span> next steps for the pitch.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>Task</th><th>Why / notes</th></tr></thead>
+<tbody>
+<tr><td><span class="tag must">Must</span></td><td><b>Confirm the agent's projects.</b> Planner view → "AI agent" → check each quote → "Quote checked: place on map" (Home Depot: on 2nd East around 1600 N, north of Walmart). Upload the other 4 minutes files from <code>data/raw/minutes/</code>. Then "Download projects.json", replace <code>public/data/projects.json</code>, commit</td><td>Until at least one project is confirmed, don't say "our AI read the records" on stage. After Home Depot is confirmed, delete its "Not mapped" entry in the <code>unmapped</code> list of <code>projects.json</code></td></tr>
+<tr><td><span class="tag must">Must</span></td><td><b>Deploy to Vercel</b> (section 7): import the repo, set <code>GEMINI_API_KEY</code>, <code>GEMINI_MODELS</code> and <code>AGENT_TOKEN</code> (any passcode) in Environment Variables, check the live URL on a phone</td><td>Not done yet. <code>api/agent.ts</code> has only run through the dev server, never on Vercel; test an upload on the live site. Vercel caps request bodies at about 4.5 MB, fine for minutes</td></tr>
+<tr><td><span class="tag must">Must</span></td><td><b>Rehearse <code>demo-script.md</code></b> twice; keep <code>pnpm build &amp;&amp; pnpm preview</code> ready offline</td><td>Routing takes a few seconds to fill the hour bar on a slow laptop; start the demo on the page early</td></tr>
+<tr><td><span class="tag should">Should</span></td><td><b>Check lane counts</b> on the 5 worst-matching streets in the accuracy scatter (hover the dots) using Google Street View; fix in <code>scripts/build_city.py</code> (see the North 2nd East override there), rebuild, recalibrate</td><td>Most lane counts are OpenStreetMap defaults; wrong lanes push traffic onto the wrong streets. ~20 min</td></tr>
+<tr><td><span class="tag should">Should</span></td><td><b>Weekday / Saturday / Sunday switch</b> in the left controls</td><td>The model already supports <code>day</code> (ITD shapes and factors in <code>hourly.json</code>); only the button is missing. ~10 min</td></tr>
+<tr><td><span class="tag should">Should</span></td><td><b>City Council minutes</b>: only P&amp;Z minutes were fetched. Find the council folder id in the city's Laserfiche archive and run <code>pnpm tsx scripts/fetch_minutes.ts &lt;id&gt;:&lt;name&gt;.txt</code></td><td>Council approvals and final plats</td></tr>
+<tr><td><span class="tag should">Should</span></td><td><b>Fix the "46 projects" line</b> in the plan doc and pitch (section 4)</td><td>The 46 are construction-map records, mostly finished sewer and paving work</td></tr>
+<tr><td><span class="tag cut">Later</span></td><td><b>Improve accuracy</b> (section 10): finer zones and more street connectors, true equilibrium assignment, newer counts from the city or ITD, BYU-I approved-housing bed counts, separate hourly shapes for work / class / shopping trips</td><td>Three data upgrades (ACS, 2023 counts, ITD hours) did not move the score, so the limit is the model's structure</td></tr>
+<tr><td><span class="tag cut">Later</span></td><td>Placement heat map, parking by zone, 2019 back-cast calibration, SUMO layer, other cities</td><td>Cut for time; good "next steps" slides</td></tr>
+<tr><td><span class="tag cut">Later</span></td><td>Code cleanup: split <code>src/model/atlas.ts</code>; code-split the 800 KB bundle (build warning); a "routing…" spinner on the hour bar</td><td>Nothing broken; tidiness</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- 4 -->
+<section id="pitch">
+<h2>4. Pitch: say / don't say</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Say</th><th>Don't say</th></tr></thead>
+<tbody>
+<tr><td>"The city's records and local news list dozens of projects…"</td><td>"Rexburg has approved 46 projects" (the 46 are mostly finished sewer and paving records)</td></tr>
+<tr><td>"Our AI reads council and P&amp;Z minutes and finds the approved projects, with a quote you can check; a person confirms each one." (only once one is confirmed)</td><td>"It watches the city's website automatically" (it reads what you upload)</td></tr>
+<tr><td>"It ranks streets in roughly the right order (correlation about 0.8); about a third of counts pass the strict GEH test. Use it to compare options."</td><td>Exact volumes or "matches real traffic"</td></tr>
+<tr><td>"Commuting patterns come from the Census for each neighborhood; work trips from Census LODES; hourly timing from ITD's counter."</td><td>That trip rates are local (other-trip rates are national averages, scaled by one calibrated factor)</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- 5 -->
+<section id="stack">
+<h2>5. Tech stack</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Piece</th><th>Tech</th></tr></thead>
+<tbody>
+<tr><td>Interface</td><td>React 19 + TypeScript, plain CSS (<code>src/styles.css</code>, copied from the old atlas)</td></tr>
+<tr><td>3D</td><td>three.js 0.128 (pinned so the old scene code works unchanged)</td></tr>
+<tr><td>Model and routing</td><td>Plain TypeScript in <code>src/model/</code>; routing runs in a Web Worker</td></tr>
+<tr><td>Build, packages, tests</td><td>Vite 8, pnpm, Vitest</td></tr>
+<tr><td>AI agent</td><td>Gemini via <code>@google/genai</code> (Interactions API, v1beta) with a 4-model fallback chain; Claude via <code>@anthropic-ai/sdk</code> if <code>AGENT_PROVIDER=claude</code></td></tr>
+<tr><td>Server</td><td>One Vercel function, <code>api/agent.ts</code> (the dev server runs the same handler)</td></tr>
+<tr><td>Data prep</td><td>Python 3.11 scripts (pypdf for the ITD reports); headless Chrome via puppeteer-core for the city archive</td></tr>
+<tr><td>Hosting</td><td>Vercel, not set up yet</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- 6 -->
+<section id="layout">
+<h2>6. Project layout</h2>
+<pre><code>CityPlan/
+├─ index.html  package.json  pnpm-lock.yaml  pnpm-workspace.yaml  tsconfig.json
+├─ vite.config.ts            dev server; also answers /api/agent locally
+├─ .env                      your keys (gitignored)
+├─ agent/   extract.ts       schema, prompt, Claude version, provider switch
+│           gemini.ts        Gemini version + fallback chain
+├─ api/     agent.ts         Vercel function behind the upload box
+├─ data/raw/                 untouched downloads
+│  ├─ export.geojson  ped.json  projects.json  streetplan.json  trafficcounts.json
+│  ├─ lodes/   acs/   itd/   minutes/
+├─ public/data/              what the app loads (each has a meta block)
+│  ├─ city-rexburg.json  graph-rexburg.json  zones.json  hourly.json
+│  ├─ calibration.json   projects.json  projects.candidates.json
+├─ scripts/  build_city.py  build_zones.py  build_hourly.py  fetch_census.py
+│            calibrate.ts  run_agent.ts  fetch_minutes.ts  shot.ts (screenshots)
+├─ src/  main.tsx  App.tsx  state.ts  ui.ts  styles.css
+│  ├─ model/   atlas.ts (old model.js)  routing.ts  candidates.ts  types.ts
+│  ├─ scene/view.ts   worker/route.worker.ts   hooks/useTraffic.ts
+│  └─ components/  CityScene  LeftControls  Timeline  AboutDialog  Panels
+│                  ProblemCards  AccuracyPanel  Placement  AgentPanel
+├─ tests/   golden.test.ts  model.test.ts  agent.test.ts  load.ts
+├─ legacy/  the old atlas (app.js, model.js, city-rexburg.js, index.html)
+└─ demo-script.md  plan.html</code></pre>
+</section>
+
+<!-- 7 -->
+<section id="run">
+<h2>7. Commands and keys</h2>
+<h3>Everyday</h3>
+<pre><code>pnpm dev                     # http://localhost:5173
+pnpm test:run                # all tests once (pnpm test = watch mode)
+pnpm build &amp;&amp; pnpm preview   # production build, offline demo backup</code></pre>
+<h3>Rebuild the data (in this order, only when inputs change)</h3>
+<pre><code>python -I scripts/build_city.py data/raw/export.geojson public/data data/raw   # city, road graph, counts
+python -I scripts/fetch_census.py                                              # ACS → data/raw/acs (needs CENSUS_API_KEY)
+python -I scripts/build_zones.py public/data data/raw/lodes                    # zones (uses lodes + acs)
+python -I scripts/build_hourly.py data/raw/itd public/data                     # ITD hourly shape
+pnpm tsx scripts/calibrate.ts                                                  # re-tune (~30 s), writes calibration.json</code></pre>
+<h3>AI agent</h3>
+<pre><code>pnpm tsx scripts/fetch_minutes.ts 716476:pz-2026-10-22.txt   # save minutes text from the city archive (Laserfiche doc id)
+pnpm agent data/raw/minutes/pz-2026-10-22.txt "P&amp;Z minutes, Oct 22 2026"
+pnpm agent --list
+pnpm agent --confirm &lt;id&gt; &lt;lat&gt; &lt;lon&gt;                          # or confirm in the app (planner → AI agent)</code></pre>
+<h3>Keys</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Key in .env</th><th>Needed for</th><th>Get it</th></tr></thead>
+<tbody>
+<tr><td><code>GEMINI_API_KEY</code></td><td>AI agent (default)</td><td>aistudio.google.com → Get API key (free tier). Checked Nov 14: 3.5 Flash-Lite, 3.6 Flash, 3.1 Flash-Lite and 4 Hydrogen work; 2.5 Flash-Lite is closed to new users; Hydrogen takes ~1 min</td></tr>
+<tr><td><code>GEMINI_MODELS</code></td><td>Order of the fallback chain</td><td>Comma-separated; optional</td></tr>
+<tr><td><code>CENSUS_API_KEY</code></td><td><code>fetch_census.py</code> only</td><td>api.census.gov/data/key_signup.html (free; click the activation link in the email)</td></tr>
+<tr><td><code>ANTHROPIC_API_KEY</code> + <code>AGENT_PROVIDER=claude</code></td><td>Optional: use Claude instead of Gemini</td><td>console.anthropic.com (paid, under $1 for all minutes)</td></tr>
+<tr><td><code>AGENT_TOKEN</code></td><td>On Vercel: passcode so strangers can't spend the API quota</td><td>Make one up; the upload box asks for it</td></tr>
+</tbody></table></div>
+<h3>Deploy (Vercel)</h3>
+<ol class="tight">
+<li>vercel.com → sign in with GitHub → Add New → Project → import <code>ylim1699/CityPlan</code>.</li>
+<li>Framework: Vite (auto). Build <code>pnpm build</code>, output <code>dist</code>.</li>
+<li>Settings → Environment Variables: <code>GEMINI_API_KEY</code>, <code>GEMINI_MODELS</code>, <code>AGENT_TOKEN</code>. Redeploy.</li>
+<li>Open the URL on a phone; in planner view, upload one minutes file to test the agent.</li>
+</ol>
+</section>
+
+<!-- 8 -->
+<section id="data">
+<h2>8. Data snapshots</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Data</th><th>Source</th><th>Used for</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Streets, buildings, lots</td><td>OpenStreetMap (Overpass Turbo)</td><td>3D city, road graph</td><td>In</td></tr>
+<tr><td>Traffic counts (89 used + 26 from 2023), PED district, project map, street plan</td><td>Madison County / Rexburg GIS</td><td>Calibration, projects</td><td>In</td></tr>
+<tr><td>Home → work pairs, jobs, workers</td><td>Census LODES 2023</td><td>Work trips, attractions</td><td>In</td></tr>
+<tr><td>Population, commute mode, carpooling, work from home, cars per household</td><td>Census ACS 2020–2024, block groups</td><td>Zone population, car trips</td><td>In</td></tr>
+<tr><td>Hourly and day-of-week shape</td><td>ITD counter 059 (SH-33)</td><td>Hourly trips</td><td>In</td></tr>
+<tr><td>P&amp;Z minutes, Jul–Oct 2026</td><td>City Laserfiche archive</td><td>AI agent</td><td>In (text)</td></tr>
+<tr><td>City Council minutes</td><td>City Laserfiche archive</td><td>AI agent</td><td>Not fetched</td></tr>
+<tr><td>Student beds per complex</td><td>BYU-I approved housing</td><td>Student placement</td><td>Not available; floor-area estimate used</td></tr>
+<tr><td>Counts newer than 2019 (street totals)</td><td>City / ITD</td><td>Calibration</td><td>Ask (section 12)</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- 9 -->
+<section id="model">
+<h2>9. How the model works</h2>
+<ol class="tight">
+<li><b>Road graph:</b> OpenStreetMap streets split at intersections (found by shared coordinates before simplifying). Capacity = lanes × per-lane rate by road type; speed from <code>maxspeed</code> tags or road-type defaults.</li>
+<li><b>Zones:</b> census blocks grouped by block group and a 1.2 km grid (106), campus split by its parking lots (4), road ends at the edge of the map (12 gateways). Each zone connects to up to 3 nearby street points.</li>
+<li><b>People:</b> ACS block group population spread by building floor area; students vs. residents by building type (apartments in the walk district = student housing, an estimate); scaled to 21,900 students and 22,100 residents, then grown by the timeline sliders. Housing projects add people; stores and other projects add trips.</li>
+<li><b>Trips:</b> work trips from LODES home → work pairs with ACS drive share, carpooling and work from home per zone; other trips by gravity on drive time; 70% of student car trips to campus; visitors and through traffic at gateways from their counts.</li>
+<li><b>Hours:</b> ITD counter 059 shape (5 pm = 9.7% of a weekday).</li>
+<li><b>Routing:</b> 4 batches (40/30/20/10%), fastest paths, BPR slowdown between batches; volumes land on the same street segments the 3D view colors.</li>
+<li><b>Calibration:</b> 288 combinations of trip scale α, distance β, student trips and through share, scored against 69 counts; 20 held out. Current: α 3, β 0.08/min, 3 student trips a day, 70% of highway traffic passing through.</li>
+</ol>
+</section>
+
+<!-- 10 -->
+<section id="accuracy">
+<h2>10. Accuracy</h2>
+<div class="grid2" style="margin-bottom:14px">
+  <div class="stat"><b>32%</b><span>tuning counts under GEH 5</span></div>
+  <div class="stat"><b>10%</b><span>held-out counts under GEH 5 (2 of 20)</span></div>
+  <div class="stat"><b>15%</b><span>2023 intersection counts under GEH 5 (4 of 26)</span></div>
+  <div class="stat"><b>0.77</b><span>correlation with counts</span></div>
+</div>
+<div class="note warn">Agencies aim for about 85% under GEH 5. The model ranks streets roughly correctly but misses many single streets. Adding ACS, the 2023 counts and the ITD hourly shape did not change the score, so the next gains need structural work: smaller zones and more connectors, true equilibrium assignment, checked lane counts, and newer street counts. The 2023 approach counts' units are not stated in the source; they are read as daily, with two-way leg volume ≈ 2 × approach.</div>
+</section>
+
+<!-- 11 -->
+<section id="phases">
+<h2>11. Build phases</h2>
+<div class="phase"><header><span class="tag done">Done</span><h3>Phase 0 · Scaffold</h3></header>
+<div class="task"><input type="checkbox" id="t0.1" checked><label for="t0.1"><span class="t">Vite + React + TS app with pnpm; old files in <code>legacy/</code>, raw data in <code>data/raw/</code></span></label></div>
+<div class="task"><input type="checkbox" id="t0.2" checked><label for="t0.2"><span class="t">three.js 0.128, Vitest, tsx</span></label></div>
+</div>
+<div class="phase"><header><span class="tag done">Done</span><h3>Phase 1 · Port the atlas</h3></header>
+<div class="task"><input type="checkbox" id="t1.1" checked><label for="t1.1"><span class="t"><code>build_city.py</code> writes JSON; model ported to <code>src/model/atlas.ts</code>; projects moved to <code>public/data/projects.json</code></span></label></div>
+<div class="task"><input type="checkbox" id="t1.2" checked><label for="t1.2"><span class="t">Golden tests against <code>legacy/model.js</code>; scene and panels as components; screenshots match</span></label></div>
+</div>
+<div class="phase"><header><span class="tag done">Done</span><h3>Phase 2 · Data</h3></header>
+<div class="task"><input type="checkbox" id="t2.1" checked><label for="t2.1"><span class="t">LODES 2023; ACS 2020–2024; ITD hourly and day-of-week</span></label></div>
+<div class="task"><input type="checkbox" id="t2.2"><label for="t2.2">Student beds per complex (BYU-I approved housing) <small>Would replace the floor-area estimate for students</small></label></div>
+</div>
+<div class="phase"><header><span class="tag done">Done, weak accuracy</span><h3>Phase 3 · Routing</h3></header>
+<div class="task"><input type="checkbox" id="t3.1" checked><label for="t3.1"><span class="t">Road graph, zones, trips, worker routing, calibration with hold-out and 2023 check</span></label></div>
+<div class="task"><input type="checkbox" id="t3.2"><label for="t3.2">Lane-count check on the worst streets <small>Section 3</small></label></div>
+<div class="task"><input type="checkbox" id="t3.3"><label for="t3.3">Structural accuracy work <small>Section 10</small></label></div>
+</div>
+<div class="phase"><header><span class="tag done">Done</span><h3>Phase 4 · Features</h3></header>
+<div class="task"><input type="checkbox" id="t4.1" checked><label for="t4.1"><span class="t">Problem cards; fix comparison; placement test; demo views</span></label></div>
+<div class="task"><input type="checkbox" id="t4.2"><label for="t4.2">Weekday / Saturday / Sunday switch <small>Model ready; button missing</small></label></div>
+<div class="task"><input type="checkbox" id="t4.3"><label for="t4.3"><span class="tag cut">Later</span> Placement heat map; parking by zone</label></div>
+</div>
+<div class="phase"><header><span class="tag must">In progress</span><h3>Phase 5 · AI agent</h3></header>
+<div class="task"><input type="checkbox" id="t5.1" checked><label for="t5.1"><span class="t">Gemini agent with fallbacks, upload + confirm in the app, command line, minutes fetched</span></label></div>
+<div class="task"><input type="checkbox" id="t5.2"><label for="t5.2">Confirm real projects and commit <code>projects.json</code> <small>Section 3, first row</small></label></div>
+<div class="task"><input type="checkbox" id="t5.3"><label for="t5.3">Fetch City Council minutes</label></div>
+</div>
+<div class="phase"><header><span class="tag must">Must</span><h3>Phase 6–7 · Demo and deploy</h3></header>
+<div class="task"><input type="checkbox" id="t6.1" checked><label for="t6.1"><span class="t">Demo views and <code>demo-script.md</code> with real numbers</span></label></div>
+<div class="task"><input type="checkbox" id="t6.2"><label for="t6.2">Deploy to Vercel and test the agent on the live site</label></div>
+<div class="task"><input type="checkbox" id="t6.3"><label for="t6.3">Rehearse twice; offline backup ready</label></div>
+</div>
+</section>
+
+<!-- 12 -->
+<section id="open">
+<h2>12. Open questions</h2>
+<ul class="tight">
+<li>Is part of North 2nd East still two lanes? (<code>build_city.py</code> sets 4 through lanes on all of it.)</li>
+<li>Counts newer than 2019 (street totals, not intersection approaches) from the city or ITD District 6. Are the 2023 approach counts daily?</li>
+<li>BYU-Idaho: student beds per approved complex; Parking Services (parkingservices@byui.edu) spaces per lot and permits sold.</li>
+<li>The county's 2015 Transportation Master Plan model: zones, trip rates, base volumes.</li>
+<li>Which level-of-service standard Rexburg or ITD uses for "congested".</li>
+<li>Student car ownership and trips per day.</li>
+<li>Who owns the Vercel project (one GitHub account imports it; add the others as members).</li>
+</ul>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  var KEY = 'atlas-plan-ticks-v2', ticks = {};
+  try { ticks = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+  var boxes = document.querySelectorAll('.task input');
+  function tally() {
+    var n = 0;
+    boxes.forEach(function (b) { if (b.checked) n++; b.closest('.task').classList.toggle('done', b.checked); });
+    document.getElementById('pc').textContent = n + ' / ' + boxes.length;
+    document.getElementById('pb').style.width = (n / boxes.length * 100) + '%';
+  }
+  boxes.forEach(function (b) {
+    if (b.id in ticks) b.checked = !!ticks[b.id];
+    b.addEventListener('change', function () {
+      ticks[b.id] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(ticks)); } catch (e) {}
+      tally();
+    });
+  });
+  tally();
+  var root = document.documentElement;
+  document.getElementById('theme').addEventListener('click', function () {
+    var dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+})();
+</script>
+</body>
+</html>

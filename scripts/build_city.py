@@ -1,6 +1,8 @@
 """Convert an Overpass Turbo GeoJSON export into the atlas city file (window.OSM_CITY).
-Usage: python3 -I build_city.py export.geojson out.js  (coordinates become integer meters from the origin)"""
-import json, math, sys, collections
+Usage: python -I scripts/build_city.py data/raw/export.geojson public/data data/raw
+       (second argument: a folder for city-rexburg.json, or a .js path for the legacy window.OSM_CITY file;
+        coordinates become integer meters from the origin)"""
+import json, math, sys, collections, re as _re
 SRC, OUT = sys.argv[1], sys.argv[2]
 EXTRA = sys.argv[3] if len(sys.argv) > 3 else None   # folder with ped.json, trafficcounts.json, projects.json, streetplan.json
 LON0, LAT0 = -111.783826, 43.8260632          # Main St x Center St
@@ -52,13 +54,24 @@ names, nidx = [], {}
 def ni(n):
     if n not in nidx: nidx[n] = len(names); names.append(n)
     return nidx[n]
+def segbase_pre(ri): return sum(len(r['pts']) - 1 for r in roads[:ri])
+# Junctions: the export has no node ids, so a coordinate shared by two or more streets is an intersection.
+# They are kept through simplification so the road graph for routing stays connected.
+used = collections.Counter()
+for f in F:
+    if f['properties'].get('highway') in CLS and f['geometry']['type'] == 'LineString':
+        for c in set(map(tuple, f['geometry']['coordinates'])): used[c] += 1
+SPEED = {'highway': 65, 'arterial': 35, 'minor': 35, 'collector': 30, 'ramp': 35, 'local': 25}  # mph, ASSUMED where OSM has no maxspeed
 roads = []
 for f in F:
     p = f['properties']; h = p.get('highway')
     if h not in CLS or f['geometry']['type'] != 'LineString': continue
     nm = p.get('name') or (p.get('ref') or '').replace(';', ' / ')
     if p.get('ref', '').startswith('US 20'): nm = 'US-20'
-    pts = dp([P(x, y) for x, y in f['geometry']['coordinates']], 2.0)
+    raw = f['geometry']['coordinates']; cut = [i for i, c in enumerate(raw) if i in (0, len(raw)-1) or used[tuple(c)] > 1]
+    pts = [P(*raw[0])]
+    for i0, i1 in zip(cut, cut[1:]): pts += dp([P(x, y) for x, y in raw[i0:i1+1]], 2.0)[1:]
+    jn = {tuple(P(*raw[i])) for i in cut}
     out = [pts[0]]
     for q in pts[1:]:
         a = out[-1]; L = math.hypot(q[0]-a[0], q[1]-a[1]); n = max(1, math.ceil(L / 200))
@@ -67,7 +80,9 @@ for f in F:
     ow = p.get('oneway') in ('yes', '1', 'true') or h in ('motorway', 'motorway_link') and p.get('oneway') != 'no'
     try: ln = int(str(p.get('lanes', '')).split(';')[0])
     except ValueError: ln = 0
-    roads.append({'c': CLS[h], 'n': nm, 'pts': out, 'ov': ov, 'lanes': ln, 'ow': ow})
+    ms = _re.match(r'(\d+)', str(p.get('maxspeed', '')))
+    roads.append({'c': CLS[h], 'n': nm, 'pts': out, 'ov': ov, 'lanes': ln, 'ow': ow,
+                  'node': [k for k, q in enumerate(out) if tuple(q) in jn], 'mph': int(ms.group(1)) if ms else SPEED[CLS[h]], 'mphb': 'osm' if ms else 'assumed'})
 # nearest cross street for each segment (grid hash)
 G = collections.defaultdict(list)
 for ri, r in enumerate(roads):
@@ -92,7 +107,6 @@ for ri, r in enumerate(roads):
     r['near'] = near
 
 # ---------- lanes and real traffic counts ----------
-import re as _re
 DEFL = {'highway': 2, 'arterial': 2, 'minor': 2, 'collector': 2, 'ramp': 1, 'local': 2}
 for r in roads:
     if r['ow']: thr = r['lanes'] or {'highway': 2, 'arterial': 2, 'minor': 2}.get(r['c'], 1)
@@ -152,6 +166,34 @@ if EXTRA:
 else:
     med = {}
     for r in roads: r['sadt'] = [0] * (len(r['pts']) - 1); r['sbasis'] = [''] * (len(r['pts']) - 1)
+
+# ---------- 2023 intersection approach counts: a recent check (not used as street volumes or for tuning) ----------
+# Each record counts one direction entering an intersection; its point sits on that leg. Location labels are sometimes
+# wrong, so the intersection is found from the points (records within 60 m), and the leg from the point's offset.
+# Two-way volume on the leg is ASSUMED to be about 2x the approach volume (traffic roughly balances over a day).
+approach = []
+if EXTRA:
+    recs = []
+    for f in TC:
+        q = f['properties']; loc = (q.get('Location') or '')
+        m = _re.search(r'\b(NB|SB|EB|WB) approach', loc)
+        if m and q.get('AADT') and q.get('Year'): recs.append((P(*f['geometry']['coordinates']), m.group(1), q['AADT'], q['Year'], loc))
+    segs_all = [(ri, k, r['pts'][k], r['pts'][k+1]) for ri, r in enumerate(roads) for k in range(len(r['pts'])-1)]
+    for pt, d, aadt, yr, loc in recs:
+        grp = [r[0] for r in recs if math.hypot(r[0][0]-pt[0], r[0][1]-pt[1]) < 60]
+        cx, cz = sum(g[0] for g in grp) / len(grp), sum(g[1] for g in grp) / len(grp)
+        ns = d in ('NB', 'SB'); side = {'NB': (0, 1), 'SB': (0, -1), 'EB': (-1, 0), 'WB': (1, 0)}[d]  # NB traffic arrives from the south (+z)
+        best = None
+        for ri, k, a, b in segs_all:
+            if roads[ri]['c'] == 'ramp': continue
+            dx, dz = b[0]-a[0], b[1]-a[1]
+            if (abs(dz) > abs(dx)) != ns: continue
+            m_ = cen([a, b]); along = (m_[0]-cx) * side[0] + (m_[1]-cz) * side[1]
+            dd = segdist((cx, cz), a, b)
+            if along <= 0 or dd > 40: continue
+            if best is None or along < best[0]: best = (along, ri, k)
+        if best: approach.append([round(cx), round(cz), aadt, yr, segbase_pre(best[1]) + best[2], round(2 * aadt * (1 + GROW) ** (2026 - yr)), d, loc])
+    print('2023 approach counts matched to a street leg:', len(approach), 'of', len(recs))
 
 # ---------- projects needing footprints (OSM buildings inside are hidden) ----------
 mw = [q for r in roads if r['n'] == 'US-20' for q in r['pts']]
@@ -270,6 +312,21 @@ porter = next(cen(ring(f)) for f in F if f['properties'].get('name') == 'Porter 
 river = [f for f in F if f['properties'].get('waterway') == 'river']
 rv = P(*river[0]['geometry']['coordinates'][len(river[0]['geometry']['coordinates'])//2]) if river else None
 CLSN = ['highway', 'arterial', 'minor', 'collector', 'ramp', 'local']
+# ---------- road graph for routing: nodes at junctions and road ends, edges cover runs of street segments ----------
+segbase, nb = [], 0
+for r in roads: segbase.append(nb); nb += len(r['pts']) - 1
+gnodes, gidx, gedges = [], {}, []
+def gn(q):
+    q = tuple(q)
+    if q not in gidx: gidx[q] = len(gnodes); gnodes.append(q)
+    return gidx[q]
+for ri, r in enumerate(roads):
+    ks = sorted(set(r['node']) | {0, len(r['pts']) - 1})
+    for a, b in zip(ks, ks[1:]):
+        L = sum(math.hypot(r['pts'][k+1][0]-r['pts'][k][0], r['pts'][k+1][1]-r['pts'][k][1]) for k in range(a, b))
+        gedges.append([gn(r['pts'][a]), gn(r['pts'][b]), ri, segbase[ri] + a, segbase[ri] + b, round(max(L, 1)), round(r['mph'] * 0.44704, 2), 1 if r['ow'] else 0])
+graph = {'meta': {'source': 'Road graph built from OpenStreetMap intersections; speeds from maxspeed tags, else assumed by road type', 'url': 'https://www.openstreetmap.org/copyright', 'fetched': '2026-11-14', 'type': 'real'},
+         'nodes': [v for q in gnodes for v in q], 'edges': gedges, 'speedBasis': {'osm': sum(1 for r in roads if r['mphb'] == 'osm'), 'assumed': sum(1 for r in roads if r['mphb'] == 'assumed')}}
 city = {
   'name': 'Rexburg, Idaho', 'origin': [LAT0, LON0], 'kx': KX, 'kz': KZ,
   'bbox': [43.775, -111.845, 43.865, -111.740], 'fetched': '2026-11-14',
@@ -277,7 +334,8 @@ city = {
   'roads': [[CLSN.index(r['c']), ni(r['n']), (r['ov'][0] if r['ov'] else 0), (ni(r['ov'][1]) if r['ov'] else ni('')), [v for q in r['pts'] for v in q], r['near'],
              r['thr'], 1 if r['ow'] else 0, ni(r['lb']), r['sadt'], [ni(b) for b in r['sbasis']]] for r in roads],
   'classAdt': med, 'counts': {'used': len(counts_used), 'records': counts_all, 'growth': GROW,
-             'pts': [[c['pt'][0], c['pt'][1], c['aadt'], c['year']] for c in counts_used]},
+             'pts': [[c['pt'][0], c['pt'][1], c['aadt'], c['year'], segbase[c['ri']] + c['k'], c['adj']] for c in counts_used],
+             'approach': approach},  # x, z, approach count, year, leg segment, two-way leg estimate grown to 2026, direction, label
   'buildings': B, 'lots': [[v for q in r for v in q] for r in lots], 'parks': [[v for q in r for v in q] for r in parks],
   'water': [[v for q in r for v in q] for r in water], 'waterways': lines_w, 'rail': rail,
   'campus': [v for q in campus for v in q], 'walk': walk, 'ped': [v for q in ped for v in q] if ped else None, 'widenings': widen, 'streetplan': lids, 'foot': FOOT, 'strips': STRIPS,
@@ -285,7 +343,16 @@ city = {
   'parking': {'lots': len(lots), 'spacesAll': spaces_all, 'lotsNear': lots_near, 'spacesNear': spaces_near, 'perSpace': 30},
   'stats': {'roads': len(roads), 'segments': nseg, 'buildings': len(B), 'heightsEstimated': est, 'hidden': dict(hidden)}
 }
+city['meta'] = {'source': 'OpenStreetMap via Overpass Turbo (c) OpenStreetMap contributors, ODbL; Madison County / Rexburg GIS layers',
+                'url': 'https://www.openstreetmap.org/copyright', 'fetched': '2026-11-14', 'type': 'real'}
 s = json.dumps(city, separators=(',', ':'))
-open(OUT, 'w').write('/* Rexburg from OpenStreetMap (c) OpenStreetMap contributors, ODbL. Generated by build_city.py */\nwindow.OSM_CITY=' + s + ';\n')
+if OUT.endswith('.js'):
+    open(OUT, 'w').write('/* Rexburg from OpenStreetMap (c) OpenStreetMap contributors, ODbL. Generated by build_city.py */\nwindow.OSM_CITY=' + s + ';\n')
+else:  # a folder: write city-rexburg.json for the React app
+    import os
+    os.makedirs(OUT, exist_ok=True)
+    open(os.path.join(OUT, 'city-rexburg.json'), 'w').write(s)
+    open(os.path.join(OUT, 'graph-rexburg.json'), 'w').write(json.dumps(graph, separators=(',', ':')))
+    print('graph', len(gnodes), 'nodes', len(gedges), 'edges', json.dumps(graph['speedBasis']))
 print(json.dumps(city['classAdt']), json.dumps({k: v for k, v in city['counts'].items() if k != 'pts'}), len(widen), 'widenings', len(lids), 'lids')
 print(json.dumps(city['stats']), json.dumps(city['parking']), 'bytes', len(s), 'campus', [round(v) for v in cc], 'walk', walk)

@@ -1,0 +1,383 @@
+{
+ "meta": {
+  "source": "Curated by the team from news, ITD, BYU-Idaho, church and city pages (each project has its own source)",
+  "url": "",
+  "fetched": "2026-11-14",
+  "type": "real"
+ },
+ "projects": [
+  {
+   "id": "madison",
+   "name": "Madison Commons",
+   "type": "Mixed use",
+   "status": "construction",
+   "fid": "madison",
+   "hM": 11,
+   "n": 10,
+   "phased": true,
+   "start": 2026.3,
+   "end": 2034,
+   "size": "About 50 acres, about 250 homes, plus restaurant and retail space",
+   "units": 250,
+   "trips": 1675,
+   "tripBasis": "250 homes x 6.7 trips a day. Commercial space not counted: tenants not announced.",
+   "where": "West of US-20 at Exit 333 (Main St), toward 12th West",
+   "plain": "A new neighborhood of homes, restaurants and shops by the Main Street exit, built in phases.",
+   "evidence": "Developer Trellis plans about 250 medium-density homes with restaurant and retail space. First-phase roads and utilities come first; full build-out is expected to take seven to ten years.",
+   "source": {
+    "label": "East Idaho News, Feb 11 2026",
+    "url": "https://www.eastidahonews.com/2026/02/restaurants-retailers-and-housing-coming-to-new-rexburg-development/"
+   },
+   "confidence": "medium",
+   "flags": [
+    "Footprint placed between US-20 and 12th West from the article; exact parcel not mapped",
+    "End date is our reading of \"seven to ten years\"",
+    "A hotel and a rec center are under discussion, not confirmed"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "whiteowl",
+   "name": "White Owl Business Park and Homestead Assisted Living",
+   "type": "Senior living and offices",
+   "status": "construction",
+   "fid": "whiteowl",
+   "hM": 12,
+   "n": 4,
+   "phased": true,
+   "start": 2026,
+   "end": 2028.5,
+   "size": "26 acres; 11 acres for the assisted living campus",
+   "units": 100,
+   "parkRate": 1,
+   "trips": 260,
+   "tripBasis": "Assumed 100 beds x 2.6 trips a day. Bed count is not in the source.",
+   "where": "West of Walmart on North 2nd East, next to the new temple",
+   "plain": "An assisted living campus with apartments and condos, with offices or medical space around it.",
+   "evidence": "A 26-acre business park anchored by an assisted living campus with a pool, pickleball courts and a walking trail. Described as already underway.",
+   "source": {
+    "label": "East Idaho News, Feb 2026",
+    "url": "https://www.eastidahonews.com/2026/02/development-near-new-rexburg-temple-to-include-the-homestead-assisted-living-facility/"
+   },
+   "confidence": "low",
+   "flags": [
+    "Footprint placed west of the temple from the article; exact parcel not mapped",
+    "No completion date in the source; 2028 is assumed",
+    "Number of beds is assumed"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "temple",
+   "name": "Teton River Idaho Temple",
+   "type": "Place of worship",
+   "status": "construction",
+   "fid": "temple",
+   "hM": 30,
+   "n": 1,
+   "start": 2024.42,
+   "end": 2027.5,
+   "size": "About 130,000 sq ft, three stories",
+   "trips": 500,
+   "tripBasis": "Assumed 500 trips a day once open. No standard rate fits; replace with a local count.",
+   "where": "111 Teton River Temple St, north Rexburg",
+   "plain": "A second Latter-day Saint temple for Rexburg, on the north end of town.",
+   "evidence": "Ground was broken June 1 2024 and construction was expected to take up to three years. Open house and dedication dates have not been announced.",
+   "source": {
+    "label": "churchofjesuschristtemples.org",
+    "url": "https://churchofjesuschristtemples.org/teton-river-idaho-temple/"
+   },
+   "confidence": "medium",
+   "flags": [
+    "Opening date not announced; mid-2027 is estimated from the groundbreaking"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "winco",
+   "name": "WinCo Foods",
+   "type": "Grocery store",
+   "status": "construction",
+   "unconfirmed": true,
+   "fid": "winco",
+   "hM": 9,
+   "n": 1,
+   "start": 2026,
+   "end": 2027,
+   "size": "84,000 sq ft on an 11-acre lot",
+   "trips": 5130,
+   "tripBasis": "84,000 sq ft x 94 trips per 1,000 sq ft, less 35% assumed pass-by traffic.",
+   "where": "North 2nd East at East Moody Rd",
+   "plain": "A fourth large grocery store, on the north end of 2nd East.",
+   "evidence": "City documents describe an 84,000-square-foot single-story store on an 11-acre lot at North 2nd East and East Moody Road.",
+   "source": {
+    "label": "East Idaho News, Jan 2025",
+    "url": "https://www.eastidahonews.com/?p=723620"
+   },
+   "confidence": "low",
+   "flags": [
+    "Opening status not confirmed. A 2026 land listing already calls it \"the new WinCo Foods store\", so it may be open",
+    "Dates are assumed",
+    "Placed on the northeast side of North 2nd East near 1256 N; exact lot not mapped"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "sundance",
+   "name": "Sundance student housing addition",
+   "type": "Student housing",
+   "status": "construction",
+   "fid": "sundance",
+   "hM": 12,
+   "n": 2,
+   "phased": true,
+   "start": 2024.7,
+   "end": 2026.75,
+   "size": "Two buildings, 220 units (120 women, 100 men)",
+   "units": 220,
+   "trips": 550,
+   "tripBasis": "220 units x 2.5 trips a day (low rate assumed inside the walk district).",
+   "where": "South Center St, next to the Post Office",
+   "plain": "Two new student apartment buildings a short walk from campus.",
+   "evidence": "Two buildings with 120 units for women and 100 for men, next to the Post Office. The whole project was slated to finish in fall 2026.",
+   "source": {
+    "label": "East Idaho News, Sept 2024",
+    "url": "https://www.eastidahonews.com/2024/09/a-construction-project-is-in-the-works-next-to-the-post-office-in-rexburg-heres-what-it-is/"
+   },
+   "confidence": "medium",
+   "flags": [
+    "Completion in fall 2026 was the plan; not confirmed as finished",
+    "Beds per unit not stated, so it is not added to the student bed count"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "library",
+   "name": "McKay Library remodel",
+   "type": "Campus building",
+   "status": "construction",
+   "fid": "library",
+   "hM": 15,
+   "n": 1,
+   "start": 2024.6,
+   "end": 2026.7,
+   "size": "Multi-year remodel in two phases",
+   "trips": 0,
+   "tripBasis": "No new trips: a remodel of an existing building.",
+   "where": "BYU-Idaho campus",
+   "plain": "The campus library is being remodeled one wing at a time.",
+   "evidence": "Contractors began in August 2024. The university lists 2026 for completion of the first of two phases.",
+   "source": {
+    "label": "BYU-Idaho campus construction",
+    "url": "https://www.byui.edu/campus-construction-projects/current-projects"
+   },
+   "confidence": "high",
+   "flags": [
+    "The second phase has no date on the university page"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "uoss",
+   "name": "University Support Services Building",
+   "type": "Campus building",
+   "status": "construction",
+   "fid": "uoss",
+   "hM": 9,
+   "n": 1,
+   "start": 2025.1,
+   "end": 2027,
+   "size": "Warehouse, loading docks, grounds facilities and offices",
+   "trips": 150,
+   "tripBasis": "Assumed 150 trips a day (staff and deliveries).",
+   "where": "Near the substation on University Blvd",
+   "plain": "A new warehouse and operations building for the university.",
+   "evidence": "A new facility with a warehouse, loading and receiving docks and offices near the substation on University Boulevard. Construction was expected to start in early 2025.",
+   "source": {
+    "label": "BYU-Idaho campus construction",
+    "url": "https://www.byui.edu/campus-construction-projects/current-projects"
+   },
+   "confidence": "medium",
+   "flags": [
+    "No completion date on the university page; end of 2026 is assumed",
+    "Location on University Blvd is approximate"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "signal",
+   "name": "2nd West and 2nd South signal upgrade",
+   "type": "Road work",
+   "status": "approved",
+   "unconfirmed": true,
+   "ll": [
+    43.8218768,
+    -111.7895468
+   ],
+   "start": 2026.6,
+   "end": 2027.3,
+   "size": "New signal cabinet, wiring and sidewalk repair",
+   "trips": 0,
+   "tripBasis": "No new trips. Model assumes 10% less capacity during work and 8% more after.",
+   "effects": [
+    {
+     "names": [
+      "South 2nd West",
+      "North 2nd West",
+      "West 2nd South",
+      "East 2nd South"
+     ],
+     "ll": [
+      43.8218768,
+      -111.7895468
+     ],
+     "rM": 260,
+     "during": 0.9,
+     "after": 1.08
+    }
+   ],
+   "where": "2nd West at 2nd South",
+   "plain": "The traffic signal at 2nd West and 2nd South is being rebuilt.",
+   "evidence": "The city sought bids, due July 8 2026, for a new cabinet and foundation, new wiring, boring and sidewalk repair at this intersection.",
+   "source": {
+    "label": "City of Rexburg bid listing",
+    "url": "https://www.idahobids.com/government-agencies/madison/rexburg-city-of-41219/"
+   },
+   "confidence": "medium",
+   "flags": [
+    "Construction dates are assumed from the bid date"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "mainst",
+   "name": "Main Street resurfacing (ITD)",
+   "type": "Road work",
+   "status": "construction",
+   "sid": "mainst",
+   "start": 2026.45,
+   "end": 2026.7,
+   "size": "SH-33 Business Spur, Exit 333 to 2nd East",
+   "trips": 0,
+   "tripBasis": "No new trips. Mostly night work, so the model takes 10% off daytime capacity.",
+   "effects": [
+    {
+     "names": [
+      "West Main Street",
+      "East Main Street"
+     ],
+     "ll": [
+      43.8261,
+      -111.7947
+     ],
+     "rM": 1500,
+     "during": 0.9,
+     "after": 1
+    }
+   ],
+   "where": "Main St from the US-20 interchange to 2nd East",
+   "plain": "Main Street was repaved in summer 2026, mostly at night.",
+   "evidence": "Work began June 15 2026, mostly overnight, with street parking removed where crews were working between 2nd East and 4th West.",
+   "source": {
+    "label": "Idaho Transportation Department, June 12 2026",
+    "url": "https://itd.idaho.gov/news/resurfacing-to-begin-monday-on-sh-33-business-spur-in-rexburg/"
+   },
+   "confidence": "high",
+   "flags": [
+    "End date is assumed"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "sewer2e",
+   "name": "2nd East sewer line",
+   "type": "Road work",
+   "status": "construction",
+   "sid": "sewer2e",
+   "start": 2026.62,
+   "end": 2026.72,
+   "size": "2nd East between Yellowstone Hwy and 7th North",
+   "trips": 0,
+   "tripBasis": "No new trips. One lane each way during work: model halves capacity.",
+   "effects": [
+    {
+     "names": [
+      "North 2nd East"
+     ],
+     "ll": [
+      43.841,
+      -111.77815
+     ],
+     "rM": 360,
+     "during": 0.5,
+     "after": 1
+    }
+   ],
+   "where": "2nd East, Yellowstone Hwy to 7th North",
+   "plain": "A sewer line went in under 2nd East in late summer 2026, with lane closures.",
+   "evidence": "A three-day full closure from August 16 2026, then one lane each way for about 30 days while the sewer line was installed.",
+   "source": {
+    "label": "Local News 8, Aug 13 2026",
+    "url": "https://localnews8.com/news/2026/08/13/portion-of-rexburgs-2nd-east-closing-for-construction/"
+   },
+   "confidence": "high",
+   "flags": [],
+   "foundBy": "person",
+   "reviewed": true
+  },
+  {
+   "id": "nysewer",
+   "name": "North Yellowstone sewer line",
+   "type": "Utility",
+   "status": "construction",
+   "sid": "nysewer",
+   "start": 2025.3,
+   "end": 2026.95,
+   "size": "$9 million line serving Rexburg, Sugar City and Teton",
+   "trips": 0,
+   "tripBasis": "No traffic effect modeled.",
+   "where": "Between Moody Rd and Riverside Park",
+   "plain": "An aging sewer main north of town was replaced with a larger one.",
+   "evidence": "Under construction since April 2025, the project replaced, realigned and enlarged a line built around 1980. The city reported it nearing completion in November 2026.",
+   "source": {
+    "label": "City of Rexburg news, Nov 2 2026",
+    "url": "https://www.rexburg.org/news/"
+   },
+   "confidence": "high",
+   "flags": [
+    "Drawn along North Yellowstone Hwy; the real route is approximate"
+   ],
+   "foundBy": "person",
+   "reviewed": true
+  }
+ ],
+ "unmapped": [
+  {
+   "name": "The Home Depot",
+   "note": "Planning and Zoning recommended approval of a roughly 40-acre plat in July 2026, with Home Depot buying 10 acres. The source does not say where, so it is not on the map or in the traffic model.",
+   "source": {
+    "label": "GatherGov meeting summary, July 2026",
+    "url": "https://gathergov.com/municipalities/rexburg-id/development-news"
+   }
+  }
+ ],
+ "context": [
+  {
+   "name": "US-20 diverging diamond interchanges (Exits 332 and 333)",
+   "note": "Rebuilt by ITD in 2024. Shown as existing.",
+   "source": {
+    "label": "City of Rexburg",
+    "url": "https://rexburg.org/page/diverging-diamond-interchanges-itd-project"
+   }
+  }
+ ]
+}
