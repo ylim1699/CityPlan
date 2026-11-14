@@ -27,7 +27,7 @@ export function StartScreen({ rec, onEnter, onReview }: { rec: Records; onEnter:
         <span><small>Rexburg</small>Growth Atlas</span>
       </div>
       <h1 id="start-title">See what a project does to traffic before you approve it.</h1>
-      <p className="start-lede">Place a project for a future year, see which streets it overloads, and compare better spots, with traffic routed through Rexburg's real streets. Everything the city has already approved in council and P&amp;Z records is on the map too.</p>
+      <p className="start-lede">Place a project for a future year, see which streets it overloads, and compare alternate sites, with traffic routed through Rexburg's real streets. Everything the city has already approved in council and P&amp;Z records is on the map too.</p>
 
       <section className="start-rec" aria-label="City records">
         <div className="start-rec-head"><b>City records</b><small>{rec.checked ? 'Last checked ' + day(rec.checked) : 'Not checked from this browser yet'}</small></div>

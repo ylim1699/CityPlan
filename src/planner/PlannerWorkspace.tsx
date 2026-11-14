@@ -115,7 +115,7 @@ export function GhostTools(p: ToolsProps) {
         <select aria-label="Year the project opens" value={year} onChange={e => setYear(+e.target.value)}>{YEARS.map(y => <option key={y} value={y}>Opens fall {y}</option>)}</select>
         <button className="mini act" onClick={startPick} aria-pressed={picking}>{picking ? 'Cancel' : '+ Place on map'}</button>
         <button className="mini" onClick={() => { const q = target(); if (q) add(q); }} title="Put it in the middle of the map view">+ In view</button>
-        {kind !== 'parking' && <button className="mini ai" onClick={() => { pick(null); setPicking(false); setRec({ kind, year, n: Date.now() }); }} title="Route the best open sites for this project">✦ Best spots</button>}
+        {kind !== 'parking' && <button className="mini ai" onClick={() => { pick(null); setPicking(false); setRec({ kind, year, n: Date.now() }); }} title="AI tests open sites for this project and walks you through the top 5">✦ AI recommendations</button>}
       </div>
       {picking && <small className="bt-hint">Click the map where it would go; it snaps to the nearest open land.</small>}
     </div>
@@ -138,7 +138,7 @@ export function GhostTools(p: ToolsProps) {
         {sel.place && !sel.place.ok && <p className="note warn" style={{ margin: '0 0 6px' }}>No open land fits here: check the site.</p>}
         <div className="seg bt-tabs" role="tablist" aria-label="About this project">
           <button role="tab" aria-selected={tab === 'impact'} aria-pressed={tab === 'impact'} onClick={() => setTab('impact')}>Impact</button>
-          <button role="tab" aria-selected={tab === 'spot'} aria-pressed={tab === 'spot'} onClick={() => setTab('spot')}>Better spot</button>
+          <button role="tab" aria-selected={tab === 'spot'} aria-pressed={tab === 'spot'} onClick={() => setTab('spot')}>Alternate sites</button>
           {sel.kind !== 'parking' && <button role="tab" aria-selected={tab === 'roads'} aria-pressed={tab === 'roads'} onClick={() => setTab('roads')}>Roads</button>}
         </div>
         <div className="bt-body">
@@ -213,7 +213,7 @@ function AiRec({ A, c, sc, kind, year, hour, ghosts, dispatch, fly, mark, onPlac
     }, 30);
   }, [ready]);
   const r = rows && rows[i];
-  useEffect(() => { if (r) { fly(r.pos); mark(r.pos, 'AI pick ' + (i + 1)); } }, [r]);
+  useEffect(() => { if (r) { fly(r.pos); mark(r.pos, 'AI recommendation ' + (i + 1)); } }, [r]);
   const best = rows && rows.length ? rows[0].dv : 0, worstDv = rows && rows.length ? rows[rows.length - 1].dv : 0;
   return createPortal(<div className="airec" role="dialog" aria-label="AI recommendation">
     <div className="airec-head"><b>✦ AI recommendation</b><small>{ty.label} · opens fall {year}</small>
@@ -221,9 +221,9 @@ function AiRec({ A, c, sc, kind, year, hour, ghosts, dispatch, fly, mark, onPlac
     {!rows ? <p className="note" style={{ margin: 0 }}>{msg}</p>
       : !r ? <p className="note" style={{ margin: 0 }}>No open site near a main street was found for this project type.</p>
       : <>
-        <div className="airec-pick"><b>Spot {i + 1} of {rows.length}</b><small>{i === 0 ? 'least added delay of the sites tested' : 'ranked by added delay'}</small></div>
+        <div className="airec-pick"><b>AI recommendation {i + 1} of {rows.length}</b><small>{i === 0 ? 'least added delay of the sites tested' : 'ranked by added delay'}</small></div>
         <div className="airec-nums">
-          <div><small>Added delay, {hourLabel(hour)}</small><b>+{r.dv.toFixed(1)} veh-h</b>{i > 0 && <small>+{(r.dv - best).toFixed(1)} vs spot 1</small>}{i === 0 && rows.length > 1 && <small>{(worstDv - best).toFixed(1)} less than spot {rows.length}</small>}</div>
+          <div><small>Added delay, {hourLabel(hour)}</small><b>+{r.dv.toFixed(1)} veh-h</b>{i > 0 && <small>+{(r.dv - best).toFixed(1)} vs no. 1</small>}{i === 0 && rows.length > 1 && <small>{(worstDv - best).toFixed(1)} less than no. {rows.length}</small>}</div>
           {r.worst && <div><small>Worst street nearby</small><b style={{ color: CCOL[A.level(r.worst.vc).key] }}>{pct(r.worst.vc)}</b>{r.worst.name && <small>{r.worst.name}</small>}</div>}
           {r.jump && <div><small>Biggest jump</small><b className={r.jump.pts >= 0.2 ? 'warn' : ''}>+{Math.round(r.jump.pts * 100)} pts</b><small>{r.jump.name}</small></div>}
           <div><small>To campus</small><b>{r.km.toFixed(1)} km</b></div>
@@ -284,29 +284,29 @@ function BetterSpot({ A, sc, shown, g, ghosts, setGhosts, flyTo, mark, hour }: {
   const best = !cur ? -1 : cur.opts.reduce((b, r, i) => r.dv < (b < 0 ? cur.mine.dv : cur.opts[b].dv) ? i : b, -1);  /* -1 = your spot */
   /* cycle the map through the options (and back to your spot); -1 = your spot */
   const [at, setAt] = useState(-1);
-  const go = (i: number) => { if (!cur) return; setAt(i); const r = i < 0 ? cur.mine : cur.opts[i]; flyTo(r.pos); mark(r.pos, i < 0 ? 'Your spot' : 'Site ' + L[i]); };
+  const go = (i: number) => { if (!cur) return; setAt(i); const r = i < 0 ? cur.mine : cur.opts[i]; flyTo(r.pos); mark(r.pos, i < 0 ? 'Your spot' : 'Alternate ' + L[i]); };
   useEffect(() => { if (cur && cur.opts.length) go(0); else setAt(-1); }, [res]);
   const step = (d: number) => { if (!cur) return; const n = cur.opts.length + 1; go(((at + 1 + d) % n + n) % n - 1); };
   if (g.kind === 'parking') return <p className="note" style={{ margin: 0 }}>Parking adds no trips of its own, so the router can't rank parking sites. Judge it by walking distance to campus.</p>;
   return <div className="better">
-    {!cur && !busy && <button className="mini act" onClick={run}>Compare your spot with other sites</button>}
+    {!cur && !busy && <button className="mini act" onClick={run}>Compare your spot with alternate sites</button>}
     {busy && <small>{busy}</small>}
     {cur && <>
       {cur.opts.length > 0 && <div className="cycle">
         <button className="mini" aria-label="Previous" onClick={() => step(-1)}>‹</button>
-        <span><b>{at < 0 ? 'Your spot' : 'Site ' + L[at]}{best === at && ' ★'}</b><small>{at < 0 ? 'where you placed it' : (cur.opts[at].dv < cur.mine.dv ? 'saves ' + Math.round((1 - cur.opts[at].dv / Math.max(cur.mine.dv, 0.01)) * 100) + '%' : 'adds more than yours') + ' · ' + (at + 1) + ' of ' + cur.opts.length}</small></span>
+        <span><b>{at < 0 ? 'Your spot' : 'Alternate ' + L[at]}{best === at && ' ★'}</b><small>{at < 0 ? 'where you placed it' : (cur.opts[at].dv < cur.mine.dv ? 'saves ' + Math.round((1 - cur.opts[at].dv / Math.max(cur.mine.dv, 0.01)) * 100) + '%' : 'adds more than yours') + ' · ' + (at + 1) + ' of ' + cur.opts.length}</small></span>
         <button className="mini" aria-label="Next" onClick={() => step(1)}>›</button>
         {at >= 0 && <button className="mini act" onClick={() => use(cur.opts[at])}>Place here</button>}
       </div>}
       <div className="cmp head"><span>Site</span><span>Added delay, {hourLabel(hour)}<small>fall {Math.floor(sc.t)} with other plans · today alone</small></span><span></span></div>
-      <div className={'cmp mine' + (at < 0 ? ' on' : '')} onClick={() => go(-1)}><span><b>Your spot</b><small>{cur.mine.km.toFixed(1)} km to campus</small><Trade r={cur.mine} /></span><span className="num">+{cur.mine.dv.toFixed(1)} veh-h{nowOf(cur.mine)}{best === -1 && <small className="best">★ best</small>}</span><span></span></div>
+      <div className={'cmp mine' + (at < 0 ? ' on' : '')} onClick={() => go(-1)}><span><b>Your spot</b><small>{cur.mine.km.toFixed(1)} km to campus</small><Trade r={cur.mine} /></span><span className="num">+{cur.mine.dv.toFixed(1)} veh-h{nowOf(cur.mine)}{best === -1 && <small className="best">★ AI recommendation</small>}</span><span></span></div>
       {cur.opts.map((r, i) => <div className={'cmp' + (at === i ? ' on' : '')} key={r.id} onClick={() => go(i)}>
-        <span><b>Site {L[i]}</b><small>{r.km.toFixed(1)} km to campus · open land</small><Trade r={r} /></span>
-        <span className="num">+{r.dv.toFixed(1)} veh-h{nowOf(r)}{r.dv < cur.mine.dv ? <small className="save">saves {(cur.mine.dv - r.dv).toFixed(1)} ({Math.round((1 - r.dv / Math.max(cur.mine.dv, 0.01)) * 100)}%)</small> : <small className="more">+{(r.dv - cur.mine.dv).toFixed(1)} more than yours</small>}{best === i && <small className="best">★ best</small>}</span>
+        <span><b>Alternate {L[i]}</b><small>{r.km.toFixed(1)} km to campus · open land</small><Trade r={r} /></span>
+        <span className="num">+{r.dv.toFixed(1)} veh-h{nowOf(r)}{r.dv < cur.mine.dv ? <small className="save">saves {(cur.mine.dv - r.dv).toFixed(1)} ({Math.round((1 - r.dv / Math.max(cur.mine.dv, 0.01)) * 100)}%)</small> : <small className="more">+{(r.dv - cur.mine.dv).toFixed(1)} more than yours</small>}{best === i && <small className="best">★ AI recommendation</small>}</span>
         <span><button className="mini act" onClick={e => { e.stopPropagation(); use(r); }}>Place here</button></span></div>)}
       <p className="note" style={{ margin: '6px 0 0' }}>{!cur.n ? 'No other open site near a main street was found.'
         : best === -1 ? 'Your spot adds the least delay of ' + (cur.n + 1) + ' sites tested.' + (cur.mine.jump && cur.mine.jump.pts >= 0.2 ? ' It still pushes ' + cur.mine.jump.name + ' up ' + Math.round(cur.mine.jump.pts * 100) + ' points: try a road fix below.' : '')
-        : 'Site ' + L[best] + ' adds the least delay of ' + (cur.n + 1) + ' sites tested. Less total delay can still overload one street: check the biggest jump.'}
+        : 'Alternate ' + L[best] + ' adds the least delay of ' + (cur.n + 1) + ' sites tested. Less total delay can still overload one street: check the biggest jump.'}
         {' '}Ranked by fall {Math.floor(sc.t)}, with everything else planned by then.{' '}
         <button className="linkbtn" onClick={run}>Run again</button></p>
     </>}
