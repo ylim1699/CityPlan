@@ -4,6 +4,7 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { bpr, geh, createRouter, type GraphFile, type ZonesFile } from '../src/model/routing';
 import { CLS, DEFAULTS, popSeries } from '../src/model/atlas';
+import { slimeRoads } from '../src/model/physarum';
 import { loadAtlas, readJson, ROOT } from './load';
 
 describe('capacity and BPR (plan Steps 1 and 7)', () => {
@@ -88,6 +89,32 @@ describe('real network', () => {
   it('2034 with projects is busier than 2034 growth only', () => {
     const w = R.run({ ...sc, t: 2034.125 }), wo = R.run({ ...sc, t: 2034.125, withProjects: false });
     expect(w.trips).toBeGreaterThan(wo.trips);
+  });
+});
+
+describe('planner additions (ported from the UI sandbox router)', () => {
+  const A = loadAtlas(), R = createRouter(A, readJson('public/data/graph-rexburg.json'), readJson('public/data/zones.json'), readJson('public/data/calibration.json').calib);
+  const sc = { t: 2030.875, hour: 17, withProjects: true, prm: DEFAULTS, spring: false, widen: [], fixes: [] };
+  const campus = A.LL(43.8236, -111.7885), north = A.LL(43.8575, -111.7850);
+  it('no plans or roads: results are unchanged', () => {
+    const a = R.run(sc), b = R.run({ ...sc, plans: [], roads: [] });
+    expect(b.vht).toBe(a.vht);
+  });
+  it('a planned site is its own zone: 500 beds by campus add less delay than at the north end', () => {
+    const base = R.run(sc), near = R.run({ ...sc, plans: [{ id: 'p', pos: campus, beds: 500 }] }), far = R.run({ ...sc, plans: [{ id: 'p', pos: north, beds: 500 }] });
+    expect(near.planTrips![0]).toBeLessThan(far.planTrips![0]);
+    expect(near.vht - base.vht).toBeLessThan(far.vht - base.vht);
+    expect(near.roadVol!['drive:p'].vol).toBeGreaterThan(0);
+  });
+  it('a new road from a planned site carries traffic (addedEdges)', () => {
+    const plan = { ...sc, plans: [{ id: 'p', pos: north, units: 250 }] }, sk = R.sinksAround(north, 9)[0];
+    const r = R.run({ ...plan, roads: [{ id: 'new', plan: 'p', to: sk.node, lenM: 800 }] });
+    expect(r.roadVol!['new'].vol).toBeGreaterThan(0);
+  });
+  it('slime-mold search proposes roads that cross no buildings', () => {
+    const res = slimeRoads(A, R, north, 14);
+    expect(res.cands.length).toBeGreaterThan(0);
+    res.cands.forEach(c => { expect(c.pts.length).toBeGreaterThanOrEqual(2); expect(c.lenM).toBeGreaterThan(0); });
   });
 });
 

@@ -16,6 +16,8 @@ import { useTraffic } from './hooks/useTraffic';
 import { AccuracyPanel, type CalibFile } from './components/AccuracyPanel';
 import { ProblemCards } from './components/ProblemCards';
 import { DemoViews, Placement } from './components/Placement';
+import { GhostTools, YearStrip } from './planner/PlannerWorkspace';
+import { GHOST_TYPES, ghostActive, ghostPlans, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
 
 type Lay = { ctl: boolean; pan: boolean; left: boolean };
 function loadLayout(): Lay {
@@ -37,6 +39,9 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
     return createAtlas(city, { ...projects, projects: projects.projects.filter(p => !ids.has(p.id)).concat(confirmed) });
   }, [city, projects, confirmed]);
   const rev = confirmed.map(p => p.id).join(',');
+  /* Planner ghosts: projects a planner places for a year (this browser). Only counted in Planner mode. */
+  const [ghosts, setGhostsRaw] = useState<Ghost[]>(loadGhosts), [ghostSel, setGhostSel] = useState<string | null>(null);
+  const setGhosts = (g: Ghost[]) => { setGhostsRaw(g); saveGhosts(g); };
   useEffect(() => { setExtraProjects(confirmed); }, [rev]);
   const sRef = useRef(s); sRef.current = s;
   const getState = useCallback(() => sRef.current, []);
@@ -46,7 +51,8 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
 
   /* Routed volumes from the worker (with and without projects); the count-based method fills in until they arrive. */
   const t = tOf(s.ti);
-  const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev]);
+  const plans = useMemo(() => s.mode === 'planner' ? ghostPlans(ghosts, t) : [], [s.mode, ghosts, t]);
+  const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev, ...(plans.length ? { plans } : {}) }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev, plans]);
   const routing = s.method === 'routed' && !!zones;
   const tr = useTraffic(sc, routing);
   const run = routing ? tr.stale : null;
@@ -71,6 +77,20 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   const hours = (routing && s.withProjects && tr.hours) || countHours || [];
 
   useEffect(() => { view.current?.apply(c.shown, c.tp); }, [c, s.layers, s.sel]);
+  /* ghosts on the map: planner mode only; double-click one to move it */
+  useEffect(() => {
+    const list = s.mode !== 'planner' ? [] : ghosts.map(g => { const ty = GHOST_TYPES[g.kind], act = ghostActive(g, c.t);
+      return { id: g.id, pos: g.pos, w: ty.w, d: ty.d, h: ty.h, n: ty.n, status: g.status, active: act,
+        label: (g.status === 'suggested' ? 'Suggested · ' : '') + ty.label + (act || g.status === 'suggested' ? '' : ' · from ' + g.year) }; });
+    view.current?.setGhosts(list, ghostSel);
+  }, [A, ghosts, ghostSel, s.mode, c.t]);
+  const ghostsRef = useRef(ghosts); ghostsRef.current = ghosts;
+  useEffect(() => {
+    view.current?.onGhost(e => {
+      setGhostSel(e.id);
+      if (e.type === 'move') setGhosts(ghostsRef.current.map(g => g.id === e.id ? { ...g, pos: e.pos } : g));
+    });
+  }, [A]);
 
   const select = (id: string | null) => {
     dispatch({ type: 'select', id });
@@ -116,6 +136,9 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
     {routing && cal && <AccuracyPanel cal={cal} />}
     {routing && zones && <Placement A={A} sc={sc} zones={zones} />}
   </>;
+  const ghostTools = routing ? <GhostTools A={A} s={s} c={c} sc={sc} dispatch={dispatch} ghosts={ghosts} setGhosts={setGhosts} selId={ghostSel} setSel={setGhostSel}
+    pick={cb => view.current?.pick(cb)} flyTo={fly} target={() => view.current ? view.current.target() : null} />
+    : <div className="zoning-banner err" role="status"><b>Ghost projects need routed trips.</b> Switch the traffic method to Routed trips (zones.json must load).</div>;
   const cls = [!lay.ctl && 'ctl-folded', !lay.pan && 'pan-folded', lay.left && 'dock-left'].filter(Boolean).join(' ');
 
   return <div id="app" ref={appRef} className={cls}>
@@ -137,11 +160,12 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
         <button className="mini" onClick={() => setLayout({ ...lay, pan: false })}>Hide</button></div>
         <h2>{title}</h2><p>{sub}</p></div>
       <div className="scroll" ref={body}>
-        {s.sel ? <ProjectDetail {...props} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <PlannerPanel {...props} extra={plannerExtra} />}
+        {s.sel ? <ProjectDetail {...props} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <PlannerPanel {...props} extra={<>{ghostTools}{plannerExtra}</>} />}
       </div>
     </section>
     <div className="hint" aria-hidden="true">Drag to turn · scroll to zoom · right-drag to move</div>
     <div className="osm-credit">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
+    {s.mode === 'planner' && <YearStrip A={A} s={s} c={c} dispatch={dispatch} ghosts={ghosts} trips={tr.run ? tr.run.with.trips ?? null : null} />}
     <Timeline ti={s.ti} t={c.t} total={g.pop.total} playing={playing} onPlay={onPlay} onChange={ti => dispatch({ type: 'ti', ti })} />
     <AboutDialog ref={about} A={A} metas={metas} />
   </div>;

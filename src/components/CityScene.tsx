@@ -11,7 +11,8 @@ export const CityScene = forwardRef<View | null, Props>(function CityScene({ A, 
   const view = useRef<View | null>(null), [failed, setFailed] = useState(false);
   const sel = useRef(onSelect); sel.current = onSelect;
   useImperativeHandle(ref, () => ({
-    apply: (s, tp) => view.current?.apply(s, tp), flyTo: p => view.current?.flyTo(p), pick: cb => view.current?.pick(cb), dispose: () => {}
+    apply: (s, tp) => view.current?.apply(s, tp), flyTo: p => view.current?.flyTo(p), pick: cb => view.current?.pick(cb), dispose: () => {},
+    setGhosts: (l, sel) => view.current?.setGhosts(l, sel), onGhost: cb => view.current?.onGhost(cb), target: () => view.current ? view.current.target() : [0, 0]
   }), []);
   useEffect(() => {
     try { view.current = createView({ canvas: canvas.current!, overlay: overlay.current!, app: appRef.current!, compass: compass.current! }, A, getState, id => sel.current(id)); }
