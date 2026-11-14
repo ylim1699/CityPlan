@@ -8,10 +8,11 @@ export type Layers = { traffic: boolean; cars: boolean; proj: boolean; walk: boo
 export type State = {
   mode: Mode; hour: number; widen: string[]; withProjects: boolean; ti: number; sel: string | null; spring: boolean;
   fixes: Fix[]; prm: Params; layers: Layers; method: 'routed' | 'counts';
+  lights: number; speed: number;  /* City lights at night (0-1.5) and Demo speed (0.25-4x), from the UI sandbox */
 };
 export const initialState: State = {
   mode: 'resident', hour: 17, widen: [], withProjects: true, ti: TODAY_I, sel: null, spring: false, fixes: [],
-  prm: { ...DEFAULTS }, layers: { traffic: true, cars: true, proj: true, walk: true }, method: 'routed'
+  prm: { ...DEFAULTS }, layers: { traffic: true, cars: true, proj: true, walk: true }, method: 'routed', lights: 1, speed: 1
 };
 export type Action =
   | { type: 'mode'; mode: Mode }

@@ -53,3 +53,5 @@ input[type=range]{accent-color:#e9b25f!important}
 .chg small{color:#f0a24b}
 /* on-screen error box (shown by main.tsx when something fails) */
 #errbox{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;max-width:min(680px,90vw);background:#3a1410;color:#ffd7c9;border:1px solid #c0512e;border-radius:8px;padding:8px 12px;font:12px/1.4 var(--mono);display:none;white-space:pre-wrap}
+/* project pin names: dark text on the light tag (the sandbox had white on white) */
+.pin span{background:#ece9e2;color:#14130f}

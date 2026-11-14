@@ -114,17 +114,18 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   const [dayPlaying, setDayPlaying] = useState(false), [playing, setPlaying] = useState(false);
   useEffect(() => {
     if (!dayPlaying) return;
-    const id = setInterval(() => dispatch({ type: 'hour', hour: sRef.current.hour + 1 }), 650);
+    /* one hour per 3 s at 1x, so the light can glide between hours (Demo speed scales it) */
+    const id = setInterval(() => dispatch({ type: 'hour', hour: sRef.current.hour + 1 }), 3000 / (s.speed || 1));
     return () => clearInterval(id);
-  }, [dayPlaying]);
+  }, [dayPlaying, s.speed]);
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => {
       if (sRef.current.ti >= LAST_I) { setPlaying(false); return; }
       dispatch({ type: 'ti', ti: sRef.current.ti + 1 });
-    }, 750);
+    }, 1500 / (s.speed || 1));
     return () => clearInterval(id);
-  }, [playing]);
+  }, [playing, s.speed]);
   const onPlay = () => { if (playing) { setPlaying(false); return; } if (s.ti >= LAST_I) dispatch({ type: 'ti', ti: TODAY_I }); setPlaying(true); };
 
   const g = A.gaps(c.t, s.prm, c.pop);
@@ -176,7 +177,7 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
         {s.sel ? <ProjectDetail {...props} /> : s.mode === 'resident' ? <ResidentPanel {...props} extra={residentExtra} /> : <PlannerPanel {...props} extra={<>{ghostTools}{plannerExtra}</>} />}
       </div>
     </section>
-    <div className="hint" aria-hidden="true">Drag to turn · scroll to zoom · right-drag to move</div>
+    <div className="hint" aria-hidden="true">Drag to move · scroll or pinch to zoom · right-drag or two-finger scroll to tilt and turn</div>
     <div className="osm-credit">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
     {s.mode === 'planner' && <YearStrip A={A} s={s} c={c} dispatch={dispatch} ghosts={ghosts} trips={tr.run ? tr.run.with.trips ?? null : null} />}
     <Timeline ti={s.ti} t={c.t} total={g.pop.total} playing={playing} onPlay={onPlay} onChange={ti => dispatch({ type: 'ti', ti })} />
