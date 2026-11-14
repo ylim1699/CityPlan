@@ -80,3 +80,15 @@
   #app .right,#app .left{height:calc(100% - 64px)}
   #app .search{display:none}
 }
+
+/* Planner numbers and assumptions: everything fits the panel width, nothing runs off to the right */
+.poprow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.poprow>div{min-width:0;overflow-wrap:anywhere}
+.numfield.numrow{display:flex;width:100%;justify-content:space-between;align-items:center;gap:8px}
+.numrow>span:first-child{flex:1 1 auto;min-width:0}
+.numrow>span:last-child{flex:none;display:inline-flex;align-items:center}
+.register{table-layout:fixed;width:100%}
+.register th:nth-child(1){width:42%}.register th:nth-child(2){width:30%}
+.register td{overflow-wrap:anywhere}
+.register .pill{white-space:normal;max-width:100%}
+.register .conf{display:inline-block;margin-top:4px}

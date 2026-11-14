@@ -55,7 +55,7 @@ function NumField({ label, val, unit, min, max, step, onChange }: { label: strin
   const [txt, setTxt] = useState(String(val));
   useEffect(() => setTxt(String(val)), [val]);
   const commit = () => { const v = +txt; if (txt.trim() !== '' && isFinite(v)) onChange(Math.min(max, Math.max(min, v))); else setTxt(String(val)); };
-  return <label className="numfield"><span>{label}</span><span><input type="number" inputMode="decimal" min={min} max={max} step={step} value={txt}
+  return <label className="numfield numrow"><span>{label}</span><span><input type="number" inputMode="decimal" min={min} max={max} step={step} value={txt}
     onChange={e => setTxt(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />{unit && <small>{unit}</small>}</span></label>;
 }
 
@@ -65,7 +65,7 @@ export function PlannerPanel({ A, s, c, dispatch, select, pe }: P) {
   const r2 = (v: number) => Math.round(v * 100) / 100;
   const changed = (['S0', 'enroll', 'R0', 'resGrowth'] as const).filter(k => s.prm[k] !== A.DEFAULTS[k]);
   return <>
-    <div><p className="sec">Population in the model</p><div className="row">
+    <div><p className="sec">Population in the model</p><div className="poprow">
       <div><div className="num" style={{ fontSize: 18 }}>{fmt(g.pop.S)}</div><small style={{ color: 'var(--muted)' }}>students in town</small></div>
       <div><div className="num" style={{ fontSize: 18 }}>{fmt(g.pop.R)}</div><small style={{ color: 'var(--muted)' }}>other residents</small></div>
       <div><div className="num" style={{ fontSize: 18 }}>{fmt(g.pop.total)}</div><small style={{ color: 'var(--muted)' }}>total</small></div></div></div>
@@ -77,12 +77,11 @@ export function PlannerPanel({ A, s, c, dispatch, select, pe }: P) {
       <NumField label="Resident growth per year" val={r2(s.prm.resGrowth * 100)} unit="%" min={-20} max={30} step={0.1} onChange={set('resGrowth', 0.01)} />
       <button className="mini" style={{ marginTop: 6 }} disabled={changed.length === 0}
         onClick={() => changed.forEach(k => dispatch({ type: 'prm', key: k, value: A.DEFAULTS[k] }))}>Reset to defaults</button></div>
-    <div><p className="sec">Project register</p><div className="tablewrap"><table><thead><tr><th>Project</th><th>Status</th><th>Confidence</th><th>Source</th></tr></thead><tbody>
+    <div><p className="sec">Project register</p><div className="tablewrap"><table className="register"><thead><tr><th>Project</th><th>Status</th><th>Source</th></tr></thead><tbody>
       {A.PROJECTS.map(p => {
         const st = pStatus(A, p, c.tp);
         return <tr key={p.id}><td><button className="back" onClick={() => select(p.id)}>{p.name}</button><br /><small style={{ color: 'var(--muted)' }}>{p.type}{p.foundBy === 'agent' ? ' · found by agent' + (p.reviewed ? ', confirmed' : ', unconfirmed') : ''}</small></td>
-          <td><span className="pill" data-s={st.key}>{st.key === 'construction' ? Math.round(st.progress * 100) + '%' : st.label.split(',')[0]}</span></td>
-          <td><span className="conf" data-c={p.confidence}>{p.confidence}</span></td><td><a href={p.source.url} target="_blank" rel="noopener">{p.source.label}</a></td></tr>;
+          <td><span className="pill" data-s={st.key}>{st.key === 'construction' ? Math.round(st.progress * 100) + '%' : st.label.split(',')[0]}</span><br /><span className="conf" data-c={p.confidence}>{p.confidence} confidence</span></td><td><a href={p.source.url} target="_blank" rel="noopener">{p.source.label}</a></td></tr>;
       })}</tbody></table></div>
       <Removed pe={pe} />
       {A.UNMAPPED.map(u => <p className="note warn" style={{ margin: '8px 0 0' }} key={u.name}><b>Not mapped: {u.name}.</b> {u.note} <a href={u.source.url} target="_blank" rel="noopener">{u.source.label}</a></p>)}</div>
