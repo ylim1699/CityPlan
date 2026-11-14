@@ -6,6 +6,8 @@ import type { Atlas } from '../model/atlas';
 import type { SegResult, XZ } from '../model/types';
 import { congOf, type State } from '../state';
 import { CCOL, daylight, hourLabel, pStatus } from '../ui';
+import { createSky } from './sky';
+import { buildTemple, footprintAxes } from './temples';
 import { buildTerrain, type TerrainFile } from './terrain';
 import { buildTrees } from './trees';
 import { createGhostLayer, type GhostDraw, type GhostEvent, type Highlight } from '../planner/ghostLayer';
@@ -57,6 +59,8 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   const sun = new T.DirectionalLight(0xffffff, 0.5); sun.position.set(-12, 30, 14); scene.add(sun); scene.add(sun.target);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004;
 
+  const sky = createSky(); scene.add(sky.mesh);  /* blue sky, sun, moon and drifting clouds (src/scene/sky.ts) */
+  const sunVis = new T.Vector3(), moonVis = new T.Vector3();
   const tints: { m: any; c: T.Color }[] = [];
   function reg<M>(mat: M, hex: number): M { tints.push({ m: mat, c: new T.Color(hex) }); return mat; }
   function flatPts(fl: number[]): XZ[] { const o: XZ[] = []; for (let k = 0; k < fl.length; k += 2) o.push([fl[k] * S, fl[k + 1] * S]); return o; }
@@ -92,16 +96,16 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   function polyLines(fl: number[], w: number): Ln[] { const p = flatPts(fl), o: Ln[] = []; for (let k = 0; k < p.length - 1; k++) o.push({ a: p[k], b: p[k + 1], w }); return o; }
 
   /* ground and land use in the sandbox's warm, darker palette, so light labels and the warm road scale read on it */
-  const ground = new T.Mesh(new T.PlaneGeometry(200, 200), reg(new T.MeshLambertMaterial({ color: 0xa39368 }), 0xa39368)); ground.receiveShadow = true;
+  const ground = new T.Mesh(new T.PlaneGeometry(200, 200), reg(new T.MeshLambertMaterial({ color: 0x748e58 }), 0x748e58));  /* a living olive green, not dry tan */ ground.receiveShadow = true;
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; scene.add(ground);
-  polys([C.campus], 0xab9a72, 0.002, 1);
-  polys(C.parks, 0x7d8a52, 0.004, 1);
-  polys(C.lots, 0x6f6a60, 0.005, 1);
-  polys(C.water, 0x4f6f80, 0.006, 1);
+  polys([C.campus], 0x8a9c60, 0.001, 1);  /* campus lawns */
+  polys(C.parks, 0x678f45, 0.0015, 1);  /* parks: greener than the town around them */
+  polys(C.lots, 0x6f6a60, 0.002, 1);
+  polys(C.water, 0x4f6f80, 0.0025, 1);
   let wl: Ln[] = []; C.waterways.forEach(w => { wl = wl.concat(polyLines(w.slice(1), Math.max(w[0], 6) * S * 1.4)); });
-  scene.add(new T.Mesh(ribbons(wl, 0.007), reg(new T.MeshBasicMaterial({ color: 0x4f6f80 }), 0x4f6f80)));
+  scene.add(new T.Mesh(ribbons(wl, 0.003), reg(new T.MeshBasicMaterial({ color: 0x4f6f80 }), 0x4f6f80)));
   let rl: Ln[] = []; C.rail.forEach(r => { rl = rl.concat(polyLines(r, 5 * S * 1.4)); });
-  scene.add(new T.Mesh(ribbons(rl, 0.008), reg(new T.MeshBasicMaterial({ color: 0x8d8478 }), 0x8d8478)));
+  scene.add(new T.Mesh(ribbons(rl, 0.0035), reg(new T.MeshBasicMaterial({ color: 0x8d8478 }), 0x8d8478)));
 
   const walk = new T.Group(), W4 = C.walk.map(v => v * S);
   const pedPts: XZ[] = C.ped ? flatPts(C.ped) : [[W4[0], W4[1]], [W4[2], W4[1]], [W4[2], W4[3]], [W4[0], W4[3]]];
@@ -120,7 +124,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   /* Streets (from the UI sandbox): a light curb/sidewalk edge (not on highways), dark asphalt,
      and the load color as a band down the middle of the driving lanes */
   const EXW = 1.5;
-  const curbGeo = ribbons(A.SEGS.filter(s => s.road.cls !== 'highway' && s.road.cls !== 'ramp').map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW * 1.4 })), 0.024); curbGeo.computeVertexNormals();
+  const curbGeo = ribbons(A.SEGS.filter(s => s.road.cls !== 'highway' && s.road.cls !== 'ramp').map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW * 1.4 })), 0.004); curbGeo.computeVertexNormals();
   const curb = new T.Mesh(curbGeo, reg(new T.MeshLambertMaterial({ color: 0x8b867c, depthWrite: false }), 0x8b867c)); curb.renderOrder = 2; curb.receiveShadow = true; scene.add(curb);
   /* Asphalt and the load band keep a minimum width on screen (uPx = scene units per pixel at the view target, set in
      frame()), so loads stay readable zoomed out, at night and at dawn; the wider dark asphalt reads as a casing. */
@@ -148,9 +152,9 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     return m;
   }
   const segLines = (f: number, px: number) => A.SEGS.map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW * f, px: (MINPX[s.road.cls] || 1.2) + px }));
-  const asphalt = new T.Mesh(wideRibbons(segLines(1.05, 1.3), 0.027), widen(reg(new T.MeshLambertMaterial({ color: 0x2a2826, depthWrite: false }), 0x2a2826)));
+  const asphalt = new T.Mesh(wideRibbons(segLines(1.05, 1.3), 0.0045), widen(reg(new T.MeshLambertMaterial({ color: 0x2a2826, depthWrite: false }), 0x2a2826)));
   asphalt.renderOrder = 3; asphalt.receiveShadow = true; asphalt.frustumCulled = false; scene.add(asphalt);
-  const roadGeo = wideRibbons(segLines(0.72, 0), 0.03, true);
+  const roadGeo = wideRibbons(segLines(0.72, 0), 0.005, true);
   const roadMat = widen(new T.MeshBasicMaterial({ vertexColors: true, depthWrite: false, fog: false }));
   const roadMesh = new T.Mesh(roadGeo, roadMat); roadMesh.renderOrder = 4; roadMesh.frustumCulled = false; scene.add(roadMesh);
   const roadCol = roadGeo.getAttribute('color') as T.BufferAttribute;
@@ -224,7 +228,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
       hover.segs = key ? byName.get(key)! : [];
       if (hover.segs.length) {
         const ls = (f: number, px: number) => hover.segs.map(i => { const s = A.SEGS[i]; return { a: s.a, b: s.b, w: s.road.c.w * S * EXW * f, px: (MINPX[s.road.cls] || 1.2) + px }; });
-        const cs = new T.Mesh(wideRibbons(ls(1.2, 3), 0.034), hoverCase), bd = new T.Mesh(wideRibbons(ls(0.9, 1.6), 0.036, true), hoverBand);
+        const cs = new T.Mesh(wideRibbons(ls(1.2, 3), 0.0055), hoverCase), bd = new T.Mesh(wideRibbons(ls(0.9, 1.6), 0.006, true), hoverBand);
         cs.renderOrder = 8; bd.renderOrder = 9; cs.frustumCulled = bd.frustumCulled = false; hover.group.add(cs, bd); hover.band = bd; syncHover();
       }
     }
@@ -371,7 +375,15 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     cols([0xa39d92, 0x8f8a80, 0xb3ab9c]), cols([0xa3a7ab, 0x8e959b, 0xb8b2a5, 0x9a8f80])];
   const ROOF_GREY = new T.Color(0x7b7b79), ROOF_ALT = cols([0x5a4a3e, 0x9a5b45, 0x5d6670, 0x4f4a45]), ROOF_FLAT = cols([0xcfcdc6, 0xa9a8a3, 0x8f8f8c]);
   const bp: number[] = [], bc: number[] = [], bw: number[] = [], ep: number[] = [], wallC = new T.Color(), roofC = new T.Color();
+  /* Rexburg Idaho Temple: find its footprint (43.81071 N, 111.77909 W) and draw the temple model there instead of a box */
+  const templeAt = A.LL(43.810709, -111.779088);
+  let templeIdx = -1, templeD = 0.5;  /* within 100 m */
   C.buildings.forEach((b, bi) => {
+    const pts = flatPts(b.slice(2)); let cx = 0, cz = 0; pts.forEach(q => { cx += q[0]; cz += q[1]; }); cx /= pts.length; cz /= pts.length;
+    const d = Math.hypot(cx - templeAt[0], cz - templeAt[1]); if (d < templeD && pts.length >= 4) { templeD = d; templeIdx = bi; }
+  });
+  C.buildings.forEach((b, bi) => {
+    if (bi === templeIdx) return;
     const t = b[0], hm = b[1], h = hm * A.VEX * S, pts = flatPts(b.slice(2)), n = pts.length;
     const j = ((bi * 2654435761) % 1000) / 1000, j2 = ((bi * 40503 + 12345) % 977) / 977, wl = WALLS[t] || WALLS[0];
     wallC.copy(wl[Math.floor(j2 * wl.length) % wl.length]).offsetHSL(0, 0, (j - 0.5) * 0.06);
@@ -403,6 +415,12 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   bGeo.computeVertexNormals();
   const bMat = reg(windowMaterial(), 0xffffff);
   const bMesh = new T.Mesh(bGeo, bMat); bMesh.castShadow = true; bMesh.receiveShadow = true; scene.add(bMesh);
+  if (templeIdx >= 0) {
+    const ax = footprintAxes(flatPts(C.buildings[templeIdx].slice(2)));
+    const tm = buildTemple({ center: ax.center, angle: ax.angle, L: ax.L, W: ax.W, bodyM: 21, totalM: 51, vex: A.VEX, S, wall: 0xf3f1ea, glass: 0x7f8fa6,
+      spire: 'end', top: 'moroni', endSign: ax.uz > 0 ? -1 : 1 });  /* spire on the north end, toward campus */
+    scene.add(tm.group); tm.mats.forEach(m => reg(m, m.color.getHex()));
+  }
   /* Building outlines: faint and dark by day, light at night so the shapes still read (setSun() blends them) */
   const eGeo = new T.BufferGeometry(); eGeo.setAttribute('position', new T.Float32BufferAttribute(ep, 3));
   const eMat = new T.LineBasicMaterial({ color: 0x2a2520, transparent: true, opacity: 0.3, depthWrite: false });
@@ -415,7 +433,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   let disposed = false;
   fetch(import.meta.env.BASE_URL + 'data/terrain-rexburg.json').then(r => r.ok ? r.json() : null).then((t: TerrainFile | null) => {
     if (!t || disposed) return;
-    const tr = buildTerrain(A, t, new T.Color(0xa39368));
+    const tr = buildTerrain(A, t, new T.Color(0x748e58));
     scene.add(tr.mesh, tr.forest, tr.farms); tr.mats.forEach(m => reg(m, m.color.getHex())); setSun(lightHour);
     ground.position.y = -0.09;  /* the terrain is the ground now; the flat plane stays underneath as a fallback */
   }).catch(() => { /* no terrain file: the flat ground stays */ });
@@ -426,12 +444,13 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   const projLayer = new T.Group(); scene.add(projLayer);
   type Sub = { solid: T.Mesh; edge: T.LineSegments; h: number; cur: number; goal: number };
   const P3: Record<string, { subs: Sub[]; strips: T.Mesh[] }> = {}, growing = new Set<Sub>();
+  let tetonModel: T.Group | null = null;
   A.PROJECTS.forEach(p => {
     const o = { subs: [] as Sub[], strips: [] as T.Mesh[] };
     if (p.foot) {
       const fw = p.foot[0], fd = p.foot[1], n = p.n || 1, cols = Math.ceil(Math.sqrt(n * fw / fd)), rows = Math.ceil(n / cols), cw = fw / cols, cd = fd / rows;
       const pad = new T.Mesh(new T.PlaneGeometry(fw + 0.06, fd + 0.06), reg(new T.MeshBasicMaterial({ color: 0xd9d2c0, transparent: true, opacity: 0.8, depthWrite: false }), 0xd9d2c0));
-      pad.rotation.x = -Math.PI / 2; pad.position.set(p.pos![0], 0.011, p.pos![1]); projLayer.add(pad);
+      pad.rotation.x = -Math.PI / 2; pad.position.set(p.pos![0], 0.0038, p.pos![1]); projLayer.add(pad);
       for (let k = 0; k < n; k++) {
         const x = p.pos![0] - fw / 2 + (k % cols + 0.5) * cw, z = p.pos![1] - fd / 2 + (Math.floor(k / cols) + 0.5) * cd;
         const solid = new T.Mesh(up, new T.MeshLambertMaterial({ color: 0xd4861c }));
@@ -444,44 +463,102 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     }
     (p.strips || []).forEach(ln => {
       const ls: Ln[] = []; for (let j = 0; j < ln.length - 1; j++) ls.push({ a: ln[j], b: ln[j + 1], w: 0.09 });
-      const m = new T.Mesh(ribbons(ls, 0.05), new T.MeshBasicMaterial({ color: 0xd4861c })); projLayer.add(m); o.strips.push(m);
+      const m = new T.Mesh(ribbons(ls, 0.0065), new T.MeshBasicMaterial({ color: 0xd4861c })); projLayer.add(m); o.strips.push(m);
     });
+    if (p.id === 'temple' && p.foot && p.pos) {  /* Teton River Idaho Temple: the real shape once the spire is up (June 2026) */
+      const long = p.foot[0] >= p.foot[1];
+      const tm = buildTemple({ center: p.pos, angle: long ? 0 : Math.PI / 2, L: Math.max(p.foot[0], p.foot[1]) * 0.8, W: Math.min(p.foot[0], p.foot[1]) * 0.62,
+        bodyM: 18, totalM: 44, vex: A.VEX, S, wall: 0xbfc3c6, glass: 0x5f6f82, spire: 'center', top: 'finial' });
+      tm.group.visible = false; projLayer.add(tm.group); tm.mats.forEach(m => reg(m, m.color.getHex())); tetonModel = tm.group;
+    }
     P3[p.id] = o;
   });
 
-  /* Moving traffic */
-  const N = 700, carPos = new Float32Array(N * 3), cars: { s: number; u: number; dir: number }[] = [], carGeo = new T.BufferGeometry();
-  carGeo.setAttribute('position', new T.BufferAttribute(carPos, 3));
-  const carPts = new T.Points(carGeo, new T.PointsMaterial({ color: 0x22343a, size: 0.07, sizeAttenuation: true }));
-  scene.add(carPts);
+  /* Moving traffic: small colored cars that drive the street network. At each corner a car picks its next street
+     (busier streets and going straight are likelier; never a U-turn). At a dead end, or when its trip is over, it
+     shrinks away and a new car appears on a street picked by traffic volume, so busy streets and intersections fill
+     up. Cars slow down as a street fills, so they bunch where the load is high. */
+  const N = 1400, CAR_COLS = [0xf2f2ee, 0xc9ccd0, 0x8d939a, 0x2b2f35, 0x1f3f73, 0x8e1f24, 0x2f6f73, 0xd8cfb8, 0x5a6b3a, 0x3a5fa8];
+  const carMat = new T.MeshLambertMaterial({ color: 0xffffff });
+  const carMesh = new T.InstancedMesh(new T.BoxGeometry(0.075, 0.032, 0.035), carMat, N);  /* ~15 m long: larger than life so they read */
+  carMesh.instanceMatrix.setUsage(T.DynamicDrawUsage); carMesh.frustumCulled = false; scene.add(carMesh);
+  type Car = { s: number; fwd: boolean; u: number; sc: number; st: 0 | 1 | 2; life: number; yaw: number; ox: number; oz: number };  /* st: 0 appearing, 1 driving, 2 leaving */
+  const cars: Car[] = [], carObj = new T.Object3D(), carCol = new T.Color();
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let lastRes: SegResult[] | null = null, seed = 11;
+  let lastRes: SegResult[] | null = null, seed = 11, cum: number[] = [], cumTot = 0;
   function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
-  function allocate(res: SegResult[]) {
-    const cum: number[] = []; let tot = 0;
-    res.forEach((r, k) => { tot += r.vol * A.SEGS[k].len; cum.push(tot); });
-    let j = 0;
-    for (let k = 0; k < N; k++) {
-      const target = (k + 0.5) / N * tot;
-      while (j < cum.length - 1 && cum[j] < target) j++;
-      const keep = cars[k] && cars[k].u;
-      cars[k] = { s: j, u: keep != null ? keep : rnd(), dir: k % 2 ? 1 : -1 };
+  /* which segment ends meet: a grid of endpoints, 6 m tolerance */
+  const TOL = 0.03, ends = new Map<string, { s: number; atA: boolean }[]>();
+  const ek = (x: number, z: number) => Math.round(x / TOL) + ',' + Math.round(z / TOL);
+  A.SEGS.forEach((sg, i) => { for (const [p, atA] of [[sg.a, true], [sg.b, false]] as [XZ, boolean][]) { const k = ek(p[0], p[1]); (ends.get(k) || ends.set(k, []).get(k)!).push({ s: i, atA }); } });
+  function meeting(p: XZ) {  /* every segment end within tolerance of p (checks the 3x3 neighbor cells) */
+    const out: { s: number; atA: boolean }[] = [], cx = Math.round(p[0] / TOL), cz = Math.round(p[1] / TOL);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      const l = ends.get((cx + dx) + ',' + (cz + dz)); if (!l) continue;
+      for (const e of l) { const q = e.atA ? A.SEGS[e.s].a : A.SEGS[e.s].b; if (Math.hypot(q[0] - p[0], q[1] - p[1]) <= TOL) out.push(e); }
     }
-    lastRes = res; placeCars(0);
+    return out;
+  }
+  const volOf = (i: number) => lastRes ? Math.max(1, lastRes[i].vol) : 1;
+  function spawn(c: Car | undefined, k: number, instant: boolean): Car {
+    let j = 0;
+    if (cumTot > 0) { const r = rnd() * cumTot; let lo = 0, hi = cum.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m] < r) lo = m + 1; else hi = m; } j = lo; }
+    else j = Math.floor(rnd() * A.SEGS.length);
+    const n: Car = c || { s: 0, fwd: true, u: 0, sc: 0, st: 0, life: 0, yaw: 0, ox: 0, oz: 0 };
+    n.s = j; n.fwd = rnd() < 0.5; n.u = rnd(); n.sc = instant ? 1 : 0; n.st = instant ? 1 : 0; n.life = 30 + rnd() * 70; n.yaw = NaN;
+    carMesh.setColorAt(k, carCol.setHex(CAR_COLS[Math.floor(rnd() * CAR_COLS.length)]));
+    if (carMesh.instanceColor) carMesh.instanceColor.needsUpdate = true;
+    return n;
+  }
+  function next(c: Car): boolean {  /* move onto the next street at the corner ahead; false at a dead end */
+    const sg = A.SEGS[c.s], end = c.fwd ? sg.b : sg.a, from = c.fwd ? sg.a : sg.b;
+    const hx = end[0] - from[0], hz = end[1] - from[1], hl = Math.hypot(hx, hz) || 1;
+    let tot = 0; const opts: { s: number; fwd: boolean; w: number }[] = [];
+    for (const e of meeting(end)) {
+      if (e.s === c.s) continue;
+      const o = A.SEGS[e.s], far = e.atA ? o.b : o.a, nx = far[0] - end[0], nz = far[1] - end[1], cos = (nx * hx + nz * hz) / ((Math.hypot(nx, nz) || 1) * hl);
+      if (cos < -0.85) continue;  /* no U-turns */
+      const w = volOf(e.s) * (0.4 + Math.max(0, cos) * 1.6);
+      opts.push({ s: e.s, fwd: e.atA, w }); tot += w;
+    }
+    if (!opts.length) return false;
+    let r = rnd() * tot; for (const o of opts) { r -= o.w; if (r <= 0) { c.s = o.s; c.fwd = o.fwd; return true; } }
+    const o = opts[opts.length - 1]; c.s = o.s; c.fwd = o.fwd; return true;
+  }
+  function allocate(res: SegResult[]) {
+    lastRes = res; cum = []; cumTot = 0;
+    res.forEach((r, k) => { cumTot += Math.max(0, r.vol) * A.SEGS[k].len; cum.push(cumTot); });
+    if (!cars.length) { for (let k = 0; k < N; k++) cars.push(spawn(undefined, k, true)); }
+    else cars.forEach(c => { c.life = Math.min(c.life, rnd() * 10); });  /* new loads: cars hand over to the new pattern within ~10 s, no jump */
+    placeCars(0);
   }
   function placeCars(dt: number) {
     if (!lastRes) return;
     for (let k = 0; k < N; k++) {
-      const c = cars[k], s = A.SEGS[c.s], vc = lastRes[c.s].vc;
-      const sp = 1.6 * Math.max(0.1, Math.min(1, 1.2 - vc));
-      c.u += c.dir * sp * dt / s.len;
-      if (c.u > 1) c.u -= Math.floor(c.u); if (c.u < 0) c.u += Math.ceil(-c.u);
-      const dx = s.b[0] - s.a[0], dz = s.b[1] - s.a[1], l = Math.hypot(dx, dz) || 1, off = c.dir * s.road.c.w * S * EXW * 0.22;
-      carPos[k * 3] = s.a[0] + dx * c.u + (-dz / l) * off;
-      carPos[k * 3 + 1] = 0.06;
-      carPos[k * 3 + 2] = s.a[1] + dz * c.u + (dx / l) * off;
+      let c = cars[k];
+      if (c.st === 0) { c.sc = Math.min(1, c.sc + dt * 2.5); if (c.sc >= 1) c.st = 1; }
+      else if (c.st === 2) { c.sc -= dt * 2.5; if (c.sc <= 0) { c = cars[k] = spawn(c, k, false); } }
+      c.life -= dt;
+      const vc = lastRes[c.s].vc, sp = 1.6 * Math.max(0.12, Math.min(1, 1.2 - vc));
+      if (c.st !== 2) {
+        c.u += sp * dt / A.SEGS[c.s].len;
+        while (c.u >= 1) {
+          const left = (c.u - 1) * A.SEGS[c.s].len;  /* distance past the corner carries onto the next street */
+          if (c.life <= 0 || !next(c)) { c.u = 1; c.st = 2; break; }  /* dead end or trip over: shrink away at the corner */
+          c.u = left / A.SEGS[c.s].len;
+        }
+      }
+      const sg = A.SEGS[c.s], p0 = c.fwd ? sg.a : sg.b, p1 = c.fwd ? sg.b : sg.a;
+      const dx = p1[0] - p0[0], dz = p1[1] - p0[1], l = Math.hypot(dx, dz) || 1, off = sg.road.c.w * S * EXW * 0.22;
+      /* drive on the right; ease the heading and lane offset through corners so turns don't snap */
+      const yaw = Math.atan2(-dz, dx), tox = (-dz / l) * off, toz = (dx / l) * off;
+      if (isNaN(c.yaw)) { c.yaw = yaw; c.ox = tox; c.oz = toz; }
+      else { const kk = 1 - Math.exp(-dt * 10); let dy = yaw - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.yaw += dy * kk; c.ox += (tox - c.ox) * kk; c.oz += (toz - c.oz) * kk; }
+      carObj.position.set(p0[0] + dx * c.u + c.ox, 0.006 + 0.016, p0[1] + dz * c.u + c.oz);  /* on the asphalt: half the car's height above the road */
+      carObj.rotation.set(0, c.yaw, 0); carObj.scale.setScalar(Math.max(0.001, c.sc));
+      carObj.updateMatrix(); carMesh.setMatrixAt(k, carObj.matrix);
     }
-    (carGeo.attributes.position as T.BufferAttribute).needsUpdate = true;
+    carMesh.instanceMatrix.needsUpdate = true;
   }
 
   /* Labels and pins */
@@ -562,11 +639,15 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   let lightHour = getState().hour, lastLights = -1, nightV = 0;
   function setSun(h: number) {
     const st = getState(), d = daylight(h), dusk = (h >= 16.5 && h <= 20) || (h >= 5 && h <= 8) ? Math.max(0, 1 - Math.abs(d - 0.45) * 2.2) : 0;
-    const t = (h - 6) / 12; let el = Math.sin(Math.PI * Math.max(0.03, Math.min(0.97, t))), az = Math.PI * (1 - t);
-    if (d < 0.05) { el = 0.8; az = 2.2; }  /* moonlight from a fixed high angle */
-    sunDir.set(-Math.cos(az) * Math.cos(el * 1.2), Math.max(0.12, el), Math.sin(az) * 0.5 + 0.35).normalize();
-    (scene.background as T.Color).copy(light.sky).lerp(light.duskC, dusk * 0.55).lerp(light.night, 1 - d);
-    (scene.fog as T.Fog).color.copy(scene.background as T.Color);
+    /* the sun's arc over Rexburg: rises in the east (+x) at 6, peaks 55° up in the south (+z) at noon, sets in the west at 18;
+       the moon runs the opposite half of the circle. Shadows come from whichever is up. */
+    const a = Math.PI * (h - 6) / 12, tilt = 55 * Math.PI / 180;
+    sunVis.set(Math.cos(a), Math.sin(a) * Math.sin(tilt), Math.sin(a) * Math.cos(tilt)).normalize();
+    moonVis.copy(sunVis).multiplyScalar(-1); moonVis.y = Math.abs(moonVis.y) * 0.8 + 0.25; moonVis.normalize();
+    if (d < 0.05) sunDir.copy(moonVis); else sunDir.set(sunVis.x, Math.max(0.08, sunVis.y), sunVis.z).normalize();
+    const haze = sky.set({ sun: sunVis, moon: moonVis, day: d, dusk });
+    (scene.background as T.Color).copy(haze);
+    (scene.fog as T.Fog).color.copy(haze);
     /* less sky fill and a stronger sun by day, so buildings and trees cast clear shadows away from the sun */
     /* at night a cool moonlit fill keeps ground, trees and buildings readable in blue-grey instead of black */
     hemi.intensity = 0.3 + 0.34 * d; hemi.color.setHex(d < 0.3 ? 0x7f93bd : 0xfff1dc); hemi.groundColor.setHex(d < 0.3 ? 0x1e2333 : 0x5a4e3a);
@@ -576,7 +657,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     tints.forEach(tn => { tn.m.color.copy(tn.c); if (tn.m instanceof T.MeshBasicMaterial) tn.m.color.multiplyScalar(dim); });
     NIGHT.uNight.value = (1 - d) * st.lights; NIGHT.uLit.value = 0.5;
     nightV = (1 - d) * st.lights;
-    (carPts.material as T.PointsMaterial).color.set(d < 0.5 ? '#f4f6ff' : '#22343a');  /* white headlights, not yellow: yellow means a busy street */
+    carMat.emissive.setRGB(1, 0.97, 0.9).multiplyScalar(0.75 * (1 - d));  /* at night cars glow with their headlights, not yellow: yellow means a busy street */
     overlay.classList.toggle('night', d < 0.5); document.body.classList.toggle('night', d < 0.4);
     grey.setHex(0x3f3a35).lerp(new T.Color(0x1c1a18), 1 - d);
     lastLights = st.lights;
@@ -616,11 +697,16 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     /* the sun follows the view so nearby buildings and trees cast shadows */
     const dist = camera.position.distanceTo(controls.target);
     PXU.uPx.value = 2 * dist * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, canvas.clientHeight);
+    /* near plane grows as you zoom out: depth stays precise, so the flat map layers can sit just above the ground
+       (a few cm apart) without flickering, and roads and buildings don't look like they float */
+    const nr = Math.max(0.02, Math.min(2, dist * 0.02));
+    if (Math.abs(camera.near - nr) > camera.near * 0.15) { camera.near = nr; camera.updateProjectionMatrix(); }
     if (hover.dirty && hover.inside && !picker) {
       hover.dirty = false; setHover(pickRoad());
       setZoneHover(hover.seg < 0 && stF.layers.zones ? pickZone() : -1);  /* zones sit above the Census blocks */
       setBlockHover(hover.seg < 0 && zoneHover < 0 && stF.layers.blocks ? pickBlock() : -1);  /* streets win: a block shows where no street is under the pointer */
     }
+    sky.tick(reduce ? 0 : dt, camera);
     sun.target.position.copy(controls.target);
     sun.position.copy(controls.target).addScaledVector(sunDir, Math.max(60, dist * 3));
     const sc2 = sun.shadow.camera as T.OrthographicCamera, hs = Math.max(6, Math.min(110, dist * 0.85));
@@ -704,7 +790,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
       if (!roadInit) { (roadCol.array as Float32Array).set(roadGoal); roadCol.needsUpdate = true; roadInit = true; } else roadFade = true;
       A.WIDEN.forEach(w => { const on = st.widen.indexOf(w.id) >= 0; widMats[w.id].opacity = on ? 1 : 0.5; widMats[w.id].color.set(on ? '#5b2fa3' : '#8557c2'); });
       widLayer.visible = st.layers.proj;
-      projLayer.visible = st.layers.proj; walk.visible = st.layers.walk; carPts.visible = st.layers.cars;
+      projLayer.visible = st.layers.proj; walk.visible = st.layers.walk; carMesh.visible = st.layers.cars;
       sigPoles.visible = st.layers.signals !== false && SIG.length > 0; sigSets.forEach(p => { p.visible = sigPoles.visible; });  /* older saved state has no signals key: show them */
       bl.group.visible = st.layers.blocks; bl.select(st.block); if (!st.layers.blocks) setBlockHover(-1);
       zl.group.visible = !!st.layers.zones; if (!st.layers.zones) setZoneHover(-1);
@@ -719,6 +805,10 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
           (s.edge.material as T.LineBasicMaterial).color.set(ps.key === 'construction' ? '#a8650f' : ps.key === 'planned' ? '#8557c2' : '#2e6bc9');
         });
         o.strips.forEach(s => { s.visible = ps.key === 'construction'; });
+        if (p.id === 'temple' && tetonModel) {  /* the temple model replaces the plain box once it would be 60% built */
+          const showT = ps.key === 'done' || (ps.key === 'construction' && ps.progress >= 0.6);
+          tetonModel.visible = showT; o.subs.forEach(s => { (s.solid.material as T.Material).visible = !showT; });
+        }
       });
       pins.forEach(pn => {
         pn.el.setAttribute('data-s', pStatus(A, pn.p, tp).key);

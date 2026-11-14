@@ -16,7 +16,7 @@ export function buildTerrain(A: Atlas, t: TerrainFile, landNear: T.Color) {
   let mnx = 1e9, mxx = -1e9, mnz = 1e9, mxz = -1e9;
   A.SEGS.forEach(s => { mnx = Math.min(mnx, s.mid[0]); mxx = Math.max(mxx, s.mid[0]); mnz = Math.min(mnz, s.mid[1]); mxz = Math.max(mxz, s.mid[1]); });
   const pos = new Float32Array(N * N * 3), col = new Float32Array(N * N * 3), farm = new Float32Array(N * N), idx: number[] = [], c = new T.Color();
-  const lowC = new T.Color(t.base < 600 ? 0x9a9a6a : 0xa39368), midC = new T.Color(0x8c8a60), forC = new T.Color(0x4f5a3a), rockC = new T.Color(0x8a8378), snowC = new T.Color(0xe8e6df);
+  const lowC = new T.Color(t.base < 600 ? 0x82935f : 0x88935c), midC = new T.Color(0x7d895b), forC = new T.Color(0x4f5a3a), rockC = new T.Color(0x8a8378), snowC = new T.Color(0xe8e6df);
   const forestPts: [number, number, number][] = [];
   /* where town is: buildings per terrain cell, summed over the 3 x 3 cells around each point (about 2 km across) */
   const cnt = new Float32Array(N * N), cellOf = (v: number) => Math.round((v + Hu) / (2 * Hu) * (N - 1));
@@ -27,7 +27,7 @@ export function buildTerrain(A: Atlas, t: TerrainFile, landNear: T.Color) {
     const out = Math.hypot(Math.max(0, mnx - x, x - mxx), Math.max(0, mnz - z, z - mxz));
     const keep = smooth(3, 22, out);                                              /* flat under the streets, real beyond */
     const fadeE = Math.min(1, Math.min(i, j, N - 1 - i, N - 1 - j) / (N * 0.08));  /* blend into the plain at the edge */
-    const em = hv[k] * t.step, abs = t.base + em, y = Math.max(-0.01, em * S * TVEX * keep * fadeE) - 0.025;
+    const em = hv[k] * t.step, abs = t.base + em, y = Math.max(-0.001, em * S * TVEX * keep * fadeE) - 0.0015;  /* level with building bases in town, just under the map layers */
     pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z;
     c.copy(lowC).lerp(midC, smooth(t.base + 80, t.base + 450, abs));
     const forest = t.base > 600 && abs > 1750 && abs < 2750;

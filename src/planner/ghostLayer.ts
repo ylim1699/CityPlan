@@ -49,7 +49,7 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
     /* site outline on the ground */
     const pad = new T.Mesh(new T.PlaneGeometry(w + 0.04, dd + 0.04), new T.MeshBasicMaterial({ color: col, transparent: true, opacity: on ? 0.35 : 0.18, depthWrite: false }));
     mats.push(pad.material as T.MeshBasicMaterial);
-    pad.rotation.x = -Math.PI / 2; pad.position.y = 0.03; pad.userData = { id: d.id }; g.add(pad);
+    pad.rotation.x = -Math.PI / 2; pad.position.y = 0.0038; pad.userData = { id: d.id }; g.add(pad);
     /* access roads: a glowing ribbon (~16 m wide) in world space, dashed while only suggested */
     const roadMats: T.MeshBasicMaterial[] = [], roadEls: Item['roadEls'] = [];
     (d.roads || []).forEach(r => {
@@ -59,8 +59,8 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
         const dash = sug ? 30 * S : L, gap = sug ? 20 * S : 0;
         for (let s0 = 0; s0 < L; s0 += dash + gap) {
           const s1 = Math.min(L, s0 + dash), ax = a[0] + ux * s0, az = a[1] + uz * s0, bx = a[0] + ux * s1, bz = a[1] + uz * s1;
-          pos.push(ax + nx - d.pos[0], 0.06, az + nz - d.pos[1], bx + nx - d.pos[0], 0.06, bz + nz - d.pos[1], bx - nx - d.pos[0], 0.06, bz - nz - d.pos[1],
-            ax + nx - d.pos[0], 0.06, az + nz - d.pos[1], bx - nx - d.pos[0], 0.06, bz - nz - d.pos[1], ax - nx - d.pos[0], 0.06, az - nz - d.pos[1]);
+          pos.push(ax + nx - d.pos[0], 0.0068, az + nz - d.pos[1], bx + nx - d.pos[0], 0.0068, bz + nz - d.pos[1], bx - nx - d.pos[0], 0.0068, bz - nz - d.pos[1],
+            ax + nx - d.pos[0], 0.0068, az + nz - d.pos[1], bx - nx - d.pos[0], 0.0068, bz - nz - d.pos[1], ax - nx - d.pos[0], 0.0068, az - nz - d.pos[1]);
         }
       }
       const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
@@ -108,7 +108,7 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
       list.forEach(h => {
         const pos: number[] = [], w = 26 * S / 2;
         h.segs.forEach(([a, b]) => {
-          const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1e-6, nx = -dz / L * w, nz = dx / L * w, y = 0.07;
+          const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1e-6, nx = -dz / L * w, nz = dx / L * w, y = 0.0072;
           pos.push(a[0] + nx, y, a[1] + nz, b[0] + nx, y, b[1] + nz, b[0] - nx, y, b[1] - nz, a[0] + nx, y, a[1] + nz, b[0] - nx, y, b[1] - nz, a[0] - nx, y, a[1] - nz);
         });
         const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
