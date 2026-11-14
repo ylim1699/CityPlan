@@ -6,9 +6,12 @@ import type { Atlas } from '../model/atlas';
 import type { SegResult, XZ } from '../model/types';
 import type { State } from '../state';
 import { CCOL, daylight, pStatus } from '../ui';
+import { createGhostLayer, type GhostDraw, type GhostEvent } from '../planner/ghostLayer';
 
 export type ViewEls = { canvas: HTMLCanvasElement; overlay: HTMLElement; app: HTMLElement; compass: HTMLElement };
-export type View = { apply: (shown: SegResult[], tp: number) => void; flyTo: (pos: XZ) => void; pick: (cb: ((pos: XZ) => void) | null) => void; dispose: () => void };
+export type View = { apply: (shown: SegResult[], tp: number) => void; flyTo: (pos: XZ) => void; pick: (cb: ((pos: XZ) => void) | null) => void; dispose: () => void;
+  /* Planner ghosts (src/planner) */
+  setGhosts: (list: GhostDraw[], sel: string | null) => void; onGhost: (cb: ((e: GhostEvent) => void) | null) => void; target: () => XZ };
 
 export function createView(els: ViewEls, A: Atlas, getState: () => State, onSelect: (id: string) => void): View | null {
   const canvas = els.canvas;
@@ -207,6 +210,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     overlay.appendChild(el);
     pins.push({ el, p, v: new T.Vector3(p.pos![0], (p.h || 0.02) + 0.1, p.pos![1]), proj: true });
   });
+  const ghosts = createGhostLayer({ scene, camera, canvas, overlay, S, VEX: A.VEX });
   const vtmp = new T.Vector3(); let W = 1, H = 1;
   function place(m: Mark) {
     const st = getState();
@@ -240,7 +244,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     controls.update();
     if (!reduce && getState().layers.cars) placeCars(dt);
     renderer.render(scene, camera);
-    marks.forEach(place); pins.forEach(place);
+    marks.forEach(place); pins.forEach(place); ghosts.frame(W, H, dt);
     compass.style.transform = 'rotate(' + controls.getAzimuthalAngle() + 'rad)';
     raf = requestAnimationFrame(frame);
   }
@@ -304,6 +308,9 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
       fly = { k: 0, from: controls.target.clone(), to: new T.Vector3(pos[0], 0, pos[1]), dir: off.normalize(), len0: len, len1: Math.min(len, 9) };
     },
     pick(cb) { picker = cb; canvas.style.cursor = cb ? 'crosshair' : ''; },
-    dispose() { canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); overlay.innerHTML = ''; }
+    setGhosts(list, sel) { ghosts.set(list, sel); },
+    onGhost(cb) { ghosts.onEvent(cb); },
+    target() { return [controls.target.x, controls.target.z]; },
+    dispose() { ghosts.dispose(); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); overlay.innerHTML = ''; }
   };
 }
