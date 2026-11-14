@@ -114,7 +114,7 @@ export function level(vc: number) {
 }
 
 export type Road = { id: number; name: string; cls: string; adt: number; adtBasis: string; pts: XZ[]; near: number[]; lanes: number; oneway: boolean;
-  laneBasis: string; segAdt: number[]; segBasis: number[]; c: typeof CLS[string] };
+  laneBasis: string; segAdt: number[]; segBasis: number[]; mph: number; mphTagged: boolean; c: typeof CLS[string] };
 export type Seg = { i: number; road: Road; a: XZ; b: XZ; mid: XZ; len: number; near: string; adt: number; counted: boolean; adtBasis: string; cap0: number; dAvg?: number };
 export type Widening = { id: string; name: string; desc: string; start: string | null; impact: string | null; rings: XZ[][]; segs: number[]; pos: XZ; factor: number; set: Record<number, 1> };
 export type TrafficOpts = { pop?: PopSeries; withProjects?: boolean; spring?: boolean; widen?: string[]; fixes?: Fix[]; volumes?: Float64Array | number[] | null };
@@ -130,7 +130,7 @@ export function createAtlas(C: OsmCity, PF: ProjectsFile) {
     for (let k = 0; k < f.length; k += 2) pts.push([f[k] * S, f[k + 1] * S]);
     const ow = !!r[7], base = r[2] ? r[2] / (ow ? 2 : 1) : CLS[cls].adt / (ow ? 2 : 1);
     return { id: i, name: C.names[r[1]], cls, adt: base, adtBasis: r[2] ? C.names[r[3]] : 'assumed for road type', pts, near: r[5],
-      lanes: r[6], oneway: ow, laneBasis: C.names[r[8]], segAdt: r[9], segBasis: r[10], c: CLS[cls] };
+      lanes: r[6], oneway: ow, laneBasis: C.names[r[8]], segAdt: r[9], segBasis: r[10], mph: r[11], mphTagged: !!r[12], c: CLS[cls] };
   });
   function centerMult(c: any, h: number) {
     const pts = [[0, 0.8], [6, 0.85], [8, c.m.am], [12, c.m.mid], [17, c.m.pm], [22, 0.85], [24, 0.8]];

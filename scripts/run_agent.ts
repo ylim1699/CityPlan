@@ -2,21 +2,33 @@
      pnpm agent <pdf-path-or-url> "<label, e.g. City Council minutes, Oct 15 2026>"
        -> adds candidates to public/data/projects.candidates.json (never shown in the app until confirmed)
      pnpm agent --list
+     pnpm agent --recheck
+       -> checks every candidate's quote against its saved record in data/raw/minutes/ and fills in its category
      pnpm agent --confirm <candidate-id> <lat> <lon>
        -> a person has checked the quote; copies it into public/data/projects.json with a map location
    Needs GEMINI_API_KEY in .env (or ANTHROPIC_API_KEY with AGENT_PROVIDER=claude); see plan.html section 5. */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { extractProjects, type FoundProject } from '../agent/extract';
+import { pdfText } from '../agent/pdftext';
 import { candidateId, toProject } from '../src/model/candidates';
+import { categoryOf, checkQuote, type QuoteCheck } from '../src/model/review';
 
 const CAND = 'public/data/projects.candidates.json', PROJ = 'public/data/projects.json';
-type Cand = FoundProject & { id: string; foundIn: { label: string; url: string }; foundAt: string; model: string };
+type Cand = FoundProject & { check?: QuoteCheck; id: string; foundIn: { label: string; url: string }; foundAt: string; model: string };
 const load = (): { meta: any; candidates: Cand[] } => existsSync(CAND) ? JSON.parse(readFileSync(CAND, 'utf8'))
   : { meta: { source: 'AI agent reading city records (unreviewed candidates)', url: '', fetched: new Date().toISOString().slice(0, 10), type: 'estimate' }, candidates: [] };
 const args = process.argv.slice(2);
 
 if (args[0] === '--list') {
-  load().candidates.forEach(c => console.log(`${c.id}\n  ${c.status} · ${c.type} · ${c.where}\n  "${c.quote.slice(0, 160)}"\n  ${c.foundIn.label}`));
+  load().candidates.forEach(c => console.log(`${c.id}\n  ${c.status} · ${categoryOf(c)} · ${c.where} · quote ${c.check || 'unchecked'}\n  "${c.quote.slice(0, 160)}"\n  ${c.foundIn.label}`));
+} else if (args[0] === '--recheck') {
+  const dir = 'data/raw/minutes/', byUrl = new Map<string, string>();
+  for (const f of readdirSync(dir)) { const t = readFileSync(dir + f, 'utf8'), u = (t.match(/^Source: (\S+)/) || [])[1]; if (u) byUrl.set(u, t); }
+  const db = load();
+  db.candidates.forEach(c => { c.category = categoryOf({ ...c, category: null }); c.check = checkQuote(c.quote, byUrl.get(c.foundIn.url) || ''); });
+  writeFileSync(CAND, JSON.stringify(db, null, 1));
+  const n = (k: string) => db.candidates.filter(c => c.check === k).length;
+  console.log(`Checked ${db.candidates.length}: ${n('exact')} word for word, ${n('close')} close (scan errors), ${n('missing')} not found, ${n('unchecked')} without a saved record`);
 } else if (args[0] === '--confirm') {
   const [, id, lat, lon] = args;
   const c = load().candidates.find(x => x.id === id);
@@ -36,11 +48,12 @@ if (args[0] === '--list') {
   const srcUrl = isUrl ? src : (text.match(/^Source: (https?:\/\/\S+)/) || [])[1] || '';  // scripts/fetch_minutes.ts writes this first line
   const res = await extractProjects(isPdf ? { pdf: bytes, label } : { text, label }), found = res.projects;
   if (res.tried.length) console.log('Fell back past: ' + res.tried.join(' | '));
+  const record = isPdf ? await pdfText(bytes) : text;
   const db = load(), now = new Date().toISOString().slice(0, 10);
   for (const f of found) {
     const id = candidateId(f);
     if (db.candidates.some(c => c.id === id)) continue;
-    db.candidates.push({ ...f, id, foundIn: { label, url: srcUrl }, foundAt: now, model: res.model });
+    db.candidates.push({ ...f, category: categoryOf(f), check: checkQuote(f.quote, record), id, foundIn: { label, url: srcUrl }, foundAt: now, model: res.model });
   }
   db.meta.fetched = now;
   writeFileSync(CAND, JSON.stringify(db, null, 1));

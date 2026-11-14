@@ -1,0 +1,1053 @@
+{
+ "version": 0.6,
+ "generator": "Overpass API 0.7.62.11 87bfad18",
+ "osm3s": {
+  "timestamp_osm_base": "2026-11-14T16:36:21Z",
+  "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+ },
+ "elements": [
+  {
+   "type": "node",
+   "id": 150947909,
+   "lat": 43.7751893,
+   "lon": -111.8319107,
+   "tags": {
+    "ele": "1480",
+    "gnis:feature_id": "397892",
+    "name": "Mark",
+    "place": "locality"
+   }
+  },
+  {
+   "type": "node",
+   "id": 150957055,
+   "lat": 43.855189,
+   "lon": -111.8385784,
+   "tags": {
+    "ele": "1478",
+    "gnis:feature_id": "397787",
+    "name": "Hibbard",
+    "place": "locality"
+   }
+  },
+  {
+   "type": "node",
+   "id": 150967389,
+   "lat": 43.8419964,
+   "lon": -111.7779987,
+   "tags": {
+    "ele": "1485",
+    "gnis:feature_id": "397828",
+    "name": "Jolley",
+    "place": "locality"
+   }
+  },
+  {
+   "type": "node",
+   "id": 358668040,
+   "lat": 43.8440779,
+   "lon": -111.8385783,
+   "tags": {
+    "amenity": "school",
+    "ele": "1478",
+    "gnis:feature_id": "401492",
+    "name": "Hibbard Elementary School"
+   }
+  },
+  {
+   "type": "node",
+   "id": 3746282232,
+   "lat": 43.8245422,
+   "lon": -111.766413,
+   "tags": {
+    "access": "yes",
+    "leisure": "playground",
+    "name": "Hidden Valley Park Playground",
+    "operator": "City of Rexburg",
+    "playground:theme": "playground",
+    "surface": "woodchips"
+   }
+  },
+  {
+   "type": "node",
+   "id": 5850318656,
+   "lat": 43.8252182,
+   "lon": -111.7886307,
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "155",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "West Main Street",
+    "addr:unit": "#7",
+    "fee": "yes",
+    "leisure": "escape_game",
+    "name": "Rexburg Re-Escape",
+    "phone": "+1-208-206-8502",
+    "website": "https://www.rexburgre-escape.com/"
+   }
+  },
+  {
+   "type": "node",
+   "id": 5898445425,
+   "lat": 43.8251691,
+   "lon": -111.782641,
+   "tags": {
+    "addr:housenumber": "30",
+    "addr:state": "ID",
+    "addr:street": "College Avenue",
+    "leisure": "fitness_centre",
+    "name": "Payne Athletic Company"
+   }
+  },
+  {
+   "type": "node",
+   "id": 8829596501,
+   "lat": 43.8523041,
+   "lon": -111.7738148,
+   "tags": {
+    "name": "North Rexburg",
+    "place": "locality"
+   }
+  },
+  {
+   "type": "node",
+   "id": 10202892550,
+   "lat": 43.8288102,
+   "lon": -111.764143,
+   "tags": {
+    "access": "yes",
+    "leisure": "playground",
+    "name": "Mill Hollow Playground",
+    "playground:theme": "playground"
+   }
+  },
+  {
+   "type": "node",
+   "id": 11705745069,
+   "lat": 43.8292218,
+   "lon": -111.8085503,
+   "tags": {
+    "leisure": "playground",
+    "name": "Gravity Factory",
+    "website": "https://www.gravityfactory.net/"
+   }
+  },
+  {
+   "type": "node",
+   "id": 12245712951,
+   "lat": 43.8294387,
+   "lon": -111.7785503,
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "153",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "North 2nd East",
+    "leisure": "sports_centre",
+    "name": "Heber Hatchets Axe Throwing",
+    "phone": "+1 208-656-5884",
+    "sport": "axe_throwing",
+    "website": "https://heberhatchets.com/axe-throwing-rexburg/"
+   }
+  },
+  {
+   "type": "node",
+   "id": 12245712952,
+   "lat": 43.8295239,
+   "lon": -111.7789373,
+   "tags": {
+    "leisure": "sports_centre",
+    "name": "Links Indoor Golf",
+    "sport": "golf",
+    "website": "https://www.linksindoor.com/locations"
+   }
+  },
+  {
+   "type": "way",
+   "id": 32506385,
+   "center": {
+    "lat": 43.8271528,
+    "lon": -111.7737455
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Smith Park"
+   }
+  },
+  {
+   "type": "way",
+   "id": 240854510,
+   "center": {
+    "lat": 43.8229212,
+    "lon": -111.791021
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Porter Park"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289115529,
+   "center": {
+    "lat": 43.8314995,
+    "lon": -111.8054834
+   },
+   "tags": {
+    "leisure": "golf_course",
+    "name": "Rexburg Golf Club"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289299512,
+   "center": {
+    "lat": 43.8346188,
+    "lon": -111.8012203
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Rexburg Nature Park"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289299543,
+   "center": {
+    "lat": 43.8255622,
+    "lon": -111.8055156
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Evergreen Park"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289382546,
+   "center": {
+    "lat": 43.8409255,
+    "lon": -111.76992
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "475",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "East 7th North",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289382666,
+   "center": {
+    "lat": 43.8279146,
+    "lon": -111.7845475
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "73",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "North Center Street",
+    "amenity": "library",
+    "building": "yes",
+    "name": "Madison Public Library"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289407027,
+   "center": {
+    "lat": 43.8247825,
+    "lon": -111.7999102
+   },
+   "tags": {
+    "amenity": "school",
+    "ele": "1482",
+    "gnis:feature_id": "401508",
+    "name": "Kennedy Elementary School"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289407031,
+   "center": {
+    "lat": 43.8221812,
+    "lon": -111.7916651
+   },
+   "tags": {
+    "access": "yes",
+    "fountain": "splash_pad",
+    "leisure": "water_park",
+    "name": "Rexburg Spray Park"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289415710,
+   "center": {
+    "lat": 43.8109063,
+    "lon": -111.779088
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "750",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "South 2nd East",
+    "amenity": "place_of_worship",
+    "building": "temple",
+    "denomination": "mormon",
+    "name": "Rexburg Idaho Temple",
+    "operator": "The Church of Jesus Christ of Latter-day Saints",
+    "operator:wikidata": "Q42504",
+    "phone": "+1 208-656-0880",
+    "religion": "christian",
+    "website": "https://www.churchofjesuschrist.org/temples/details/rexburg-idaho-temple",
+    "wikidata": "Q7319370",
+    "wikipedia": "en:Rexburg Idaho Temple"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289415748,
+   "center": {
+    "lat": 43.8107666,
+    "lon": -111.7814021
+   },
+   "tags": {
+    "amenity": "place_of_worship",
+    "building": "church",
+    "check_date": "2026-07-13",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289466476,
+   "center": {
+    "lat": 43.8097869,
+    "lon": -111.8015328
+   },
+   "tags": {
+    "amenity": "school",
+    "name": "Madison Middle School"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289466484,
+   "center": {
+    "lat": 43.811967,
+    "lon": -111.8052943
+   },
+   "tags": {
+    "brand": "World Gym",
+    "brand:wikidata": "Q8035794",
+    "leisure": "fitness_centre",
+    "name": "World Gym",
+    "opening_hours": "Mo-Th 05:00-23:00; Fr 05:00-22:00; Sa 06:00-22:00"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289575687,
+   "center": {
+    "lat": 43.826909,
+    "lon": -111.7814813
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "35",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "North 1st East",
+    "amenity": "townhall",
+    "building": "yes",
+    "name": "Rexburg City Hall"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289677351,
+   "center": {
+    "lat": 43.8315439,
+    "lon": -111.7788708
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "257",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "North 2nd East",
+    "building": "yes",
+    "leisure": "sports_centre",
+    "name": "Soma Jiu-jitsu Academy",
+    "sport": "jiu-jitsu"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289677406,
+   "center": {
+    "lat": 43.8289925,
+    "lon": -111.7768779
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "110",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "North 2nd East",
+    "amenity": "school",
+    "fax": "+1-208-581-8275",
+    "name": "Adams Elementary",
+    "operator": "Madison School District 321",
+    "operator:wikidata": "Q96391397",
+    "phone": "+1-208-359-3335",
+    "website": "https://www.msd321.com/o/aes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289677412,
+   "center": {
+    "lat": 43.8297539,
+    "lon": -111.7745846
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "314",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "East 2nd North",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "denomination": "latter_day_saints",
+    "loc_name": "Rexburg North Stake Center",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "operator": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian"
+   }
+  },
+  {
+   "type": "way",
+   "id": 289677420,
+   "center": {
+    "lat": 43.8322662,
+    "lon": -111.765745
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "315",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "Gary Drive",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian",
+    "website": "https://www.churchofjesuschrist.org/"
+   }
+  },
+  {
+   "type": "way",
+   "id": 290039942,
+   "center": {
+    "lat": 43.8220353,
+    "lon": -111.8039606
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "700",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "Park Street",
+    "air_conditioning": "yes",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "building:levels": "1",
+    "check_date": "2025-05-18",
+    "denomination": "mormon",
+    "internet_access": "wlan",
+    "internet_access:fee": "no",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "opening_hours": "Su 08:30-16:00",
+    "religion": "christian",
+    "website": "https://www.churchofjesuschrist.org/maps/meetinghouses/@43.822114,-111.800612,16&id=meetinghouse:5170664-01-01",
+    "wheelchair": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 290039949,
+   "center": {
+    "lat": 43.817531,
+    "lon": -111.8037365
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "389",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "Mariah Avenue",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "check_date": "2026-04-07",
+    "denomination": "mormon",
+    "loc_name": "Rexburg Married Student 2nd Stake Center",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian",
+    "wheelchair": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 290039957,
+   "center": {
+    "lat": 43.8107593,
+    "lon": -111.7914449
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "289",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "West 7th South",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "check_date": "2026-07-13",
+    "denomination": "mormon",
+    "loc_name": "Rexburg Married Student 3rd Stake Center",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian",
+    "website": "https://www.churchofjesuschrist.org"
+   }
+  },
+  {
+   "type": "way",
+   "id": 290039971,
+   "center": {
+    "lat": 43.8037645,
+    "lon": -111.7799293
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "1070",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "South 2nd East",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian"
+   }
+  },
+  {
+   "type": "way",
+   "id": 290192843,
+   "center": {
+    "lat": 43.8237204,
+    "lon": -111.7826443
+   },
+   "tags": {
+    "amenity": "place_of_worship",
+    "building": "yes",
+    "denomination": "protestant",
+    "name": "Calvary Chapel Rexburg",
+    "religion": "christian",
+    "service_times": "Su 10:00, We 19:00"
+   }
+  },
+  {
+   "type": "way",
+   "id": 290192848,
+   "center": {
+    "lat": 43.822309,
+    "lon": -111.7814221
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "166",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "South 1st East",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "denomination": "latter_day_saints",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian"
+   }
+  },
+  {
+   "type": "way",
+   "id": 299927988,
+   "center": {
+    "lat": 43.8209514,
+    "lon": -111.7860418
+   },
+   "tags": {
+    "leisure": "stadium",
+    "name": "Viking Stadium"
+   }
+  },
+  {
+   "type": "way",
+   "id": 299927997,
+   "center": {
+    "lat": 43.8194094,
+    "lon": -111.7827558
+   },
+   "tags": {
+    "amenity": "library",
+    "building": "yes",
+    "name": "David O. McKay Library"
+   }
+  },
+  {
+   "type": "way",
+   "id": 370930272,
+   "center": {
+    "lat": 43.8222826,
+    "lon": -111.7986121
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Park Street Park"
+   }
+  },
+  {
+   "type": "way",
+   "id": 370932744,
+   "center": {
+    "lat": 43.8316705,
+    "lon": -111.7853559
+   },
+   "tags": {
+    "leisure": "water_park",
+    "name": "Rexburg Rapids"
+   }
+  },
+  {
+   "type": "way",
+   "id": 370970558,
+   "center": {
+    "lat": 43.8245452,
+    "lon": -111.7654049
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Hidden Valley Park"
+   }
+  },
+  {
+   "type": "way",
+   "id": 370984163,
+   "center": {
+    "lat": 43.812865,
+    "lon": -111.7616629
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "612",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "South Hidden Valley Road",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian",
+    "website": "https://www.churchofjesuschrist.org/"
+   }
+  },
+  {
+   "type": "way",
+   "id": 458950944,
+   "center": {
+    "lat": 43.8260977,
+    "lon": -111.7707937
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "450",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "East Main Street",
+    "amenity": "hospital",
+    "emergency": "yes",
+    "healthcare": "hospital",
+    "name": "Madison Memorial Hospital",
+    "opening_hours": "24/7",
+    "phone": "+1 208 359 6900",
+    "website": "https://madisonmemorial.org/"
+   }
+  },
+  {
+   "type": "way",
+   "id": 526905732,
+   "center": {
+    "lat": 43.8056414,
+    "lon": -111.8242629
+   },
+   "tags": {
+    "amenity": "school",
+    "mascot": "Bobcats",
+    "name": "Madison High School"
+   }
+  },
+  {
+   "type": "way",
+   "id": 542838017,
+   "center": {
+    "lat": 43.8362484,
+    "lon": -111.7798415
+   },
+   "tags": {
+    "landuse": "retail",
+    "name": "Teton River Village"
+   }
+  },
+  {
+   "type": "way",
+   "id": 558031337,
+   "center": {
+    "lat": 43.8169022,
+    "lon": -111.8053518
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Oakbrook Pit"
+   }
+  },
+  {
+   "type": "way",
+   "id": 588516827,
+   "center": {
+    "lat": 43.8180852,
+    "lon": -111.7890051
+   },
+   "tags": {
+    "landuse": "retail",
+    "name": "University Plaza"
+   }
+  },
+  {
+   "type": "way",
+   "id": 591094245,
+   "center": {
+    "lat": 43.8254543,
+    "lon": -111.788305
+   },
+   "tags": {
+    "landuse": "retail",
+    "name": "West Main Mall"
+   }
+  },
+  {
+   "type": "way",
+   "id": 621356305,
+   "center": {
+    "lat": 43.8242966,
+    "lon": -111.7843941
+   },
+   "tags": {
+    "landuse": "retail",
+    "name": "T-Rex Plaza"
+   }
+  },
+  {
+   "type": "way",
+   "id": 629089289,
+   "center": {
+    "lat": 43.8198541,
+    "lon": -111.78163
+   },
+   "tags": {
+    "access": "private",
+    "leisure": "playground",
+    "name": "Behavior Study Playground"
+   }
+  },
+  {
+   "type": "way",
+   "id": 725466264,
+   "center": {
+    "lat": 43.8157731,
+    "lon": -111.7817854
+   },
+   "tags": {
+    "leisure": "garden",
+    "name": "Thomas E. Ricks Memorial Gardens"
+   }
+  },
+  {
+   "type": "way",
+   "id": 948854446,
+   "center": {
+    "lat": 43.816456,
+    "lon": -111.8192065
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "454",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "South 12th West",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "check_date": "2025-01-05",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian",
+    "website": "https://www.churchofjesuschrist.org/"
+   }
+  },
+  {
+   "type": "way",
+   "id": 948854452,
+   "center": {
+    "lat": 43.8213753,
+    "lon": -111.8187842
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "210",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "South 12th West",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "check_date": "2025-01-05",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian",
+    "website": "https://www.churchofjesuschrist.org/"
+   }
+  },
+  {
+   "type": "way",
+   "id": 948854458,
+   "center": {
+    "lat": 43.7977438,
+    "lon": -111.8241747
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "2332",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "West 2000 South",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian",
+    "website": "https://www.churchofjesuschrist.org/"
+   }
+  },
+  {
+   "type": "way",
+   "id": 964465430,
+   "center": {
+    "lat": 43.8297543,
+    "lon": -111.7711155
+   },
+   "tags": {
+    "amenity": "school",
+    "denomination": "mormon",
+    "landuse": "religious",
+    "name": "Madison Junior High Seminary",
+    "official_name": "Church of Jesus Christ of Latter-day Saints Seminary",
+    "operator": "Church of Jesus Christ of Latter-da Saints",
+    "religion": "christian"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1037990839,
+   "center": {
+    "lat": 43.8064533,
+    "lon": -111.8059426
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "859",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "South Yellowstone Highway",
+    "addr:unit": "700",
+    "branch": "Rexburg",
+    "brand": "Anytime Fitness",
+    "brand:wikidata": "Q4778364",
+    "building": "yes",
+    "leisure": "fitness_centre",
+    "name": "Anytime Fitness",
+    "phone": "+1 208-656-9675",
+    "ref": "495",
+    "website": "https://www.anytimefitness.com/gyms/495/rexburg-id-83440/"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1038700449,
+   "center": {
+    "lat": 43.8398301,
+    "lon": -111.7774894
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "664",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "North 2nd East",
+    "building": "yes",
+    "check_date": "2026-09-06",
+    "leisure": "fitness_centre",
+    "name": "Fit 1",
+    "opening_hours": "24/7"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1115615127,
+   "center": {
+    "lat": 43.828352,
+    "lon": -111.7639535
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Mill Hollow Park",
+    "operator": "City of Rexburg"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1115619102,
+   "center": {
+    "lat": 43.8073965,
+    "lon": -111.8225243
+   },
+   "tags": {
+    "leisure": "stadium",
+    "name": "Madison Sports Stadium"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1191532425,
+   "center": {
+    "lat": 43.8129688,
+    "lon": -111.7797823
+   },
+   "tags": {
+    "leisure": "garden",
+    "name": "Student Gardens"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1458239754,
+   "center": {
+    "lat": 43.8423288,
+    "lon": -111.8129455
+   },
+   "tags": {
+    "leisure": "golf_course",
+    "name": "Teton Lakes Golf Course"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1496706027,
+   "center": {
+    "lat": 43.8243091,
+    "lon": -111.8001373
+   },
+   "tags": {
+    "access": "permissive",
+    "leisure": "playground",
+    "name": "Kennedy Elementary School playground",
+    "operator": "Kennedy Elementary School"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510614450,
+   "center": {
+    "lat": 43.8362969,
+    "lon": -111.7969997
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Eagle Park"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1554935071,
+   "center": {
+    "lat": 43.8302449,
+    "lon": -111.7694466
+   },
+   "tags": {
+    "addr:city": "Rexburg",
+    "addr:housenumber": "134",
+    "addr:postcode": "83440",
+    "addr:state": "ID",
+    "addr:street": "Madison Avenue",
+    "amenity": "school",
+    "education": "school",
+    "fax": "+1-208-581-8281",
+    "name": "Madison Junior High School",
+    "operator": "Madison School District 321",
+    "operator:wikidata": "Q96391397",
+    "phone": "+1-208-359-3310",
+    "website": "https://www.msd321.com/o/mjh"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1554935081,
+   "center": {
+    "lat": 43.8037753,
+    "lon": -111.7962029
+   },
+   "tags": {
+    "amenity": "place_of_worship",
+    "building": "church",
+    "denomination": "mormon",
+    "name": "The Church of Jesus Christ of Latter-day Saints",
+    "religion": "christian"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 8311245,
+   "center": {
+    "lat": 43.8166761,
+    "lon": -111.7831485
+   },
+   "tags": {
+    "amenity": "university",
+    "ele": "1489",
+    "name": "Brigham Young University - Idaho",
+    "short_name": "BYU",
+    "type": "multipolygon",
+    "wikidata": "Q1029431",
+    "wikipedia": "en:Brigham Young University–Idaho"
+   }
+  }
+ ]
+}

@@ -2,8 +2,9 @@
    Only the newest request of each type is worked on (older ones are dropped while dragging sliders),
    main runs first, then fix comparisons, then the year scan. Results are cached. */
 import { createAtlas, HOURLY } from '../model/atlas';
-import { createRouter, type Router, type Scenario } from '../model/routing';
+import { createRouter, type Router, type Scenario, type ZoneStats } from '../model/routing';
 import { slimeRoads, type RoadCandidate } from '../model/physarum';
+import { measures, type Series } from '../model/overview';
 import type { XZ } from '../model/types';
 
 export type Req =
@@ -12,14 +13,16 @@ export type Req =
   | { type: 'run'; key: string; sc: Scenario; hours?: boolean }
   | { type: 'hours'; key: string; sc: Scenario }
   | { type: 'years'; key: string; sc: Scenario; from: number; to: number }
+  | { type: 'overview'; key: string; sc: Scenario; from: number; to: number }
   | { type: 'compare'; key: string; sc: Scenario; options: { id: string; sc: Scenario }[]; pos?: XZ }
   | { type: 'slime'; key: string; site: XZ; rad?: number; skipNode?: number | null }
   | { type: 'judge'; key: string; sc: Scenario; options: { id: string; sc: Scenario }[] };
 export type Res =
   | { type: 'ready' } | { type: 'error'; error: string }
-  | { type: 'run'; key: string; with: { vol: Float64Array; tti: Float64Array; vht: number; trips?: number }; without: { vol: Float64Array; tti: Float64Array; vht: number }; ms: number }
+  | { type: 'run'; key: string; with: { vol: Float64Array; tti: Float64Array; vht: number; trips?: number; zone?: ZoneStats; flows?: { zone: number; from: Float32Array }[] }; without: { vol: Float64Array; tti: Float64Array; vht: number; zone?: ZoneStats }; ms: number }
   | { type: 'hours'; key: string; hours: { mx: number; avg: number }[] }
   | { type: 'years'; key: string; years: { t: number; vc: Float32Array }[] }
+  | { type: 'overview'; key: string; series: Series }
   | { type: 'compare'; key: string; base: number; options: { id: string; vht: number; vol: Float64Array; worst?: Worst | null; roadVol?: Record<string, { vol: number; vc: number }>; planTrips?: number[] }[]; baseWorst?: Worst | null }
   | { type: 'slime'; key: string; cands: RoadCandidate[]; sinks: number; ms: number }
   | { type: 'judge'; key: string; base: number; options: { id: string; vht: number; planTrips?: number[]; roadVol?: Record<string, { vol: number; vc: number }> }[] };
@@ -33,10 +36,10 @@ function build() {
   R = createRouter(A, graph, zones, cal.calib, hourly);
   cache.clear();
 }
-const ORDER = ['run', 'compare', 'slime', 'years', 'hours'] as const;
+const ORDER = ['run', 'compare', 'slime', 'years', 'hours', 'overview'] as const;
 const pending = new Map<string, Req>(); let busy = false;
 const newerRun = () => pending.has('run');
-const cache = new Map<string, any>();
+const cache = new Map<string, any>(), NEWER = {};
 function remember(k: string, v: any) { cache.set(k, v); if (cache.size > 300) cache.delete(cache.keys().next().value!); return v; }
 const post = (m: Res, tr: Transferable[] = []) => (self as any).postMessage(m, tr);
 
@@ -54,7 +57,7 @@ function handle(m: Req) {
   if (m.type === 'run') {
     const t0 = performance.now();
     const w = runOne(m.sc), wo = runOne({ ...m.sc, withProjects: false });
-    post({ type: 'run', key: m.key, with: { vol: w.vol, tti: w.tti, vht: w.vht, trips: w.trips }, without: { vol: wo.vol, tti: wo.tti, vht: wo.vht }, ms: Math.round(performance.now() - t0) });
+    post({ type: 'run', key: m.key, with: { vol: w.vol, tti: w.tti, vht: w.vht, trips: w.trips, zone: w.zone, flows: w.flows }, without: { vol: wo.vol, tti: wo.tti, vht: wo.vht, zone: wo.zone }, ms: Math.round(performance.now() - t0) });
     if (m.hours) pending.set('hours', { type: 'hours', key: m.key, sc: m.sc });  // the hour bar fills in last
   } else if (m.type === 'hours') {
     {
@@ -75,6 +78,20 @@ function handle(m: Req) {
       years.push({ t: sc.t, vc: Float32Array.from(r.vol, (v: number, i: number) => v / caps[i]) });
     }
     post({ type: 'years', key: m.key, years });
+  } else if (m.type === 'overview') {
+    /* the overview dashboard: congestion measures for every fall, both scenarios, and every hour today and in the selected quarter */
+    const res = (sc: Scenario) => {
+      const vol = runOne(sc).vol as Float64Array, tp = sc.withProjects ? sc.t : Math.min(sc.t, A!.TODAY), caps = A!.capacities(tp, { widen: sc.widen, fixes: sc.fixes });
+      return Array.from(vol, (v, i) => ({ vol: v, cap: caps[i], vc: v / caps[i] }));
+    };
+    const at = (t: number, hour: number, withProjects: boolean) => { if (newerRun()) throw NEWER; return res({ ...m.sc, t, hour, withProjects }); };
+    try {
+      const years: Series['years'] = [];
+      for (let y = m.from; y <= m.to; y++) years.push({ y, grow: measures(A!, at(y + 0.875, m.sc.hour, false)), plans: measures(A!, at(y + 0.875, m.sc.hour, true)) });
+      const nowRes = at(A!.TODAY, m.sc.hour, true);
+      const day = Array.from({ length: 24 }, (_, h) => ({ h, now: measures(A!, at(A!.TODAY, h, true)).delay, then: measures(A!, at(m.sc.t, h, true)).delay }));
+      post({ type: 'overview', key: m.key, series: { years, day, now: measures(A!, nowRes), nowVc: nowRes.map(r => r.vc) } });
+    } catch (e) { if (e !== NEWER) throw e; pending.set('overview', pending.get('overview') || m); }  // finish after the new main run
   } else if (m.type === 'compare') {
     const base = runOne(m.sc).vht;
     /* pos: also report the worst main street within 2 km of it (scene radius 10), for local before/after */

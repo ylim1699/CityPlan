@@ -31,7 +31,9 @@
     "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=707665&dbid=0&repo=Rexburg"
    },
    "foundAt": "2026-11-14",
-   "model": "gemini-3.5-flash-lite"
+   "model": "gemini-3.5-flash-lite",
+   "category": "subdivision",
+   "check": "exact"
   },
   {
    "name": "Moody Townhomes Planned Unit Development (PUD)",
@@ -60,7 +62,9 @@
     "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=707665&dbid=0&repo=Rexburg"
    },
    "foundAt": "2026-11-14",
-   "model": "gemini-3.5-flash-lite"
+   "model": "gemini-3.5-flash-lite",
+   "category": "housing",
+   "check": "exact"
   },
   {
    "name": "Summerfield 14 Plat",
@@ -90,7 +94,534 @@
     "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=707665&dbid=0&repo=Rexburg"
    },
    "foundAt": "2026-11-14",
-   "model": "gemini-3.5-flash-lite"
+   "model": "gemini-3.5-flash-lite",
+   "category": "subdivision",
+   "check": "exact"
+  },
+  {
+   "name": "Summerfield Div 14 Subdivision",
+   "type": "Subdivision",
+   "status": "approved",
+   "where": "620 S 2530 W",
+   "units": 35,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The Planning and Zoning Commission recommended approval to the City Council to subdivide the property into 35 residential lots as part of the Summerfield development.",
+   "quote": "MOTION: Commissioner Casper moved to recommend approval of the Summerfield Division 14 Final Plat, located at approximately 620 South, 2530 West, consisting of 35 residential lots, and forward the recommendation to the City Council for final approval as it has met staff requirements and continues to fit within the Comprehensive Plan.",
+   "page": 5,
+   "confidence": "high",
+   "flags": [
+    "No start year stated in the record",
+    "No completion date in the record",
+    "No acreage stated"
+   ],
+   "id": "ag-summerfield-div-14-subdivision",
+   "foundIn": {
+    "label": "P&Z minutes, August 6 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=710322&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "subdivision",
+   "check": "exact"
+  },
+  {
+   "name": "Moody Townhomes PUD",
+   "type": "Townhomes",
+   "status": "approved",
+   "where": "396 W Moody Rd",
+   "units": 137,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The commission recommended that county commissioners vacate the existing Shirley Subdivision and approve a 137-unit townhome planned unit development.",
+   "quote": "MOTION: Motion to recommend County Commissioners Approve the Moody Townhomes PUD plat as that the project was an appropriate fit for the location adjacent to Highway 20, would provide affordable homeownership opportunities for first-time homebuyers and other residents, met staff requirements, and was consistent with the Comprehensive Plan.",
+   "page": 10,
+   "confidence": "high",
+   "flags": [
+    "No start year stated in the record",
+    "No completion date in the record",
+    "No acreage stated",
+    "Approval is a recommendation to Madison County Commissioners since it is in the impact area"
+   ],
+   "id": "ag-moody-townhomes-pud",
+   "foundIn": {
+    "label": "P&Z minutes, August 6 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=710322&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "housing",
+   "check": "exact"
+  },
+  {
+   "name": "Walmart Wireless Communication Tower CUP",
+   "type": "Commercial",
+   "status": "planned",
+   "where": "Walmart",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": 2026,
+   "endYear": null,
+   "plain": "A wireless communication tower conditional use permit for Walmart is listed as an upcoming item on the heads up schedule for August 20th, 2026.",
+   "quote": "August 20th, 2026 – Walmart Wireless Communication Tower CUP",
+   "page": 11,
+   "confidence": "medium",
+   "flags": [
+    "Mentioned in heads up schedule for a future meeting",
+    "No exact address stated beyond Walmart",
+    "No square footage or dimensions stated"
+   ],
+   "id": "ag-walmart-wireless-communication-tower-cup",
+   "foundIn": {
+    "label": "P&Z minutes, August 6 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=710322&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "utility",
+   "check": "exact"
+  },
+  {
+   "name": "Basic American Annexation",
+   "type": "Annexation",
+   "status": "planned",
+   "where": "Basic American",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": 2026,
+   "endYear": null,
+   "plain": "Basic American Annexation is listed as an upcoming agenda item on the heads up schedule for August 20th, 2026.",
+   "quote": "August 20th, 2026 – Basic American Annexation",
+   "page": 11,
+   "confidence": "low",
+   "flags": [
+    "Mentioned only in heads up schedule for a future meeting",
+    "No location details or acreage provided"
+   ],
+   "id": "ag-basic-american-annexation",
+   "foundIn": {
+    "label": "P&Z minutes, August 6 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=710322&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "zoning only",
+   "check": "missing"
+  },
+  {
+   "name": "Tamana Fields Plat",
+   "type": "Subdivision",
+   "status": "approved",
+   "where": "601 University Blvd",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": 2027.25,
+   "endYear": null,
+   "plain": "A six-lot subdivision containing five commercial lots and one common area is planned near 601 University Boulevard, featuring road and infrastructure extensions.",
+   "quote": "Located at approximately 601 University Blvd, the application is to subdivide the property into 6 lots.",
+   "page": 3,
+   "confidence": "high",
+   "flags": [
+    "No completion date in the record",
+    "Acres not stated in the record"
+   ],
+   "id": "ag-tamana-fields-plat",
+   "foundIn": {
+    "label": "P&Z minutes, October 22 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=716476&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "subdivision",
+   "check": "exact"
+  },
+  {
+   "name": "Comprehensive Plan Map Amendment at 4 W Moody Rd",
+   "type": "Rezoning",
+   "status": "approved",
+   "where": "4 W Moody Rd",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": 5.5,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved a Comprehensive Plan map amendment to change two parcels at 4 W Moody Road from Intermediate Residential to Commercial.",
+   "quote": "Council Member C. Erickson moved to approve Resolution No 2026 — og a Comprehensive Plan Map amendment from Intermediate Residential (IR) to Commercial (C) at approximately 4 W Moody Rd",
+   "page": 11,
+   "confidence": "high",
+   "flags": [
+    "No start year stated",
+    "No completion date stated"
+   ],
+   "id": "ag-comprehensive-plan-map-amendment-at-4-w-",
+   "foundIn": {
+    "label": "City Council minutes, July 1 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=708357&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "zoning only",
+   "check": "exact"
+  },
+  {
+   "name": "Rezone at 4 W Moody Rd",
+   "type": "Rezoning",
+   "status": "approved",
+   "where": "4 W Moody Rd",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": 5.5,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved rezoning two parcels at 4 W Moody Road from Light Industrial and Medium Density Residential 2 to Community Business Center.",
+   "quote": "Council Member Riggins moved to approve Ordinance No 1352 a rezone from Light Industrial (LI) and Medium Density Residential 2 (MDR2) to Community Business Center (CBC) zone at approximately 4 W Moody Rd and consider first read",
+   "page": 12,
+   "confidence": "high",
+   "flags": [
+    "No start year stated",
+    "No completion date stated"
+   ],
+   "id": "ag-rezone-at-4-w-moody-rd",
+   "foundIn": {
+    "label": "City Council minutes, July 1 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=708357&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "zoning only",
+   "check": "exact"
+  },
+  {
+   "name": "University Towne Center Plat",
+   "type": "Subdivision",
+   "status": "approved",
+   "where": "901 S Yellowstone Hwy",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved subdividing the University Towne Center property at 901 S Yellowstone Highway into 10 lots.",
+   "quote": "Council Member Reeser moved to approve the University Towne Center Plat located at approximately got S Yellowstone Hwy, the application is to subdivide the property into (io) lots",
+   "page": 13,
+   "confidence": "high",
+   "flags": [
+    "No acreage stated",
+    "No start year stated",
+    "No completion date stated"
+   ],
+   "id": "ag-university-towne-center-plat",
+   "foundIn": {
+    "label": "City Council minutes, July 1 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=708357&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "subdivision",
+   "check": "exact"
+  },
+  {
+   "name": "Vacate a Portion of the Sky Meadows Plat",
+   "type": "Subdivision vacation",
+   "status": "approved",
+   "where": "1228 Stone Dr",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved vacating a portion of the Sky Meadows Plat located at 1228 Stone Drive.",
+   "quote": "Council Member Johnson moved to approve Ordinance No 1348 Vacate a Portion of the Sky Meadows Plat at Approximately 1228 Stone Dr. and consider second read",
+   "page": 15,
+   "confidence": "high",
+   "flags": [
+    "No start year stated",
+    "No completion date stated"
+   ],
+   "id": "ag-vacate-a-portion-of-the-sky-meadows-plat",
+   "foundIn": {
+    "label": "City Council minutes, July 1 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=708357&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "zoning only",
+   "check": "exact"
+  },
+  {
+   "name": "Rezone 509-539 S 5th W",
+   "type": "Rezoning",
+   "status": "approved",
+   "where": "509-539 S 5th W",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved rezoning 509-539 S 5th W from High Density Residential 1 to High Density Residential 2.",
+   "quote": "Council Member Riggins moved to approve Ordinance No 1349 Rezone 509-539 S 5th W from High Density Residential 1 (HDR1) to High Density Residential 2 (HDR2) Zone and consider second read",
+   "page": 16,
+   "confidence": "high",
+   "flags": [
+    "No start year stated",
+    "No completion date stated"
+   ],
+   "id": "ag-rezone-509-539-s-5th-w",
+   "foundIn": {
+    "label": "City Council minutes, July 1 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=708357&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "zoning only",
+   "check": "close"
+  },
+  {
+   "name": "9th East Bridge Project",
+   "type": "Road work",
+   "status": "approved",
+   "where": "9th East between 7th North and Barney Dairy Road",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved a local grant agreement to construct the 9th East bridge and roadway between 7th North and Barney Dairy Road, allowing the project to proceed to bidding.",
+   "quote": "Public Works Director Davidson presented a resolution to enter into a local grant agreement with the state for the 9th East project between 7th North and Barney Dairy Road. The project includes construction of the roadway and a bridge across the river.",
+   "page": 6,
+   "confidence": "high",
+   "flags": [
+    "No start date in the record",
+    "No completion date in the record"
+   ],
+   "id": "ag-9th-east-bridge-project",
+   "foundIn": {
+    "label": "City Council minutes, August 5 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=710595&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "road or trail",
+   "check": "exact"
+  },
+  {
+   "name": "Home Depot Subdivision Plat",
+   "type": "Subdivision",
+   "status": "approved",
+   "where": "approximately 901 S Yellowstone Hwy",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved subdividing property located at approximately 901 S Yellowstone Highway into six lots, with construction already underway.",
+   "quote": "P&Z Administrator Parkinson reviewed the plat for property located east of the temple under construction near the North Rexburg Interchange. The property includes multiple parcels that would be divided according to the proposed Plat. Construction has already begun on the development. Home Depot owns its individual lot within the development and is included in the plat as the anchor store.",
+   "page": 8,
+   "confidence": "high",
+   "flags": [
+    "No start date in the record",
+    "No completion date in the record"
+   ],
+   "id": "ag-home-depot-subdivision-plat",
+   "foundIn": {
+    "label": "City Council minutes, August 5 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=710595&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "subdivision",
+   "check": "exact"
+  },
+  {
+   "name": "Summerfield Division 14 Subdivision Plat",
+   "type": "Subdivision",
+   "status": "approved",
+   "where": "approximately 620 S 2530 W",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": 13.17,
+   "startYear": null,
+   "endYear": null,
+   "plain": "A 13.17-acre property located at approximately 620 S 2530 W was approved to be subdivided into 35 lots.",
+   "quote": "City Planner Kyle Baldwin reviewed another plat within the Summerfield development. The proposed plat consists of approximately 13.17 acres and the property will be divided into 35 lots.",
+   "page": 5,
+   "confidence": "high",
+   "flags": [
+    "No start year stated",
+    "No completion date stated"
+   ],
+   "id": "ag-summerfield-division-14-subdivision-plat",
+   "foundIn": {
+    "label": "City Council minutes, August 19 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=715659&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "subdivision",
+   "check": "exact"
+  },
+  {
+   "name": "Walmart Wireless Communication Cell Tower",
+   "type": "Cell tower",
+   "status": "approved",
+   "where": "Approximately 1450 N 2nd East",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": 0.05,
+   "startYear": null,
+   "endYear": null,
+   "plain": "A new wireless communication cell tower is approved to be constructed in the Northeast corner of the Walmart property.",
+   "quote": "Council Member Riggins moved to approve a Conditional Use Permit (CUP) for a cell tower in Regional Business Center (RBC) zone located at approximately 145o N 2nd E in the City of Rexburg; Council Member Johnson seconded the motion; Mayor Merrill asked for a vote: ... The motion carried.",
+   "page": 24,
+   "confidence": "high",
+   "flags": [
+    "No start year stated",
+    "No completion date stated"
+   ],
+   "id": "ag-walmart-wireless-communication-cell-towe",
+   "foundIn": {
+    "label": "City Council minutes, September 2 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=715661&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "utility",
+   "check": "exact"
+  },
+  {
+   "name": "Teton River Connecting Path and Pedestrian Bridge Project #A024(684)",
+   "type": "Road work",
+   "status": "approved",
+   "where": "North side of the Teton River near Albertsons",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved an agreement with Forsgren Associates to design a pathway extension and pedestrian bridge along the north side of the Teton River.",
+   "quote": "Council Member Johnson moved to approve the ITD Local Professional Services Agreement for Forsgren Associates to design the Teton River Connecting Path and Pedestrian Bridge Project; Council President E. Erickson seconded the motion; Mayor Merrill asked for a vote: ... The motion carried.",
+   "page": 22,
+   "confidence": "high",
+   "flags": [
+    "No start year stated",
+    "No completion date stated"
+   ],
+   "id": "ag-teton-river-connecting-path-and-pedestri",
+   "foundIn": {
+    "label": "City Council minutes, September 2 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=715661&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "road or trail",
+   "check": "exact"
+  },
+  {
+   "name": "Wastewater Treatment Plant's dewatering replacement and drying upgrade design contract",
+   "type": "Infrastructure",
+   "status": "approved",
+   "where": "Wastewater Treatment Plant",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": null,
+   "endYear": null,
+   "plain": "The city approved a design contract for upgrades to the wastewater treatment plant's biosolids handling and drying process.",
+   "quote": "Council Member C. Erickson moved to approve the Contract for the design of the Wastewater Treatment Plant's dewatering replacement and drying upgrade; Council Member Riggins seconded the motion",
+   "page": 11,
+   "confidence": "high",
+   "flags": [
+    "No start year stated",
+    "No end year stated"
+   ],
+   "id": "ag-wastewater-treatment-plant-s-dewatering-",
+   "foundIn": {
+    "label": "City Council minutes, September 16 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=715665&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "utility",
+   "check": "exact"
+  },
+  {
+   "name": "Idaho Transportation Department FTA 5311 Rural Funding Agreement #02771RX for Public Transportation Study",
+   "type": "Transportation study",
+   "status": "approved",
+   "where": "Rexburg",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": 2026.75,
+   "endYear": 2028.75,
+   "plain": "The city approved a grant agreement and budget adjustment for a two-year public transportation study.",
+   "quote": "Council President E. Erickson moved to approve the Idaho Transportation Department FTA 5311 Rural Funding Agreement #02771RX and Fiscal Year 2027 Budget Adjustment for Public Transportation Study; Council Member Tietjen seconded the motion",
+   "page": 12,
+   "confidence": "high",
+   "flags": [
+    "Start year inferred from grant period beginning October 1"
+   ],
+   "id": "ag-idaho-transportation-department-fta-5311",
+   "foundIn": {
+    "label": "City Council minutes, September 16 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=715665&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "study or plan",
+   "check": "exact"
+  },
+  {
+   "name": "Teton River Trails & Bridge Design",
+   "type": "Trail and bridge design",
+   "status": "approved",
+   "where": "North side of the Teton River at Albertsons east to the new Teton River Park Area",
+   "units": null,
+   "beds": null,
+   "sqft": null,
+   "acres": null,
+   "startYear": 2027,
+   "endYear": 2028,
+   "plain": "The city approved funding for the design phase of a new trail and pedestrian bridge along the north side of the Teton River, with construction expected in 2028.",
+   "quote": "This budget adjustment is for Design Only of the trail on the north side of the Teton River at Albertsons east to our new Teton River Park Area where a new pedestrian bridge would be part of this design. The design is for $458,969 and should be completed by next summer sometime in 2027. Construction would be in Fiscal Year 2028 and is estimated at $806,000.",
+   "page": 3,
+   "confidence": "high",
+   "flags": [
+    "Design start year is implied by fiscal year 2027 and completion note"
+   ],
+   "id": "ag-teton-river-trails-bridge-design",
+   "foundIn": {
+    "label": "City Council minutes, October 21 2026",
+    "url": "https://laserfiche.rexburg.org/WebLink/DocView.aspx?id=717774&dbid=0&repo=Rexburg"
+   },
+   "foundAt": "2026-11-14",
+   "model": "gemini-3.5-flash-lite",
+   "category": "road or trail",
+   "check": "close"
   }
  ]
 }

@@ -1,5 +1,5 @@
 /* Planner workspace (year strip, ghost tools, ghost labels) */
-.yearstrip{position:absolute;left:calc(12px + var(--L));right:calc(12px + var(--R));bottom:96px;padding:8px 12px;display:grid;gap:6px}
+.yearstrip{position:absolute;left:calc(12px + var(--Lo));right:calc(12px + var(--Ro));bottom:96px;padding:8px 12px;display:grid;gap:6px}
 .ys-ctl{display:flex;gap:10px;align-items:center}
 .ys-ctl input{flex:1;accent-color:#d4861c;min-width:80px}
 .ys-ctl input:disabled{opacity:.35}
@@ -15,7 +15,7 @@
 .zoning-banner{border:1.5px solid #cf552d;background:repeating-linear-gradient(135deg,rgba(207,85,45,.16) 0 10px,rgba(207,85,45,.08) 10px 20px);color:#f3c2ad;border-radius:8px;padding:9px 11px;font-size:12px;line-height:1.4}
 .zoning-banner b{color:#ff9a6e;letter-spacing:.02em}
 .zoning-banner.err{background:rgba(208,83,46,.22);border-color:#ff5a2a;color:#ffd0bd}
-.seg.wrap{flex-wrap:wrap}
+.seg.wrap{flex-wrap:wrap;border-radius:16px}
 .mini[aria-pressed="true"]{background:rgba(233,178,95,.22)}
 .ghostrow{cursor:pointer}
 .ghostrow.on{background:rgba(240,140,58,.1);outline:1px solid rgba(240,140,58,.6)}

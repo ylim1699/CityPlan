@@ -4,19 +4,34 @@ import * as T from 'three';
 import { MapControls } from 'three/examples/jsm/controls/OrbitControls';
 import type { Atlas } from '../model/atlas';
 import type { SegResult, XZ } from '../model/types';
-import type { State } from '../state';
-import { CCOL, daylight, pStatus } from '../ui';
+import { congOf, type State } from '../state';
+import { CCOL, daylight, hourLabel, pStatus } from '../ui';
 import { buildTerrain, type TerrainFile } from './terrain';
 import { buildTrees } from './trees';
 import { createGhostLayer, type GhostDraw, type GhostEvent, type Highlight } from '../planner/ghostLayer';
+import { createBlockLayer, density, densityClass, DENSITY } from './blockLayer';
+import type { BlockGroup } from '../model/types';
+import { createZoneLayer, ZONE_EMPTY, ZONE_PEOPLE } from './zoneLayer';
+import type { ZonesFile, ZoneStats } from '../model/routing';
 
-export type ViewEls = { canvas: HTMLCanvasElement; overlay: HTMLElement; app: HTMLElement; compass: HTMLElement };
+/* plain names for the road classes, for the street hover label */
+const ROAD_TYPE: Record<string, string> = { highway: 'Highway', arterial: 'Major arterial', minor: 'Minor arterial', collector: 'Collector', ramp: 'Ramp', local: 'Local street' };
+
+export type ViewEls = { canvas: HTMLCanvasElement; overlay: HTMLElement; app: HTMLElement };
 export type View = { apply: (shown: SegResult[], tp: number) => void; flyTo: (pos: XZ) => void; pick: (cb: ((pos: XZ) => void) | null) => void; dispose: () => void;
   /* Planner ghosts (src/planner) */
   setGhosts: (list: GhostDraw[], sel: string | null) => void; onGhost: (cb: ((e: GhostEvent) => void) | null) => void; target: () => XZ;
-  setHighlight: (list: Highlight[]) => void };
+  setHighlight: (list: Highlight[]) => void;
+  /* trip zones layer: people and car trips per zone from the latest routing run */
+  setZoneStats: (z: ZoneStats | null) => void;
+  /* the map search result: a pin with its name, or null to clear it */
+  mark: (pos: XZ | null, label?: string) => void;
+  /* Shopping filter: arcs from where shoppers come from to one store, n = car trips a day; null clears them */
+  setFlows: (list: Flow[] | null) => void };
+export type Flow = { a: XZ; b: XZ; n: number };
 
-export function createView(els: ViewEls, A: Atlas, getState: () => State, onSelect: (id: string) => void): View | null {
+export function createView(els: ViewEls, A: Atlas, getState: () => State, onSelect: (id: string) => void,
+  blocks: BlockGroup[] | null = null, onBlock: (id: string | null) => void = () => {}, zones: ZonesFile | null = null): View | null {
   const canvas = els.canvas;
   let renderer: T.WebGLRenderer;
   try { renderer = new T.WebGLRenderer({ canvas, antialias: true }); } catch (e) { return null; }
@@ -105,12 +120,161 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   const EXW = 1.5;
   const curbGeo = ribbons(A.SEGS.filter(s => s.road.cls !== 'highway' && s.road.cls !== 'ramp').map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW * 1.4 })), 0.024); curbGeo.computeVertexNormals();
   const curb = new T.Mesh(curbGeo, reg(new T.MeshLambertMaterial({ color: 0x8b867c, depthWrite: false }), 0x8b867c)); curb.renderOrder = 2; curb.receiveShadow = true; scene.add(curb);
-  const asphaltGeo = ribbons(A.SEGS.map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW })), 0.027); asphaltGeo.computeVertexNormals();
-  const asphalt = new T.Mesh(asphaltGeo, reg(new T.MeshLambertMaterial({ color: 0x3b3936, depthWrite: false }), 0x3b3936)); asphalt.renderOrder = 3; asphalt.receiveShadow = true; scene.add(asphalt);
-  const roadGeo = ribbons(A.SEGS.map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW * 0.58 })), 0.03, true);
-  const roadMat = new T.MeshBasicMaterial({ vertexColors: true, depthWrite: false });
-  const roadMesh = new T.Mesh(roadGeo, roadMat); roadMesh.renderOrder = 4; scene.add(roadMesh);
+  /* Asphalt and the load band keep a minimum width on screen (uPx = scene units per pixel at the view target, set in
+     frame()), so loads stay readable zoomed out, at night and at dawn; the wider dark asphalt reads as a casing. */
+  const PXU = { uPx: { value: 0.01 } };
+  const MINPX: Record<string, number> = { highway: 2.6, arterial: 2.4, minor: 2.1, collector: 1.9, ramp: 1.6, local: 0.8 };
+  type WLn = Ln & { px: number };
+  function wideRibbons(lines: WLn[], y: number, withColor?: boolean) {
+    const pos: number[] = [], side: number[] = [], wd: number[] = [], nrm: number[] = [];
+    lines.forEach(ln => {
+      const dx = ln.b[0] - ln.a[0], dz = ln.b[1] - ln.a[1], l = Math.hypot(dx, dz) || 1e-6, ux = dx / l, uz = dz / l, nx = -uz, nz = ux;
+      const c = (p: XZ, su: number, sn: number) => { pos.push(p[0], y, p[1]); side.push(ux * su * 0.8 + nx * sn, 0, uz * su * 0.8 + nz * sn); wd.push(ln.w / 2, ln.px); nrm.push(0, 1, 0); };
+      c(ln.a, -1, 1); c(ln.b, 1, 1); c(ln.b, 1, -1); c(ln.a, -1, 1); c(ln.b, 1, -1); c(ln.a, -1, -1);
+    });
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    g.setAttribute('side', new T.Float32BufferAttribute(side, 3)); g.setAttribute('wd', new T.Float32BufferAttribute(wd, 2)); g.setAttribute('normal', new T.Float32BufferAttribute(nrm, 3));
+    if (withColor) g.setAttribute('color', new T.Float32BufferAttribute(new Float32Array(pos.length), 3));
+    g.boundingSphere = new T.Sphere(new T.Vector3(), 1e4);  /* widened in the shader, so never cull it */
+    return g;
+  }
+  function widen<M extends T.Material>(m: M): M {
+    m.onBeforeCompile = (sh: any) => {
+      sh.uniforms.uPx = PXU.uPx;
+      sh.vertexShader = 'uniform float uPx;\nattribute vec3 side;\nattribute vec2 wd;\n' + sh.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = position + side * max(wd.x, wd.y * uPx);');
+    };
+    return m;
+  }
+  const segLines = (f: number, px: number) => A.SEGS.map(s => ({ a: s.a, b: s.b, w: s.road.c.w * S * EXW * f, px: (MINPX[s.road.cls] || 1.2) + px }));
+  const asphalt = new T.Mesh(wideRibbons(segLines(1.05, 1.3), 0.027), widen(reg(new T.MeshLambertMaterial({ color: 0x2a2826, depthWrite: false }), 0x2a2826)));
+  asphalt.renderOrder = 3; asphalt.receiveShadow = true; asphalt.frustumCulled = false; scene.add(asphalt);
+  const roadGeo = wideRibbons(segLines(0.72, 0), 0.03, true);
+  const roadMat = widen(new T.MeshBasicMaterial({ vertexColors: true, depthWrite: false, fog: false }));
+  const roadMesh = new T.Mesh(roadGeo, roadMat); roadMesh.renderOrder = 4; roadMesh.frustumCulled = false; scene.add(roadMesh);
   const roadCol = roadGeo.getAttribute('color') as T.BufferAttribute;
+
+  /* Hover a street: the whole street (by name) lifts out with a white casing, a wider band and a label */
+  const byName = new Map<string, number[]>();
+  A.SEGS.forEach((s, i) => { const k = s.road.name || '#' + s.road.id; const l = byName.get(k); if (l) l.push(i); else byName.set(k, [i]); });
+  const hover = { key: '', segs: [] as number[], seg: -1, group: new T.Group(), band: null as T.Mesh | null, x: 0, y: 0, dirty: false, inside: false };
+  const hoverCase = widen(new T.MeshBasicMaterial({ color: 0xffffff, depthWrite: false, depthTest: false, fog: false }));
+  const hoverBand = widen(new T.MeshBasicMaterial({ vertexColors: true, depthWrite: false, depthTest: false, fog: false }));
+  scene.add(hover.group);
+  const tip = document.createElement('div'); tip.className = 'roadtip'; tip.style.display = 'none';  /* added to the overlay once it is cleared below */
+  /* Census block groups (Filter > Census blocks): hover one for a summary, click it for the details panel */
+  const bl = createBlockLayer(scene, S); if (blocks) bl.set(blocks);
+  let blockHover = -1;
+  function setBlockHover(i: number) {
+    if (i === blockHover) return;
+    blockHover = i; bl.hover(i); canvas.style.cursor = picker ? 'crosshair' : i >= 0 ? 'pointer' : ''; showTip();
+  }
+  function pickBlock() {
+    hRay.setFromCamera(hNdc, camera);
+    return hRay.ray.intersectPlane(hPlane, hHit) ? bl.pick([hHit.x, hHit.z]) : -1;
+  }
+  const fmtN = (v: number) => Math.round(v).toLocaleString('en-US');
+  /* Trip zones (Filter > Trip zones): the traffic model's zones, hover one for its people, jobs and car trips */
+  const zl = createZoneLayer(scene, S); if (zones && blocks) zl.set(zones, blocks, C.campus);
+  let zoneHover = -1;
+  function setZoneHover(i: number) {
+    if (i === zoneHover) return;
+    zoneHover = i; zl.hover(i); canvas.style.cursor = picker ? 'crosshair' : i >= 0 ? 'pointer' : ''; showTip();
+  }
+  function pickZone() {
+    hRay.setFromCamera(hNdc, camera);
+    return hRay.ray.intersectPlane(hPlane, hHit) ? zl.pick([hHit.x, hHit.z]) : -1;
+  }
+  function showZoneTip() {
+    const z = zl.info(zoneHover);
+    if (!z) { tip.style.display = 'none'; return; }
+    tip.innerHTML = '<b></b><em></em><span><i></i></span>';
+    tip.querySelector('b')!.textContent = z.a.name;
+    tip.querySelector('em')!.textContent = z.a.kind === 'campus' ? 'Trip zone · 4 model zones, a destination for class trips'
+      : z.a.kind === 'gateway' ? 'Trip zone · traffic from outside the map' + (z.a.aadt ? ' · ' + fmtN(z.a.aadt) + ' vehicles a day counted' : '')
+      : 'Trip zone · the block group cut by a 1.2 km grid';
+    (tip.querySelector('i') as HTMLElement).style.background = z.k >= 0 ? ZONE_PEOPLE[z.k].color : ZONE_EMPTY;
+    tip.querySelector('span')!.append(z.a.kind === 'gateway' ? 'No residents (edge of the map)' : fmtN(z.res + z.stu) + ' people · ' + fmtN(z.res) + ' residents, ' + fmtN(z.stu) + ' students');
+    const line = (t: string) => { const s = document.createElement('small'); s.style.display = 'block'; s.textContent = t; tip.appendChild(s); };
+    if (z.a.kind !== 'gateway') line(fmtN(z.workers) + ' workers live here · ' + fmtN(z.jobs) + ' jobs here (LODES 2023)');
+    if (z.trips) {
+      line('Car trips at ' + hourLabel(z.trips.hour) + ': ' + fmtN(z.trips.out * z.trips.share) + ' leaving · ' + fmtN(z.trips.inn * z.trips.share) + ' arriving');
+      line('Per day: ' + fmtN(z.trips.out) + ' leaving · ' + fmtN(z.trips.inn) + ' arriving');
+    } else line('Car trips: waiting for the routed run');
+    if (z.a.kind === 'town') line('People are estimated from building floor area, scaled to the city totals');
+    tip.style.display = 'block'; tip.style.left = hover.x + 'px'; tip.style.top = hover.y + 'px';
+  }
+  function showBlockTip() {
+    const b = blockHover >= 0 ? bl.get(blockHover) : null;
+    if (!b) { tip.style.display = 'none'; return; }
+    const d = density(b), k = densityClass(b);
+    tip.innerHTML = '<b></b><span><i></i></span><small></small>';
+    tip.querySelector('b')!.textContent = b.name;
+    (tip.querySelector('i') as HTMLElement).style.background = k >= 0 ? DENSITY[k].color : '#9aa3ad';
+    tip.querySelector('span')!.append(b.pop == null ? 'Population not published' : fmtN(b.pop) + ' people (estimate ±' + fmtN(b.popMoe ?? 0) + ')' + (d != null ? ' · ' + fmtN(d) + ' per km²' : ''));
+    tip.querySelector('small')!.textContent = (b.pop2020 != null ? '2020 Census count: ' + fmtN(b.pop2020) + ' · ' : '') + 'Click for details';
+    tip.style.display = 'block'; tip.style.left = hover.x + 'px'; tip.style.top = hover.y + 'px';
+  }
+  function setHover(seg: number) {
+    const key = seg < 0 ? '' : A.SEGS[seg].road.name || '#' + A.SEGS[seg].road.id;
+    hover.seg = seg;
+    if (key !== hover.key) {
+      hover.key = key; hover.group.children.forEach(m => (m as T.Mesh).geometry.dispose()); hover.group.clear(); hover.band = null;
+      hover.segs = key ? byName.get(key)! : [];
+      if (hover.segs.length) {
+        const ls = (f: number, px: number) => hover.segs.map(i => { const s = A.SEGS[i]; return { a: s.a, b: s.b, w: s.road.c.w * S * EXW * f, px: (MINPX[s.road.cls] || 1.2) + px }; });
+        const cs = new T.Mesh(wideRibbons(ls(1.2, 3), 0.034), hoverCase), bd = new T.Mesh(wideRibbons(ls(0.9, 1.6), 0.036, true), hoverBand);
+        cs.renderOrder = 8; bd.renderOrder = 9; cs.frustumCulled = bd.frustumCulled = false; hover.group.add(cs, bd); hover.band = bd; syncHover();
+      }
+    }
+    showTip();
+  }
+  function syncHover() {  /* the lifted band shows the same (fading) load colors */
+    if (!hover.band) return;
+    const src = roadCol.array as Float32Array, dst = (hover.band.geometry.getAttribute('color') as T.BufferAttribute);
+    const d = dst.array as Float32Array;
+    hover.segs.forEach((i, k) => { const f = A.SEGS[i].road.cls === 'local' ? 1 / 0.62 : 1; for (let v = 0; v < 18; v++) d[k * 18 + v] = Math.min(1, src[i * 18 + v] * f); });
+    dst.needsUpdate = true;
+  }
+  function showTip() {
+    if (hover.seg < 0) { if (zoneHover >= 0) showZoneTip(); else showBlockTip(); return; }
+    if (!lastRes) { tip.style.display = 'none'; return; }
+    const sg = A.SEGS[hover.seg], r = lastRes[hover.seg], lv = A.level(r.vc);
+    let worst = 0; hover.segs.forEach(i => { worst = Math.max(worst, lastRes![i].vc); });
+    const rd = sg.road, lanesAssumed = rd.laneBasis.startsWith('assumed');
+    tip.innerHTML = '<b></b><em></em><span><i></i></span><small></small>';
+    tip.querySelector('b')!.textContent = rd.name || 'Unnamed street';
+    /* road type, speed limit and through lanes; "assumed" where OpenStreetMap has no tag */
+    tip.querySelector('em')!.textContent = ROAD_TYPE[rd.cls] + ' · ' + rd.mph + ' mph' + (rd.mphTagged ? '' : ' (assumed)') + ' · '
+      + rd.lanes + (rd.lanes === 1 ? ' lane' : ' lanes') + (rd.oneway ? ', one-way' : '') + (lanesAssumed ? ' (assumed)' : '');
+    (tip.querySelector('i') as HTMLElement).style.background = CCOL[lv.key];
+    tip.querySelector('span')!.append(Math.round(r.vc * 100) + '% of capacity here · ' + lv.label);
+    tip.querySelector('small')!.textContent = hover.segs.length > 1 ? 'Busiest stretch ' + Math.round(worst * 100) + '%' : '';
+    tip.style.display = 'block'; tip.style.left = hover.x + 'px'; tip.style.top = hover.y + 'px';
+  }
+  const hRay = new T.Raycaster(), hNdc = new T.Vector2(), hPlane = new T.Plane(new T.Vector3(0, 1, 0), 0), hHit = new T.Vector3();
+  function pickRoad() {  /* nearest street segment to the pointer on the ground, within about 7 px */
+    hRay.setFromCamera(hNdc, camera);
+    if (!hRay.ray.intersectPlane(hPlane, hHit)) return -1;
+    const px = hHit.x, pz = hHit.z, lim = Math.max(0.02, PXU.uPx.value * 7);
+    let best = -1, bd = lim * lim;
+    A.SEGS.forEach((s, i) => {
+      const ax = s.a[0], az = s.a[1], dx = s.b[0] - ax, dz = s.b[1] - az, L = dx * dx + dz * dz || 1e-9;
+      const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / L)), ex = ax + dx * t - px, ez = az + dz * t - pz, d2 = ex * ex + ez * ez;
+      const hw = Math.max(s.road.c.w * S * EXW * 0.5, PXU.uPx.value * (MINPX[s.road.cls] || 1.2));
+      if (d2 < bd + hw * hw) { bd = d2; best = i; }
+    });
+    return best;
+  }
+  const onMove = (e: PointerEvent) => {
+    if (e.buttons) { if (hover.seg >= 0) setHover(-1); setBlockHover(-1); setZoneHover(-1); return; }  /* dragging the map: no hover */
+    const r = canvas.getBoundingClientRect();
+    hover.x = e.clientX - r.left; hover.y = e.clientY - r.top; hover.inside = true;
+    hNdc.set(hover.x / r.width * 2 - 1, -(hover.y / r.height) * 2 + 1); hover.dirty = true;
+  };
+  const onLeave = () => { hover.inside = false; hover.dirty = false; setHover(-1); setBlockHover(-1); setZoneHover(-1); };
+  canvas.addEventListener('pointermove', onMove); canvas.addEventListener('pointerleave', onLeave);
+  /* road colors fade to new loads instead of snapping (apply() sets the goal, frame() eases toward it) */
+  const roadGoal = new Float32Array(roadCol.array.length); let roadFade = false, roadInit = false;
 
   /* Streetlights (from the UI sandbox): warm sodium on main roads, whiter LED on side streets, shown at night */
   const glowTex = (() => {
@@ -128,6 +292,45 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   const slGeo = new T.BufferGeometry(); slGeo.setAttribute('position', new T.Float32BufferAttribute(sl, 3)); slGeo.setAttribute('color', new T.Float32BufferAttribute(slc, 3));
   const slMat = new T.PointsMaterial({ size: 0.26, map: glowTex, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, sizeAttenuation: true });
   const slPts = new T.Points(slGeo, slMat); slPts.renderOrder = 5; slPts.visible = false; scene.add(slPts);
+
+  /* Traffic signals from OpenStreetMap, one per signalized intersection: a dark pole on the corner with a lamp
+     that cycles green, yellow, red (each intersection on its own offset), drawn at a steady size on screen */
+  const SIG = C.signals || [], sigH = 7 * A.VEX * S, sigOff = 9 * S, sigCycle = 24;
+  const poleG = new T.CylinderGeometry(0.5, 0.5, 1, 5); poleG.translate(0, 0.5, 0);
+  const sigPoles = new T.InstancedMesh(poleG, new T.MeshLambertMaterial({ color: 0x2b2a28 }), Math.max(1, SIG.length));
+  const sigPos: number[] = [], sigM4 = new T.Matrix4(), sigQ = new T.Quaternion(), sigV = new T.Vector3(), sigSc = new T.Vector3(S * 1.4, sigH, S * 1.4);
+  SIG.forEach(([x, z], k) => {
+    sigV.set(x * S + sigOff, 0, z * S + sigOff); sigM4.compose(sigV, sigQ, sigSc); sigPoles.setMatrixAt(k, sigM4);
+    sigPos.push(sigV.x, sigH, sigV.z);
+  });
+  sigPoles.count = SIG.length; sigPoles.instanceMatrix.needsUpdate = true; scene.add(sigPoles);
+  /* the icon on top: a signal head (red, yellow, green lamps, the current one lit), one point set per lit lamp */
+  const sigIcon = (lit: number) => {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d')!;
+    x.fillStyle = '#161513'; x.strokeStyle = '#f2ead8'; x.lineWidth = 3;
+    x.beginPath(); x.roundRect(19, 2, 26, 60, 7); x.fill(); x.stroke();
+    ['#ff4436', '#ffc23a', '#3ddc6b'].forEach((col, k) => {
+      x.globalAlpha = k === lit ? 1 : 0.22; x.fillStyle = col;
+      x.beginPath(); x.arc(32, 13 + k * 19, 7.5, 0, Math.PI * 2); x.fill();
+    });
+    return new T.CanvasTexture(c);
+  };
+  const sigPx = renderer.getPixelRatio();  /* fixed size on screen, like a map pin */
+  const sigSets = [0, 1, 2].map(lit => {
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(new Float32Array(sigPos.length), 3));
+    const pts = new T.Points(g, new T.PointsMaterial({ size: 24 * sigPx, map: sigIcon(lit), transparent: true, alphaTest: 0.05, depthWrite: false, sizeAttenuation: false }));
+    pts.renderOrder = 7; pts.frustumCulled = false; scene.add(pts); return pts;
+  });
+  let sigT = 0;
+  function paintSignals() {
+    const n = [0, 0, 0], arrs = sigSets.map(p => p.geometry.getAttribute('position').array as Float32Array);
+    SIG.forEach((_, k) => {
+      const ph = (sigT / sigCycle + k * 0.37) % 1, lit = ph < 0.45 ? 2 : ph < 0.55 ? 1 : 0, o = n[lit]++ * 3;
+      arrs[lit][o] = sigPos[k * 3]; arrs[lit][o + 1] = sigPos[k * 3 + 1]; arrs[lit][o + 2] = sigPos[k * 3 + 2];
+    });
+    sigSets.forEach((p, lit) => { p.geometry.setDrawRange(0, n[lit]); p.geometry.getAttribute('position').needsUpdate = true; });
+  }
+  paintSignals();
 
   /* Windows drawn by the shader (from the UI sandbox): a grid of panes on every wall above 0.7 m,
      glass by day; at night a share of them lights up (uNight, uLit are set by apply()). */
@@ -165,7 +368,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     cols([0xc9c6bf, 0xa8a49b, 0xd9d4c8, 0x8f9aa3, 0xb5a58a, 0x7d8890, 0xe2ded4]), cols([0xe8e2d6, 0xc9b89a, 0x9b5a43]),
     cols([0xa39d92, 0x8f8a80, 0xb3ab9c]), cols([0xa3a7ab, 0x8e959b, 0xb8b2a5, 0x9a8f80])];
   const ROOF_GREY = new T.Color(0x7b7b79), ROOF_ALT = cols([0x5a4a3e, 0x9a5b45, 0x5d6670, 0x4f4a45]), ROOF_FLAT = cols([0xcfcdc6, 0xa9a8a3, 0x8f8f8c]);
-  const bp: number[] = [], bc: number[] = [], bw: number[] = [], wallC = new T.Color(), roofC = new T.Color();
+  const bp: number[] = [], bc: number[] = [], bw: number[] = [], ep: number[] = [], wallC = new T.Color(), roofC = new T.Color();
   C.buildings.forEach((b, bi) => {
     const t = b[0], hm = b[1], h = hm * A.VEX * S, pts = flatPts(b.slice(2)), n = pts.length;
     const j = ((bi * 2654435761) % 1000) / 1000, j2 = ((bi * 40503 + 12345) % 977) / 977, wl = WALLS[t] || WALLS[0];
@@ -180,6 +383,9 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     let u = 0;
     for (let k = 0; k < n; k++) {
       const p = pts[k], q = pts[(k + 1) % n], L = Math.hypot(q[0] - p[0], q[1] - p[1]) / S;
+      ep.push(p[0], h, p[1], q[0], h, q[1]);  /* roof outline */
+      const o = pts[(k + n - 1) % n], cr = (p[0] - o[0]) * (q[1] - p[1]) - (p[1] - o[1]) * (q[0] - p[0]);
+      if (Math.abs(cr) > 0.26 * Math.hypot(p[0] - o[0], p[1] - o[1]) * Math.hypot(q[0] - p[0], q[1] - p[1])) ep.push(p[0], 0, p[1], p[0], h, p[1]);  /* corners only, not every vertex on a curve */
       wv(p[0], 0, p[1], u, 0); wv(q[0], 0, q[1], u + L, 0); wv(q[0], h, q[1], u + L, hm);
       wv(p[0], 0, p[1], u, 0); wv(q[0], h, q[1], u + L, hm); wv(p[0], h, p[1], u, hm);
       u += L;
@@ -195,6 +401,11 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   bGeo.computeVertexNormals();
   const bMat = reg(windowMaterial(), 0xffffff);
   const bMesh = new T.Mesh(bGeo, bMat); bMesh.castShadow = true; bMesh.receiveShadow = true; scene.add(bMesh);
+  /* Building outlines: faint and dark by day, light at night so the shapes still read (setSun() blends them) */
+  const eGeo = new T.BufferGeometry(); eGeo.setAttribute('position', new T.Float32BufferAttribute(ep, 3));
+  const eMat = new T.LineBasicMaterial({ color: 0x2a2520, transparent: true, opacity: 0.3, depthWrite: false });
+  const bEdges = new T.LineSegments(eGeo, eMat); bEdges.renderOrder = 1; scene.add(bEdges);
+  const EDGE_DAY = new T.Color(0x2a2520), EDGE_NIGHT = new T.Color(0xcfd8e6);
 
   /* Trees in town (street trees and park groves) and the terrain around it (loaded after the city is up) */
   const trees = buildTrees(A); scene.add(trees.group); trees.group.children.forEach(ch => { ch.castShadow = true; });
@@ -203,7 +414,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   fetch(import.meta.env.BASE_URL + 'data/terrain-rexburg.json').then(r => r.ok ? r.json() : null).then((t: TerrainFile | null) => {
     if (!t || disposed) return;
     const tr = buildTerrain(A, t, new T.Color(0xa39368));
-    scene.add(tr.mesh, tr.forest); tr.mats.forEach(m => reg(m, m.color.getHex())); setSun(lightHour);
+    scene.add(tr.mesh, tr.forest, tr.farms); tr.mats.forEach(m => reg(m, m.color.getHex())); setSun(lightHour);
     ground.position.y = -0.09;  /* the terrain is the ground now; the flat plane stays underneath as a fallback */
   }).catch(() => { /* no terrain file: the flat ground stays */ });
 
@@ -211,9 +422,10 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   const up = new T.BoxGeometry(1, 1, 1); up.translate(0, 0.5, 0);
   const upEdges = new T.EdgesGeometry(up);
   const projLayer = new T.Group(); scene.add(projLayer);
-  const P3: Record<string, { subs: { solid: T.Mesh; edge: T.LineSegments }[]; strips: T.Mesh[] }> = {};
+  type Sub = { solid: T.Mesh; edge: T.LineSegments; h: number; cur: number; goal: number };
+  const P3: Record<string, { subs: Sub[]; strips: T.Mesh[] }> = {}, growing = new Set<Sub>();
   A.PROJECTS.forEach(p => {
-    const o = { subs: [] as { solid: T.Mesh; edge: T.LineSegments }[], strips: [] as T.Mesh[] };
+    const o = { subs: [] as Sub[], strips: [] as T.Mesh[] };
     if (p.foot) {
       const fw = p.foot[0], fd = p.foot[1], n = p.n || 1, cols = Math.ceil(Math.sqrt(n * fw / fd)), rows = Math.ceil(n / cols), cw = fw / cols, cd = fd / rows;
       const pad = new T.Mesh(new T.PlaneGeometry(fw + 0.06, fd + 0.06), reg(new T.MeshBasicMaterial({ color: 0xd9d2c0, transparent: true, opacity: 0.8, depthWrite: false }), 0xd9d2c0));
@@ -221,11 +433,11 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
       for (let k = 0; k < n; k++) {
         const x = p.pos![0] - fw / 2 + (k % cols + 0.5) * cw, z = p.pos![1] - fd / 2 + (Math.floor(k / cols) + 0.5) * cd;
         const solid = new T.Mesh(up, new T.MeshLambertMaterial({ color: 0xd4861c }));
-        solid.position.set(x, 0, z); solid.scale.set(cw * 0.75, p.h!, cd * 0.75);
+        solid.position.set(x, 0, z); solid.scale.set(cw * 0.75, 0.001, cd * 0.75); solid.visible = false;  /* frame() raises it */
         const edge = new T.LineSegments(upEdges, new T.LineBasicMaterial({ color: 0x2e6bc9 }));
         edge.position.set(x, 0, z); edge.scale.set(cw * 0.75, p.h!, cd * 0.75);
         projLayer.add(solid); projLayer.add(edge);
-        o.subs.push({ solid, edge });
+        o.subs.push({ solid, edge, h: p.h!, cur: 0, goal: 0 });
       }
     }
     (p.strips || []).forEach(ln => {
@@ -272,8 +484,8 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
 
   /* Labels and pins */
   const overlay = els.overlay;
-  overlay.innerHTML = '';
-  type Mark = { el: HTMLElement; v: T.Vector3; walk?: boolean; proj?: boolean; p?: any };
+  overlay.innerHTML = ''; overlay.appendChild(tip);
+  type Mark = { el: HTMLElement; v: T.Vector3; walk?: boolean; proj?: boolean; shop?: boolean; p?: any };
   const marks: Mark[] = [];
   function streetAt(name: string, near: XZ) {
     let best: XZ | null = null, bd = 1e9;
@@ -290,6 +502,12 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
       marks.push({ el, v: new T.Vector3(l[1][0], l[2], l[1][1]), walk: /^Walk/.test(l[0]) });
     });
   if (C.places.river) { const rv = document.createElement('div'); rv.className = 'place water'; rv.textContent = 'Teton River'; overlay.appendChild(rv); marks.push({ el: rv, v: new T.Vector3(C.places.river[0] * S, 0.1, C.places.river[1] * S) }); }
+  /* Stores and restaurants (Filter > Stores and restaurants): each shop zone of the traffic model, named from OpenStreetMap */
+  (zones?.zones || []).forEach(z => {
+    if (!z.shop || !z.name || /walmart/i.test(z.name)) return;  /* Walmart has its own place label */
+    const el = document.createElement('div'); el.className = 'place shop'; el.textContent = z.name.split(', ')[0]; el.title = z.name; overlay.appendChild(el);
+    marks.push({ el, v: new T.Vector3(z.x * S, 0.15, z.z * S), shop: true });
+  });
   const pins: Mark[] = [];
   A.PROJECTS.forEach(p => {
     const el = document.createElement('button'); el.className = 'pin'; el.setAttribute('aria-label', p.name);
@@ -298,12 +516,30 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     overlay.appendChild(el);
     pins.push({ el, p, v: new T.Vector3(p.pos![0], (p.h || 0.02) + 0.1, p.pos![1]), proj: true });
   });
+  let found: Mark | null = null;  /* the map search pin */
+  /* Shopping trips: one arc per home area, raised with distance, as thick as its trips (square root, so small ones still show) */
+  const flowG = new T.Group(), flowMat = new T.MeshBasicMaterial({ color: 0xe9b25f, transparent: true, opacity: 0.85, depthWrite: false });
+  const dotMat = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false });
+  scene.add(flowG);
+  function setFlows(list: Flow[] | null) {
+    flowG.children.forEach(m => { (m as T.Mesh).geometry.dispose(); }); flowG.clear();
+    if (!list || !list.length) return;
+    const mx = Math.max(...list.map(f => f.n)) || 1;
+    list.forEach(f => {
+      const d = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]); if (d < 0.05) return;
+      const c = new T.QuadraticBezierCurve3(new T.Vector3(f.a[0], 0.06, f.a[1]), new T.Vector3((f.a[0] + f.b[0]) / 2, 0.3 + Math.min(d, 25) * 0.12, (f.a[1] + f.b[1]) / 2), new T.Vector3(f.b[0], 0.06, f.b[1]));
+      const r = 0.012 + 0.06 * Math.sqrt(f.n / mx);
+      const m = new T.Mesh(new T.TubeGeometry(c, 40, r, 6, false), flowMat); m.renderOrder = 6; flowG.add(m);
+      const dot = new T.Mesh(new T.SphereGeometry(r * 1.8, 10, 8), dotMat); dot.position.set(f.a[0], 0.06, f.a[1]); dot.renderOrder = 6; flowG.add(dot);
+    });
+    const end = new T.Mesh(new T.CylinderGeometry(0.22, 0.22, 0.04, 28), flowMat); end.position.set(list[0].b[0], 0.06, list[0].b[1]); end.renderOrder = 6; flowG.add(end);
+  }
   const ghosts = createGhostLayer({ scene, camera, canvas, overlay, S, VEX: A.VEX });
   const vtmp = new T.Vector3(); let W = 1, H = 1;
   function place(m: Mark) {
     const st = getState();
     vtmp.copy(m.v).project(camera);
-    const hide = vtmp.z > 1 || vtmp.z < -1 || (m.proj && !st.layers.proj) || (m.walk && !st.layers.walk);
+    const hide = vtmp.z > 1 || vtmp.z < -1 || (m.proj && !st.layers.proj) || (m.walk && !st.layers.walk) || (m.shop && st.layers.shops === false);
     m.el.style.display = hide ? 'none' : '';
     if (hide) return;
     m.el.style.left = ((vtmp.x * 0.5 + 0.5) * W).toFixed(1) + 'px';
@@ -318,7 +554,8 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
 
   /* Day and night (from the UI sandbox): the sun moves with the hour (east in the morning, west in the evening),
      the sky darkens, windows and streetlights come on, and the light glides to a new hour at the demo speed. */
-  const light = { sky: new T.Color(0x14130f), duskC: new T.Color(0x2a1c10), night: new T.Color(0x040507) };
+  const light = { sky: new T.Color(0x14130f), duskC: new T.Color(0x2a1c10), night: new T.Color(0x0a0e16) };  /* deep night navy: dark, but not flat black */
+  const dimOf = (d: number) => 0.3 + 0.7 * d;  /* flat colors at night keep about a third of their brightness */
   const sunDir = new T.Vector3(0.3, 1, 0.4).normalize();
   let lightHour = getState().hour, lastLights = -1, nightV = 0;
   function setSun(h: number) {
@@ -328,19 +565,22 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     sunDir.set(-Math.cos(az) * Math.cos(el * 1.2), Math.max(0.12, el), Math.sin(az) * 0.5 + 0.35).normalize();
     (scene.background as T.Color).copy(light.sky).lerp(light.duskC, dusk * 0.55).lerp(light.night, 1 - d);
     (scene.fog as T.Fog).color.copy(scene.background as T.Color);
-    hemi.intensity = 0.14 + 0.6 * d; hemi.color.setHex(d < 0.3 ? 0x8a9bc0 : 0xfff1dc); hemi.groundColor.setHex(0x5a4e3a);
-    sun.intensity = 0.05 + 0.75 * d; sun.color.setHex(d < 0.05 ? 0x8a9bc0 : dusk > 0.2 ? 0xffc98e : 0xffe6c2);
-    const dim = 0.24 + 0.76 * d;  /* unlit (flat) materials dim by hand; lit ones follow the lights */
+    /* less sky fill and a stronger sun by day, so buildings and trees cast clear shadows away from the sun */
+    /* at night a cool moonlit fill keeps ground, trees and buildings readable in blue-grey instead of black */
+    hemi.intensity = 0.3 + 0.34 * d; hemi.color.setHex(d < 0.3 ? 0x7f93bd : 0xfff1dc); hemi.groundColor.setHex(d < 0.3 ? 0x1e2333 : 0x5a4e3a);
+    sun.intensity = 0.12 + 0.92 * d;
+    eMat.color.copy(EDGE_DAY).lerp(EDGE_NIGHT, 1 - d); eMat.opacity = 0.3 + 0.22 * (1 - d); sun.color.setHex(d < 0.05 ? 0xa8bce0 : dusk > 0.2 ? 0xffc98e : 0xffe6c2);
+    const dim = dimOf(d);  /* unlit (flat) materials dim by hand; lit ones follow the lights */
     tints.forEach(tn => { tn.m.color.copy(tn.c); if (tn.m instanceof T.MeshBasicMaterial) tn.m.color.multiplyScalar(dim); });
     NIGHT.uNight.value = (1 - d) * st.lights; NIGHT.uLit.value = 0.5;
     nightV = (1 - d) * st.lights;
-    (carPts.material as T.PointsMaterial).color.set(d < 0.5 ? '#ffe7a0' : '#22343a');
+    (carPts.material as T.PointsMaterial).color.set(d < 0.5 ? '#f4f6ff' : '#22343a');  /* white headlights, not yellow: yellow means a busy street */
     overlay.classList.toggle('night', d < 0.5); document.body.classList.toggle('night', d < 0.4);
     grey.setHex(0x3f3a35).lerp(new T.Color(0x1c1a18), 1 - d);
     lastLights = st.lights;
   }
   let fly: any = null, raf = 0, zoomVel = 0, tiltVel = 0, turnVel = 0, zoomAt: T.Vector3 | null = null;
-  const clock = new T.Clock(), compass = els.compass.firstElementChild as HTMLElement;
+  const clock = new T.Clock();
   function frame() {
     const dt = Math.min(clock.getDelta(), 0.05);
     if (fly) {
@@ -373,16 +613,36 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     controls.update();
     /* the sun follows the view so nearby buildings and trees cast shadows */
     const dist = camera.position.distanceTo(controls.target);
+    PXU.uPx.value = 2 * dist * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, canvas.clientHeight);
+    if (hover.dirty && hover.inside && !picker) {
+      hover.dirty = false; setHover(pickRoad());
+      setZoneHover(hover.seg < 0 && stF.layers.zones ? pickZone() : -1);  /* zones sit above the Census blocks */
+      setBlockHover(hover.seg < 0 && zoneHover < 0 && stF.layers.blocks ? pickBlock() : -1);  /* streets win: a block shows where no street is under the pointer */
+    }
     sun.target.position.copy(controls.target);
     sun.position.copy(controls.target).addScaledVector(sunDir, Math.max(60, dist * 3));
     const sc2 = sun.shadow.camera as T.OrthographicCamera, hs = Math.max(6, Math.min(110, dist * 0.85));
     if (sc2.right !== hs) { sc2.left = -hs; sc2.right = hs; sc2.top = hs; sc2.bottom = -hs; sc2.near = 1; sc2.far = Math.max(200, dist * 6); sc2.updateProjectionMatrix(); }
     slPts.visible = nightV > 0.02;
     if (slPts.visible) { slMat.opacity = 0.42 * Math.min(1, nightV); slMat.size = Math.max(0.26, dist * 0.0034); }
+    if (sigPoles.visible && !reduce) { sigT += dt; paintSignals(); }
+    if (roadFade) {  /* ease road colors toward the newest loads */
+      const arr = roadCol.array as Float32Array, k = reduce ? 1 : 1 - Math.exp(-dt * 7);
+      let left = false;
+      for (let i = 0; i < arr.length; i++) { const d = roadGoal[i] - arr[i]; if (Math.abs(d) > 0.002) { arr[i] += d * k; left = true; } else arr[i] = roadGoal[i]; }
+      roadCol.needsUpdate = true; roadFade = left; syncHover();
+    }
+    if (growing.size) {  /* buildings rise or sink to their new stage of construction */
+      const k = reduce ? 1 : 1 - Math.exp(-dt * 5);
+      growing.forEach(g => {
+        g.cur += (g.goal - g.cur) * k;
+        if (Math.abs(g.goal - g.cur) < 0.002) { g.cur = g.goal; growing.delete(g); }
+        g.solid.visible = g.cur > 0.002; g.solid.scale.y = Math.max(0.001, g.cur * g.h);
+      });
+    }
     if (!reduce && getState().layers.cars) placeCars(dt);
     renderer.render(scene, camera);
-    marks.forEach(place); pins.forEach(place); ghosts.frame(W, H, dt);
-    compass.style.transform = 'rotate(' + controls.getAzimuthalAngle() + 'rad)';
+    marks.forEach(place); pins.forEach(place); if (found) place(found); ghosts.frame(W, H, dt);
     raf = requestAnimationFrame(frame);
   }
   raf = requestAnimationFrame(frame);
@@ -409,7 +669,11 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   const ray = new T.Raycaster(), ground0 = new T.Plane(new T.Vector3(0, 1, 0), 0), hit = new T.Vector3();
   const onDown = (e: PointerEvent) => { down = [e.clientX, e.clientY]; };
   const onUp = (e: PointerEvent) => {
-    if (!picker || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    if (!picker) {  /* a plain click with the blocks layer on opens that block group (or closes it, off the blocks) */
+      if (getState().layers.blocks && e.button === 0) { const i = blockHover >= 0 ? blockHover : pickBlock(); onBlock(i >= 0 ? bl.get(i)!.id : null); }
+      return;
+    }
     const r = canvas.getBoundingClientRect();
     ray.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
     if (ray.ray.intersectPlane(ground0, hit)) { const cb = picker; picker = null; canvas.style.cursor = ''; cb([hit.x, hit.z]); }
@@ -420,24 +684,26 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
   return {
     apply(shown, tp) {
       const st = getState();
-      const dim = 0.24 + 0.76 * daylight(lightHour);  /* sky, lights and windows follow the gliding hour in setSun() */
+      const dim = dimOf(daylight(lightHour));  /* sky, lights and windows follow the gliding hour in setSun() */
       roadMat.color.setScalar(st.layers.traffic ? 1 : dim);
-      const arr = roadCol.array as Float32Array;
       shown.forEach((r, k) => {
-        if (st.layers.traffic) tmpc.set(CCOL[A.level(r.vc).key]); else tmpc.copy(grey);
-        for (let v = 0; v < 6; v++) { const o = (k * 6 + v) * 3; arr[o] = tmpc.r; arr[o + 1] = tmpc.g; arr[o + 2] = tmpc.b; }
+        const lk = A.level(r.vc).key;
+        if (st.layers.traffic && st.cong[congOf(lk)]) { tmpc.set(CCOL[lk]); if (A.SEGS[k].road.cls === 'local') tmpc.multiplyScalar(0.62); } else tmpc.copy(grey);  /* side streets quieter */
+        for (let v = 0; v < 6; v++) { const o = (k * 6 + v) * 3; roadGoal[o] = tmpc.r; roadGoal[o + 1] = tmpc.g; roadGoal[o + 2] = tmpc.b; }
       });
-      roadCol.needsUpdate = true;
+      if (!roadInit) { (roadCol.array as Float32Array).set(roadGoal); roadCol.needsUpdate = true; roadInit = true; } else roadFade = true;
       A.WIDEN.forEach(w => { const on = st.widen.indexOf(w.id) >= 0; widMats[w.id].opacity = on ? 1 : 0.5; widMats[w.id].color.set(on ? '#5b2fa3' : '#8557c2'); });
       widLayer.visible = st.layers.proj;
       projLayer.visible = st.layers.proj; walk.visible = st.layers.walk; carPts.visible = st.layers.cars;
+      sigPoles.visible = st.layers.signals !== false && SIG.length > 0; sigSets.forEach(p => { p.visible = sigPoles.visible; });  /* older saved state has no signals key: show them */
+      bl.group.visible = st.layers.blocks; bl.select(st.block); if (!st.layers.blocks) setBlockHover(-1);
+      zl.group.visible = !!st.layers.zones; if (!st.layers.zones) setZoneHover(-1);
       A.PROJECTS.forEach(p => {
         const ps = pStatus(A, p, tp), o = P3[p.id], n = o.subs.length;
         o.subs.forEach((s, k) => {
           let fill = ps.key === 'done' ? 1 : Math.max(0, Math.min(1, ps.progress * n - k));
           if (ps.key === 'construction' && n === 1) fill = Math.max(0.08, ps.progress);
-          s.solid.visible = fill > 0;
-          s.solid.scale.y = Math.max(0.001, fill * p.h!);
+          if (s.goal !== fill) { s.goal = fill; growing.add(s); }
           (s.solid.material as T.MeshLambertMaterial).color.set(ps.key === 'done' || fill >= 1 && n > 1 ? '#0e8a79' : '#d4861c').multiplyScalar(0.4 + 0.6 * dim);
           s.edge.visible = ps.key !== 'done' && fill < 1;
           (s.edge.material as T.LineBasicMaterial).color.set(ps.key === 'construction' ? '#a8650f' : ps.key === 'planned' ? '#8557c2' : '#2e6bc9');
@@ -448,7 +714,15 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
         pn.el.setAttribute('data-s', pStatus(A, pn.p, tp).key);
         pn.el.classList.toggle('sel', st.sel === pn.p.id);
       });
-      allocate(shown);
+      allocate(shown); showTip();
+    },
+    setFlows,
+    mark(pos, label) {
+      if (found) { found.el.remove(); found = null; }
+      if (!pos) return;
+      const el = document.createElement('div'); el.className = 'pin found'; el.setAttribute('role', 'img'); el.setAttribute('aria-label', label || 'Search result');
+      const sp = document.createElement('span'); sp.textContent = label || ''; el.appendChild(sp); el.appendChild(document.createElement('i'));
+      overlay.appendChild(el); found = { el, v: new T.Vector3(pos[0], 0.1, pos[1]) }; place(found);
     },
     flyTo(pos) {
       const off = camera.position.clone().sub(controls.target), len = off.length();
@@ -459,6 +733,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     onGhost(cb) { ghosts.onEvent(cb); },
     setHighlight(list) { ghosts.highlight(list); },
     target() { return [controls.target.x, controls.target.z]; },
-    dispose() { disposed = true; canvas.removeEventListener('wheel', onWheel); ghosts.dispose(); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); overlay.innerHTML = ''; }
+    setZoneStats(z) { zl.setStats(z); if (zoneHover >= 0) showTip(); },
+    dispose() { disposed = true; bl.dispose(); zl.dispose(); setFlows(null); flowMat.dispose(); dotMat.dispose(); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('pointermove', onMove); canvas.removeEventListener('pointerleave', onLeave); ghosts.dispose(); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); overlay.innerHTML = ''; }
   };
 }
