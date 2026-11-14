@@ -3,20 +3,21 @@
 import * as T from 'three';
 import type { XZ } from '../model/types';
 
-export type GhostDraw = { id: string; pos: XZ; w: number; d: number; h: number; n: number; label: string; status: 'planned' | 'suggested'; active: boolean };
+export type GhostDraw = { id: string; pos: XZ; w: number; d: number; h: number; n: number; label: string; status: 'planned' | 'suggested'; active: boolean;
+  roads?: { pts: XZ[]; status: 'planned' | 'suggested'; label: string }[] };
 export type GhostEvent = { type: 'move'; id: string; pos: XZ } | { type: 'select'; id: string };
 
 export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: HTMLCanvasElement; overlay: HTMLElement; S: number; VEX: number }) {
   const { scene, camera, canvas, overlay, S, VEX } = o;
   const group = new T.Group(); scene.add(group);
-  type Item = { g: T.Group; mats: (T.MeshBasicMaterial | T.LineBasicMaterial | T.LineDashedMaterial)[]; el: HTMLElement; v: T.Vector3; d: GhostDraw };
+  type Item = { g: T.Group; mats: (T.MeshBasicMaterial | T.LineBasicMaterial | T.LineDashedMaterial)[]; el: HTMLElement; v: T.Vector3; d: GhostDraw; roadMats: T.MeshBasicMaterial[]; roadEls: { el: HTMLElement; v: T.Vector3 }[] };
   let items: Item[] = [], sel: string | null = null, carrying: string | null = null, cb: ((e: GhostEvent) => void) | null = null, t0 = 0;
 
   function clear() {
     items.forEach(it => {
-      it.el.remove();
+      it.el.remove(); it.roadEls.forEach(r => r.el.remove());
       it.g.traverse(ch => { const m = ch as T.Mesh; if (m.geometry) m.geometry.dispose(); });
-      it.mats.forEach(m => m.dispose());
+      it.mats.forEach(m => m.dispose()); it.roadMats.forEach(m => m.dispose());
     });
     group.clear(); items = [];
   }
@@ -44,10 +45,32 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
     const pad = new T.Mesh(new T.PlaneGeometry(w + 0.04, dd + 0.04), new T.MeshBasicMaterial({ color: col, transparent: true, opacity: on ? 0.35 : 0.18, depthWrite: false }));
     mats.push(pad.material as T.MeshBasicMaterial);
     pad.rotation.x = -Math.PI / 2; pad.position.y = 0.03; pad.userData = { id: d.id }; g.add(pad);
+    /* access roads: a glowing ribbon (~16 m wide) in world space, dashed while only suggested */
+    const roadMats: T.MeshBasicMaterial[] = [], roadEls: Item['roadEls'] = [];
+    (d.roads || []).forEach(r => {
+      const sug = r.status === 'suggested', pos: number[] = [], w = 16 * S / 2;
+      for (let k = 0; k < r.pts.length - 1; k++) {
+        const a = r.pts[k], b = r.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1e-6, ux = dx / L, uz = dz / L, nx = -uz * w, nz = ux * w;
+        const dash = sug ? 30 * S : L, gap = sug ? 20 * S : 0;
+        for (let s0 = 0; s0 < L; s0 += dash + gap) {
+          const s1 = Math.min(L, s0 + dash), ax = a[0] + ux * s0, az = a[1] + uz * s0, bx = a[0] + ux * s1, bz = a[1] + uz * s1;
+          pos.push(ax + nx - d.pos[0], 0.06, az + nz - d.pos[1], bx + nx - d.pos[0], 0.06, bz + nz - d.pos[1], bx - nx - d.pos[0], 0.06, bz - nz - d.pos[1],
+            ax + nx - d.pos[0], 0.06, az + nz - d.pos[1], bx - nx - d.pos[0], 0.06, bz - nz - d.pos[1], ax - nx - d.pos[0], 0.06, az - nz - d.pos[1]);
+        }
+      }
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+      const m = new T.MeshBasicMaterial({ color: sug ? 0xffc04d : 0xf08c1a, transparent: true, opacity: sug ? 0.85 : 0.95, depthWrite: false, side: T.DoubleSide });
+      roadMats.push(m); g.add(new T.Mesh(geo, m));
+      if (r.label) {
+        const mid = r.pts[Math.floor(r.pts.length / 2)], prev = r.pts[Math.max(0, Math.floor(r.pts.length / 2) - 1)];
+        const re = document.createElement('div'); re.className = 'planlabel ghost road'; re.textContent = r.label; overlay.appendChild(re);
+        roadEls.push({ el: re, v: new T.Vector3((mid[0] + prev[0]) / 2, 0.2, (mid[1] + prev[1]) / 2) });
+      }
+    });
     group.add(g);
     const el = document.createElement('div'); el.className = 'planlabel' + (sug ? ' ghost' : '') + (future ? ' future' : '') + (on ? ' sel' : '');
     el.textContent = d.label; overlay.appendChild(el);
-    items.push({ g, mats, el, v: new T.Vector3(d.pos[0], h + 0.15, d.pos[1]), d });
+    items.push({ g, mats, el, v: new T.Vector3(d.pos[0], h + 0.15, d.pos[1]), d, roadMats, roadEls });
   }
 
   const ray = new T.Raycaster(), ground = new T.Plane(new T.Vector3(0, 1, 0), 0), hit = new T.Vector3(), ndc = new T.Vector2();
@@ -86,6 +109,9 @@ export function createGhostLayer(o: { scene: T.Scene; camera: T.Camera; canvas: 
         const hide = vt.z > 1 || vt.z < -1;
         it.el.style.display = hide ? 'none' : '';
         if (!hide) { it.el.style.left = ((vt.x * 0.5 + 0.5) * W).toFixed(1) + 'px'; it.el.style.top = ((-vt.y * 0.5 + 0.5) * H).toFixed(1) + 'px'; }
+        it.roadMats.forEach((m, k) => { if ((it.d.roads || [])[k]?.status === 'suggested') m.opacity = 0.45 + 0.45 * pulse; });
+        it.roadEls.forEach(r => { vt.copy(r.v).project(camera); const hd = vt.z > 1 || vt.z < -1; r.el.style.display = hd ? 'none' : '';
+          if (!hd) { r.el.style.left = ((vt.x * 0.5 + 0.5) * W).toFixed(1) + 'px'; r.el.style.top = ((-vt.y * 0.5 + 0.5) * H).toFixed(1) + 'px'; } });
         if (carrying === it.d.id) it.el.textContent = 'Click where it should go';
         else if (it.el.textContent !== it.d.label) it.el.textContent = it.d.label;
       });

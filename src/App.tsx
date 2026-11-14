@@ -17,7 +17,7 @@ import { AccuracyPanel, type CalibFile } from './components/AccuracyPanel';
 import { ProblemCards } from './components/ProblemCards';
 import { DemoViews, Placement } from './components/Placement';
 import { GhostTools, YearStrip } from './planner/PlannerWorkspace';
-import { GHOST_TYPES, ghostActive, ghostPlans, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
+import { GHOST_TYPES, ghostActive, ghostPlans, ghostRoads, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
 import { snapSite, useSuggest } from './planner/suggest';
 
 type Lay = { ctl: boolean; pan: boolean; left: boolean };
@@ -53,7 +53,8 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   /* Routed volumes from the worker (with and without projects); the count-based method fills in until they arrive. */
   const t = tOf(s.ti);
   const plans = useMemo(() => s.mode === 'planner' ? ghostPlans(ghosts, t) : [], [s.mode, ghosts, t]);
-  const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev, ...(plans.length ? { plans } : {}) }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev, plans]);
+  const roads = useMemo(() => s.mode === 'planner' ? ghostRoads(ghosts, t) : [], [s.mode, ghosts, t]);
+  const sc: Scenario = useMemo(() => ({ t, hour: s.hour, withProjects: true, prm: s.prm, spring: s.spring, widen: s.widen, fixes: s.fixes, rev, ...(plans.length ? { plans } : {}), ...(roads.length ? { roads } : {}) }), [t, s.hour, s.prm, s.spring, s.widen, s.fixes, rev, plans, roads]);
   const routing = s.method === 'routed' && !!zones;
   const tr = useTraffic(sc, routing);
   const run = routing ? tr.stale : null;
@@ -85,7 +86,8 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   useEffect(() => {
     const list = s.mode !== 'planner' ? [] : ghosts.map(g => { const ty = GHOST_TYPES[g.kind], act = ghostActive(g, c.t);
       return { id: g.id, pos: g.pos, w: ty.w, d: ty.d, h: ty.h, n: ty.n, status: g.status, active: act,
-        label: (g.status === 'suggested' ? 'Suggested · ' : '') + ty.label + (act || g.status === 'suggested' ? '' : ' · from ' + g.year) }; });
+        label: (g.status === 'suggested' ? 'Suggested · ' : '') + ty.label + (act || g.status === 'suggested' ? '' : ' · from ' + g.year),
+        roads: (g.roads || []).map((r, i) => ({ pts: r.pts, status: r.status, label: r.status === 'suggested' ? 'Road option ' + (i + 1) : '' })) }; });
     view.current?.setGhosts(list, ghostSel);
   }, [A, ghosts, ghostSel, s.mode, c.t]);
   const ghostsRef = useRef(ghosts); ghostsRef.current = ghosts;
@@ -95,7 +97,8 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
       if (e.type !== 'move') return;
       const list = ghostsRef.current, me = list.find(g => g.id === e.id); if (!me) return;
       const pl = snapSite(A, me.kind, e.pos, list.filter(g => g.id !== e.id));  /* placement rules */
-      setGhosts(list.map(g => g.id === e.id ? { ...g, pos: pl.pos, place: { moved: pl.moved, ok: pl.ok, lot: pl.lot } } : g));
+      /* a moved project loses its access roads: they were drawn from the old site */
+      setGhosts(list.map(g => g.id === e.id ? { ...g, pos: pl.pos, place: { moved: pl.moved, ok: pl.ok, lot: pl.lot }, roads: undefined } : g));
     });
   }, [A]);
 

@@ -1,6 +1,6 @@
 /* Planner workspace: Now ↔ year toggle with a year slider, a counter strip for the chosen year,
    and ghost projects tied to a year. Ghost traffic comes from the routing worker (scenario.extra). */
-import { useEffect, useMemo, useState, type Dispatch } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch } from 'react';
 import type { Atlas } from '../model/atlas';
 import type { Scenario } from '../model/routing';
 import type { XZ } from '../model/types';
@@ -10,7 +10,7 @@ import { send, useWorkerMessages } from '../hooks/useTraffic';
 import { CCOL, TODAY_I, fmt, hourLabel, pct } from '../ui';
 import './planner.css';
 import { snapSite, type SuggestState } from './suggest';
-import { GHOST_TYPES, KINDS, YEARS, ghostActive, ghostPlans, ghostSupply, newGhost, type Ghost, type GhostKind } from './ghosts';
+import { GHOST_TYPES, KINDS, YEARS, ghostActive, ghostPlans, ghostSupply, newGhost, type Ghost, type GhostKind, type GhostRoad } from './ghosts';
 
 export const tiOfYear = (y: number) => (y - 2024) * 4 + 3;  /* fall (Q4) of year y */
 const yearOf = (t: number) => Math.floor(t);
@@ -114,12 +114,12 @@ export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, se
         </span></div>;
     })}</div>}
     {ghosts.length > 0 && <p className="note" style={{ marginTop: 6 }}>Double-click a ghost on the map to pick it up, then click where it should go.</p>}
-    {sel && <Impact A={A} s={s} c={c} sc={sc} g={sel} ghosts={ghosts} dispatch={dispatch} />}
+    {sel && <Impact A={A} s={s} c={c} sc={sc} g={sel} ghosts={ghosts} dispatch={dispatch} setGhosts={setGhosts} />}
   </div>;
 }
 
 /* ---------- Before → after for one ghost: route the year with and without it ---------- */
-function Impact({ A, s, c, sc, g, ghosts, dispatch }: { A: Atlas; s: State; c: Computed; sc: Scenario; g: Ghost; ghosts: Ghost[]; dispatch: Dispatch<Action> }) {
+function Impact({ A, s, c, sc, g, ghosts, dispatch, setGhosts }: { A: Atlas; s: State; c: Computed; sc: Scenario; g: Ghost; ghosts: Ghost[]; dispatch: Dispatch<Action>; setGhosts: (g: Ghost[]) => void }) {
   const act = g.status === 'planned' && ghostActive(g, c.t);
   const without = useMemo<Scenario>(() => { const rest = ghostPlans(ghosts.filter(x => x.id !== g.id), sc.t), o: Scenario = { ...sc }; if (rest.length) o.plans = rest; else delete o.plans; return o; }, [sc, ghosts, g.id]);
   const key = JSON.stringify({ k: 'ghost-impact', sc, without: without.plans || [] });
@@ -157,6 +157,50 @@ function Impact({ A, s, c, sc, g, ghosts, dispatch }: { A: Atlas; s: State; c: C
     {rows.length ? <><p className="sec" style={{ marginTop: 8 }}>Streets it loads up</p>{rows.map(x =>
       <div className="chg" key={x.n}><span>{x.n}</span><span className="num">{pct(x.b)} → <b style={{ color: CCOL[A.level(x.a).key] }}>{pct(x.a)}</b> <small>+{Math.round((x.a - x.b) * 100)} pts</small></span></div>)}</>
       : <p className="note">No main street gains a full point at {hourLabel(s.hour)}.{s.hour === 17 ? ' Try 8 am.' : s.hour === 8 ? ' Try 5 pm.' : ' Try 8 am or 5 pm.'}</p>}
+    {g.kind !== 'parking' && <AccessRoads s={s} sc={sc} g={g} ghosts={ghosts} setGhosts={setGhosts} trips={(() => { const i = ghostPlans(ghosts, sc.t).findIndex(p => p.id === g.id); return i >= 0 && cur.w.planTrips ? cur.w.planTrips[i] : null; })()} />}
     <p className="note" style={{ marginTop: 6 }}>Both runs route every trip in town through the street network for this hour; only this project differs. Its trips start at the site and reach the nearest street by a driveway. Screening, not a site study.</p>
+  </div>;
+}
+
+/* ---------- Access roads for one project: slime-mold search proposes, the router judges ---------- */
+function AccessRoads({ s, sc, g, ghosts, setGhosts, trips }: { s: State; sc: Scenario; g: Ghost; ghosts: Ghost[]; setGhosts: (g: Ghost[]) => void; trips: number | null }) {
+  const [busy, setBusy] = useState<string | null>(null), [msg, setMsg] = useState<string | null>(null);
+  const job = useRef<{ slime?: string; judge?: string; cands: { to: number; toName: string; pts: XZ[]; lenM: number }[] } | null>(null);
+  const roads = g.roads || [];
+  const setRoads = (list: GhostRoad[]) => setGhosts(ghosts.map(x => x.id === g.id ? { ...x, roads: list } : x));
+  useWorkerMessages(m => {
+    const j = job.current; if (!j) return;
+    if (m.type === 'slime' && m.key === j.slime) {
+      if (!m.cands.length) { job.current = null; setBusy(null); setMsg(m.sinks ? 'Every route to a nearby street crosses buildings or water. Move the project closer to open land.' : 'No street within 2.8 km to connect to.'); return; }
+      j.cands = m.cands; j.judge = 'judge:roads:' + Date.now();
+      setBusy('Found ' + m.cands.length + ' candidate roads in ' + m.ms + ' ms. The router is testing each one…');
+      send({ type: 'judge', key: j.judge, sc, options: m.cands.map((cd, i) => ({ id: String(i), sc: { ...sc, roads: (sc.roads || []).concat([{ id: 'cand', plan: g.id, to: cd.to, lenM: Math.round(cd.lenM), cls: 'collector' as const }]) } })) });
+    }
+    if (m.type === 'judge' && m.key === j.judge) {
+      job.current = null; setBusy(null);
+      const tested = m.options.map(o => { const cd = j.cands[+o.id]; return { ...cd, dvht: o.vht - m.base, vol: o.roadVol?.cand?.vol ?? 0 }; });
+      const good = tested.filter(x => x.dvht < -0.05).sort((a, b) => a.dvht / a.lenM - b.dvht / b.lenM).slice(0, 3);
+      const keep = (g.roads || []).filter(r => r.status === 'planned');
+      setRoads(keep.concat(good.map((x, i) => ({ id: 'road-' + g.id + '-' + Date.now().toString(36) + i, to: x.to, toName: x.toName, pts: x.pts, lenM: x.lenM, status: 'suggested' as const, dvht: x.dvht, vol: x.vol }))));
+      setMsg(good.length ? good.length + ' of ' + tested.length + ' candidate roads save driving time. They are dashed on the map; accept the one you want.'
+        : 'The router tested ' + tested.length + ' candidate roads and none saves driving time at ' + hourLabel(sc.hour) + '. The single driveway is enough.');
+    }
+  });
+  const run = () => {
+    setMsg(null); setBusy('Slime-mold search: growing paths from the site to nearby streets, around buildings and water…');
+    const k = 'slime:' + Date.now(); job.current = { slime: k, cands: [] };
+    send({ type: 'slime', key: k, site: g.pos, rad: 14 });
+  };
+  const sug = roads.filter(r => r.status === 'suggested'), mine = roads.filter(r => r.status === 'planned');
+  const line = (r: GhostRoad) => 'to ' + (r.toName || 'a local street') + ', ' + fmt(r.lenM) + ' m' + (r.dvht != null ? ' · Router: ' + (r.dvht < 0 ? '−' : '+') + Math.abs(r.dvht).toFixed(1) + ' veh-h at ' + hourLabel(s.hour) : '') + (r.vol ? ' · ' + fmt(r.vol) + ' cars an hour' : '');
+  return <div style={{ marginTop: 8 }}><p className="sec">Access roads</p>
+    {trips != null && !mine.length && <small style={{ display: 'block', color: 'var(--muted)' }}>{trips >= 1200 ? 'One driveway carries ' : 'Its driveway carries '}{fmt(trips)} car trips a day.</small>}
+    {mine.map(r => <div className="chg" key={r.id}><span><b>Your road</b> {line(r)}</span><button className="mini" onClick={() => setRoads(roads.filter(x => x.id !== r.id))}>Remove</button></div>)}
+    {sug.map(r => <div className="chg" key={r.id}><span><b>Option {roads.indexOf(r) + 1}</b> {line(r)}{Math.abs(r.dvht || 0) > 20 ? <><br /><small className="warnline">Large saving: it probably becomes a shortcut for through traffic. Check before accepting.</small></> : null}</span>
+      <span style={{ display: 'grid', gap: 4 }}><button className="mini act" onClick={() => setRoads(roads.filter(x => x.status === 'planned' || x.id === r.id).map(x => x.id === r.id ? { ...x, status: 'planned' as const } : x))}>Accept</button>
+        <button className="mini" onClick={() => setRoads(roads.filter(x => x.id !== r.id))}>Dismiss</button></span></div>)}
+    {busy ? <small>{busy}</small> : <button className="mini act" style={{ marginTop: 4 }} onClick={run}>{sug.length || mine.length ? 'Search again' : 'Suggest access roads'}</button>}
+    {msg && !busy && <p className="note" style={{ margin: '6px 0 0' }}>{msg}</p>}
+    <p className="note" style={{ margin: '6px 0 0' }}>The slime-mold search only proposes roads; the router keeps the ones that cut total driving time in this hour. New roads are modeled as two-lane collectors. Cost, right-of-way and grades are not checked.</p>
   </div>;
 }

@@ -22,7 +22,7 @@ export type Res =
   | { type: 'years'; key: string; years: { t: number; vc: Float32Array }[] }
   | { type: 'compare'; key: string; base: number; options: { id: string; vht: number; vol: Float64Array; worst?: Worst | null; roadVol?: Record<string, { vol: number; vc: number }>; planTrips?: number[] }[]; baseWorst?: Worst | null }
   | { type: 'slime'; key: string; cands: RoadCandidate[]; sinks: number; ms: number }
-  | { type: 'judge'; key: string; base: number; options: { id: string; vht: number; planTrips?: number[] }[] };
+  | { type: 'judge'; key: string; base: number; options: { id: string; vht: number; planTrips?: number[]; roadVol?: Record<string, { vol: number; vc: number }> }[] };
 type Worst = { vc: number; name: string };
 
 let R: Router | null = null, A: ReturnType<typeof createAtlas> | null = null;
@@ -83,7 +83,7 @@ function handle(m: Req) {
     post({ type: 'compare', key: m.key, base, options, baseWorst: m.pos ? R!.localWorst(m.sc, runOne(m.sc).vol, m.pos, 10) : null });
   } else if (m.type === 'judge') {  /* like compare, but queued per key so other panels' compares never drop it */
     const base = runOne(m.sc).vht;
-    post({ type: 'judge', key: m.key, base, options: m.options.map(o => { const r = runOne(o.sc); return { id: o.id, vht: r.vht, planTrips: r.planTrips }; }) });
+    post({ type: 'judge', key: m.key, base, options: m.options.map(o => { const r = runOne(o.sc); return { id: o.id, vht: r.vht, planTrips: r.planTrips, roadVol: r.roadVol }; }) });
   } else if (m.type === 'slime') {
     const t0 = performance.now(), r = slimeRoads(A!, R!, m.site, m.rad, m.skipNode);
     post({ type: 'slime', key: m.key, cands: r.cands, sinks: r.sinks, ms: Math.round(performance.now() - t0) });

@@ -2,12 +2,16 @@
    Planned ghosts go into the router's scenario (housing adds people to its zone, shops and offices add trips);
    Suggested ghosts are proposals and are drawn on the map but do not count until a planner accepts them. */
 import type { Atlas } from '../model/atlas';
-import type { PlanSite, ZonesFile } from '../model/routing';
+import type { NewRoad, PlanSite, ZonesFile } from '../model/routing';
 import type { XZ } from '../model/types';
 
 export type GhostKind = 'student' | 'homes' | 'grocery' | 'office' | 'parking';
 /* place: result of the placement rules at the last drop (moved = meters it snapped; ok false = no legal spot nearby) */
-export type Ghost = { id: string; kind: GhostKind; pos: XZ; year: number; status: 'planned' | 'suggested'; why?: string; place?: { moved: number; ok: boolean; lot?: boolean } };
+export type Ghost = { id: string; kind: GhostKind; pos: XZ; year: number; status: 'planned' | 'suggested'; why?: string; place?: { moved: number; ok: boolean; lot?: boolean };
+  roads?: GhostRoad[] };
+/* An access road from a ghost to an existing street node (found by the slime-mold search, judged by the router).
+   Suggested roads are drawn dashed and not counted; accepted ones are added to the network with their project. */
+export type GhostRoad = { id: string; to: number; toName: string; pts: XZ[]; lenM: number; status: 'planned' | 'suggested'; dvht?: number; vol?: number };
 
 /* Sizes in meters. Trip figures are ESTIMATES from ITE-style rates (same as the UI sandbox). */
 export const GHOST_TYPES: Record<GhostKind, {
@@ -44,6 +48,12 @@ export function zoneFinder(A: Atlas, zones: ZonesFile | null) {  /* nearest Cens
    (scenario.plans), with a driveway to the nearest street, so its trips leave from where it actually sits.
    Positions are rounded to 4 m so tiny drags reuse cached runs. */
 const r2 = (x: number) => Math.round(x * 50) / 50;
+export function ghostRoads(list: Ghost[], t: number): NewRoad[] {
+  const out: NewRoad[] = [];
+  list.forEach(g => { if (g.status !== 'planned' || !ghostActive(g, t) || g.kind === 'parking') return;
+    (g.roads || []).forEach(r => { if (r.status === 'planned') out.push({ id: r.id, plan: g.id, to: r.to, lenM: Math.round(r.lenM), cls: 'collector' }); }); });
+  return out;
+}
 export function ghostPlans(list: Ghost[], t: number): PlanSite[] {
   return list.filter(g => g.status === 'planned' && ghostActive(g, t) && g.kind !== 'parking').map(g => {
     const ty = GHOST_TYPES[g.kind];
