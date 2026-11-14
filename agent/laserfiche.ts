@@ -4,6 +4,9 @@
    short, and results cached for a while, so checking for new records never crowds out residents using the archive.
    Node only (used by api/records.ts). */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 const B = 'https://laserfiche.rexburg.org/WebLink/';
 const REPO = 'Rexburg';
 
@@ -29,11 +32,11 @@ async function openSession() {
   const jar = new Map<string, string>();
   const take = (r: Response) => { (r.headers.getSetCookie?.() || []).forEach(c => { const [kv] = c.split(';'); const i = kv.indexOf('='); jar.set(kv.slice(0, i).trim(), kv.slice(i + 1)); }); };
   const cookie = () => [...jar].map(([k, v]) => k + '=' + v).join('; ');
-  const get = async (path: string) => { const r = await fetch(B + path, { headers: { cookie: cookie() }, redirect: 'manual' }); take(r); return r; };
+  const get = async (path: string) => { const r = await fetch(B + path, { headers: { cookie: cookie() }, redirect: 'manual', signal: AbortSignal.timeout(8e3) }); take(r); return r; };
   /* the first visit sets the cookie and redirects once to confirm cookies work */
   await get('Browse.aspx?dbid=0&repo=' + REPO); await get('Browse.aspx?dbid=0&repo=' + REPO + '&cr=1');
   async function post<T>(service: string, body: unknown): Promise<T> {
-    const r = await fetch(B + service, { method: 'POST', headers: { cookie: cookie(), 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(B + service, { method: 'POST', headers: { cookie: cookie(), 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(8e3) });
     take(r);
     const t = await r.text();
     if (/number of sessions has reached the licensed limit/i.test(t)) throw new ArchiveBusy('The city archive is at its limit of public visitors right now. Try again in a few minutes.');
@@ -119,11 +122,34 @@ async function walk(s: Session, now: Date): Promise<CityRecord[]> {
   return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+/* Saved copies of records (scripts/fetch_minutes.ts: "Source: <DocView url>\nTitle: ...\nPages: n\n\n<text>", named
+   cc-YYYY-MM-DD.txt or pz-YYYY-MM-DD.txt). Used when this server can't reach the archive (it refuses some cloud hosts);
+   vercel.json bundles the folder with the functions. */
+const SAVED = join(process.cwd(), 'data/raw/minutes');
+function savedRecords(): (CityRecord & { file: string })[] {
+  let names: string[] = [];
+  try { names = readdirSync(SAVED).filter(n => n.endsWith('.txt')); } catch { return []; }
+  return names.flatMap(file => {
+    const head = readFileSync(join(SAVED, file), 'utf8').slice(0, 400);
+    const id = +((head.match(/[?&]id=(\d+)/) || [])[1] || 0), m = file.match(/^(cc|pz)-(\d{4}-\d{2}-\d{2})/);
+    if (!id || !m) return [];
+    const src = SOURCES.find(s => s.kind === (m[1] === 'cc' ? 'council' : 'pz'))!;
+    const title = ((head.match(/^Title: (.*)$/m) || [])[1] || file).replace(/\.pdf$/i, '').trim();
+    return [{ id, kind: src.kind, title, label: src.label + ', ' + nice(m[2]), date: m[2], url: B + 'DocView.aspx?id=' + id + '&dbid=0&repo=' + REPO, edoc: false, file }];
+  });
+}
+
 /* cached so a busy afternoon of "Check for new records" opens one archive session every ten minutes at most */
 let listed: { at: number; records: CityRecord[] } | null = null;
 export async function latestRecords(now = new Date()): Promise<CityRecord[]> {
   if (listed && Date.now() - listed.at < 10 * 60e3) return listed.records;
-  const records = await use(s => walk(s, now));
+  let records: CityRecord[];
+  try { records = await use(s => walk(s, now)); }
+  catch (e) {
+    const saved = savedRecords();
+    if (!saved.length) throw e;
+    records = saved.map(({ file, ...r }) => r).sort((a, b) => b.date.localeCompare(a.date));
+  }
   listed = { at: Date.now(), records };
   return records;
 }
@@ -132,6 +158,8 @@ export async function latestRecords(now = new Date()): Promise<CityRecord[]> {
 const read = new Map<number, { pdf?: Uint8Array; text: string }>();
 export async function recordContent(id: number, edoc: boolean): Promise<{ pdf?: Uint8Array; text: string }> {
   const hit = read.get(id); if (hit) return hit;
+  const copy = savedRecords().find(r => r.id === id);
+  if (copy) return { text: readFileSync(join(SAVED, copy.file), 'utf8').replace(/^[\s\S]*?\r?\n\r?\n/, '') };  // drop the header
   /* the archive's "electronic file" flag does not match the file names, so try the likelier form first, then the other */
   const got = await use(async s => {
     const asFile = async () => { const b = await s.file(id); return b[0] === 0x25 && b[1] === 0x50 ? { pdf: b, text: '' } : null; };  // %P: a PDF

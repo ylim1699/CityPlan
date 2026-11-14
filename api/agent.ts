@@ -32,6 +32,8 @@ export async function POST(request: Request) {
     const projects = r.projects.map(p => ({ ...p, category: categoryOf(p), check: checkQuote(p.quote, text) }));
     return Response.json({ projects, source: { label, url }, model: r.model, tried: r.tried });
   } catch (e) {
-    return Response.json({ error: String(e instanceof Error ? e.message : e) }, { status: 502 });
+    /* Node's fetch says only "fetch failed"; the cause names the real problem (timeout, refused, certificate) */
+    const cause = e instanceof Error && e.cause ? ' (' + String((e.cause as any).code || (e.cause as any).message || e.cause) + ')' : '';
+    return Response.json({ error: String(e instanceof Error ? e.message : e) + cause }, { status: 502 });
   }
 }

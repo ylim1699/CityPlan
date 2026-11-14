@@ -28,6 +28,8 @@ export async function POST(request: Request) {
     }
     return Response.json({ error: "Send { action: 'list' } or { action: 'read', id }" }, { status: 400 });
   } catch (e) {
-    return Response.json({ error: String(e instanceof Error ? e.message : e) }, { status: e instanceof ArchiveBusy ? 503 : 502 });
+    /* Node's fetch says only "fetch failed"; the cause names the real problem (timeout, refused, certificate) */
+    const cause = e instanceof Error && e.cause ? ' (' + String((e.cause as any).code || (e.cause as any).message || e.cause) + ')' : '';
+    return Response.json({ error: String(e instanceof Error ? e.message : e) + cause }, { status: e instanceof ArchiveBusy ? 503 : 502 });
   }
 }
