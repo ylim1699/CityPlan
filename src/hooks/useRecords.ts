@@ -65,7 +65,7 @@ export function useRecords(projects: ProjectsFile) {
   async function call(body: unknown) {
     let pass = ''; try { pass = sessionStorage.getItem('agent-pass') || ''; } catch (e) {}
     const r = await fetch('/api/records', { method: 'POST', headers: { 'content-type': 'application/json', ...(pass ? { 'x-agent-token': pass } : {}) }, body: JSON.stringify(body) });
-    const j = await r.json().catch(() => ({ error: 'The records service is not running here (it needs the server: pnpm dev or the deployed site).' }));
+    const j = await r.json().catch(() => ({ error: 'The records service did not answer properly (HTTP ' + r.status + '). It needs the server: pnpm dev or the deployed site; on Vercel, check the function logs.' }));
     if (!r.ok) throw Object.assign(new Error(j.error || 'HTTP ' + r.status), { status: r.status });
     return j;
   }

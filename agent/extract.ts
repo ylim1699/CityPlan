@@ -5,7 +5,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
-import { CATEGORIES } from '../src/model/review';
+import { CATEGORIES } from '../src/model/review.js';
 
 export const CLAUDE_MODEL = 'claude-opus-5-5';
 
@@ -76,6 +76,6 @@ export function providerReady() {
   return provider() === 'gemini' ? !!process.env.GEMINI_API_KEY : !!process.env.ANTHROPIC_API_KEY;
 }
 export async function extractProjects(input: ExtractInput): Promise<ExtractResult> {
-  if (provider() === 'gemini') { const { extractWithGemini } = await import('./gemini'); return extractWithGemini(input); }
+  if (provider() === 'gemini') { const { extractWithGemini } = await import('./gemini.js'); return extractWithGemini(input); }
   return extractWithClaude(input);
 }

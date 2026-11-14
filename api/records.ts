@@ -4,10 +4,10 @@
    { action: 'read', id, edoc, label, url } -> { projects, source, model }  the same answer as /api/agent for that record
    Reading uses the AI agent (GEMINI_API_KEY or ANTHROPIC_API_KEY); listing needs no key. AGENT_TOKEN guards both, as in
    api/agent.ts. Nothing is saved: found projects go to the planner's review list and a person confirms each one. */
-import { extractProjects, provider, providerReady } from '../agent/extract';
-import { ArchiveBusy, latestRecords, recordContent } from '../agent/laserfiche';
-import { pdfText } from '../agent/pdftext';
-import { categoryOf, checkQuote } from '../src/model/review';
+import { extractProjects, provider, providerReady } from '../agent/extract.js';
+import { ArchiveBusy, latestRecords, recordContent } from '../agent/laserfiche.js';
+import { pdfText } from '../agent/pdftext.js';
+import { categoryOf, checkQuote } from '../src/model/review.js';
 
 export async function POST(request: Request) {
   const token = process.env.AGENT_TOKEN;

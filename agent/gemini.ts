@@ -3,7 +3,7 @@
    Default chain: a primary plus 3 fallbacks. Override in .env, e.g. GEMINI_MODELS=gemini-3.5-flash-lite,gemini-3.6-flash */
 import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
-import { Found, SYSTEM, TASK, keepQuoted, type ExtractInput, type ExtractResult } from './extract';
+import { Found, SYSTEM, TASK, keepQuoted, type ExtractInput, type ExtractResult } from './extract.js';
 
 export const GEMINI_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-4-hydrogen'];  // hydrogen last: most capable but about a minute per request
 export function geminiModels() { return (process.env.GEMINI_MODELS || GEMINI_MODELS.join(',')).split(',').map(s => s.trim()).filter(Boolean); }

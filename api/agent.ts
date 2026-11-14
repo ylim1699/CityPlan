@@ -4,9 +4,9 @@
    Each project comes back with its quote checked against the record's own text (check) and a category, so the reviewer
    sees at once whether the quote is really there. Nothing is saved here: a person confirms each project in the app.
    Needs GEMINI_API_KEY (default provider, with model fallbacks) or ANTHROPIC_API_KEY with AGENT_PROVIDER=claude. If AGENT_TOKEN is set, callers must send it in x-agent-token, so strangers can't spend the API budget. */
-import { extractProjects, provider, providerReady } from '../agent/extract';
-import { guessLabel, laserficheFile, pdfText } from '../agent/pdftext';
-import { categoryOf, checkQuote } from '../src/model/review';
+import { extractProjects, provider, providerReady } from '../agent/extract.js';
+import { guessLabel, laserficheFile, pdfText } from '../agent/pdftext.js';
+import { categoryOf, checkQuote } from '../src/model/review.js';
 
 export async function POST(request: Request) {
   const token = process.env.AGENT_TOKEN;
