@@ -6,14 +6,15 @@ import type { PlanSite, ZonesFile } from '../model/routing';
 import type { XZ } from '../model/types';
 
 export type GhostKind = 'student' | 'homes' | 'grocery' | 'office' | 'parking';
-export type Ghost = { id: string; kind: GhostKind; pos: XZ; year: number; status: 'planned' | 'suggested'; why?: string };
+/* place: result of the placement rules at the last drop (moved = meters it snapped; ok false = no legal spot nearby) */
+export type Ghost = { id: string; kind: GhostKind; pos: XZ; year: number; status: 'planned' | 'suggested'; why?: string; place?: { moved: number; ok: boolean; lot?: boolean } };
 
 /* Sizes in meters. Trip figures are ESTIMATES from ITE-style rates (same as the UI sandbox). */
 export const GHOST_TYPES: Record<GhostKind, {
   label: string; size: string; w: number; d: number; h: number; n: number; note: string;
   beds?: number; units?: number; spaces?: number; park: number; trips?: number;
 }> = {
-  student: { label: 'Student housing', size: '500 beds', w: 120, d: 80, h: 20, n: 2, beds: 500, park: 300, note: 'Adds 500 students to its zone; the router gives fewer car trips in the walk district' },
+  student: { label: 'Student housing', size: '500 beds', w: 70, d: 50, h: 18, n: 2, beds: 500, park: 300, note: 'Adds 500 students to its zone; the router gives fewer car trips in the walk district' },
   homes: { label: 'Neighborhood', size: '250 homes', w: 300, d: 300, h: 8, n: 12, units: 250, park: 550, note: 'Adds 250 households (3.3 people each) to its zone' },
   grocery: { label: 'Grocery store', size: '50,000 sq ft', w: 120, d: 90, h: 9, n: 1, park: 200, trips: 3055, note: '94 trips per 1,000 sq ft, less 35% pass-by (estimate)' },
   office: { label: 'Office or clinic', size: '60,000 sq ft', w: 80, d: 60, h: 16, n: 1, park: 180, trips: 660, note: '11 trips per 1,000 sq ft (estimate)' },

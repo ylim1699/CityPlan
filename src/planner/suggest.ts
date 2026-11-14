@@ -1,5 +1,5 @@
 /* "Suggest sites": screen open land quickly, then let the router judge the best few (ported from the UI sandbox,
-   rebuilt on CityPlan's router). Open land = no mapped building, park, water or parking lot under the footprint,
+   rebuilt on CityPlan's router). Open land = no mapped building, park or water under the footprint (parking lots count as redevelopment sites),
    no street through it, and a main street within about 1.2 km. Zoning and ownership are NOT checked. */
 import { useCallback, useRef, useState } from 'react';
 import type { Atlas } from '../model/atlas';
@@ -10,7 +10,7 @@ import { hourLabel } from '../ui';
 import { GHOST_TYPES, ghostPlans, newGhost, type Ghost, type GhostKind } from './ghosts';
 
 const OCC = 0.3;  /* occupancy grid cell, scene units (60 m) */
-type Land = { occ: Set<string>; polys: { box: number[]; pts: XZ[] }[]; segIdx: Map<string, number[]>; box: number[] };
+type Land = { occ: Set<string>; polys: { box: number[]; pts: XZ[]; lot: boolean }[]; segIdx: Map<string, number[]>; box: number[] };
 const landCache = new WeakMap<Atlas, Land>();
 const key = (x: number, z: number) => Math.floor(x / OCC) + ',' + Math.floor(z / OCC);
 
@@ -23,11 +23,12 @@ function land(A: Atlas): Land {
     for (let k = 2; k < b.length; k += 2) { const x = b[k] * S, z = b[k + 1] * S; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     for (let x = x0; x <= x1 + OCC / 2; x += OCC / 2) for (let z = z0; z <= z1 + OCC / 2; z += OCC / 2) occ.add(key(x, z));
   });
-  [C.parks, C.water, C.lots].forEach(list => (list || []).forEach(fl => {
+  /* parks and water are off limits; parking lots are allowed as redevelopment sites (student housing near campus usually replaces lots) */
+  ([[C.parks, false], [C.water, false], [C.lots, true]] as [number[][], boolean][]).forEach(([list, lot]) => (list || []).forEach(fl => {
     const pts: XZ[] = []; for (let k = 0; k < fl.length; k += 2) pts.push([fl[k] * S, fl[k + 1] * S]);
     if (pts.length < 3) return;
     const bx = [1e9, -1e9, 1e9, -1e9]; pts.forEach(p => { bx[0] = Math.min(bx[0], p[0]); bx[1] = Math.max(bx[1], p[0]); bx[2] = Math.min(bx[2], p[1]); bx[3] = Math.max(bx[3], p[1]); });
-    polys.push({ box: bx, pts });
+    polys.push({ box: bx, pts, lot });
   }));
   A.SEGS.forEach((s, i) => {
     const n = Math.max(2, Math.ceil(s.len / (OCC / 2)));
@@ -49,11 +50,12 @@ function nearSegs(L: Land, pos: XZ, r: number) {
   return out;
 }
 /* Is a footprint of this kind free at pos? (used for suggestions now, and for placement rules in step 3) */
-export function siteFree(A: Atlas, kind: GhostKind, pos: XZ) {
+export function siteFree(A: Atlas, kind: GhostKind, pos: XZ, allowLots = true) {
   const L = land(A), t = GHOST_TYPES[kind], hw = t.w * A.S / 2, hd = t.d * A.S / 2;
   for (let x = -hw; x <= hw + 1e-9; x += OCC / 2) for (let z = -hd; z <= hd + 1e-9; z += OCC / 2) if (L.occ.has(key(pos[0] + x, pos[1] + z))) return false;
   const probes: XZ[] = [pos, [pos[0] - hw, pos[1] - hd], [pos[0] + hw, pos[1] - hd], [pos[0] - hw, pos[1] + hd], [pos[0] + hw, pos[1] + hd]];
   for (const P of L.polys) {
+    if (P.lot && allowLots) continue;
     if (P.box[0] > pos[0] + hw || P.box[1] < pos[0] - hw || P.box[2] > pos[1] + hd || P.box[3] < pos[1] - hd) continue;
     if (probes.some(q => inPoly(q, P.pts))) return false;
   }
@@ -135,4 +137,35 @@ export function useSuggest(A: Atlas, sc: Scenario, shown: SegResult[], ghosts: G
     }, 30);
   }, [A, sc, shown, setGhosts]);
   return { suggest, st };
+}
+
+/* ---------- Placement rules (step 3) ----------
+   Generic rules only, until the county zoning layer is loaded: the footprint must sit on open land (no mapped
+   building, park or water under it; parking lots allowed as redevelopment, no street through it, which also keeps it about 30-60 m back from
+   street centerlines), keep 30 m from the planner's other projects, and have a street within about 400 m.
+   A drop that breaks a rule snaps to the nearest spot that passes, searching out to 1 km. */
+function clearOfOthers(A: Atlas, kind: GhostKind, pos: XZ, others: Ghost[]) {
+  const t = GHOST_TYPES[kind], gap = 30 * A.S;
+  return others.every(o => {
+    const u = GHOST_TYPES[o.kind];
+    return Math.abs(o.pos[0] - pos[0]) > (t.w + u.w) * A.S / 2 + gap || Math.abs(o.pos[1] - pos[1]) > (t.d + u.d) * A.S / 2 + gap;
+  });
+}
+export type Placement = { pos: XZ; moved: number; ok: boolean; lot?: boolean };  /* moved in meters; ok false = no legal spot nearby; lot = sits on a parking lot */
+export function snapSite(A: Atlas, kind: GhostKind, pos: XZ, others: Ghost[]): Placement {
+  const L = land(A);
+  const legal = (p: XZ) => nearSegs(L, p, 2).length > 0 && siteFree(A, kind, p) && clearOfOthers(A, kind, p, others);
+  const onLot = (p: XZ) => !siteFree(A, kind, p, false);
+  if (legal(pos)) return { pos, moved: 0, ok: true, lot: onLot(pos) };
+  const step = OCC / 2, maxR = 5;  /* 30 m rings out to 1 km */
+  for (let r = step; r <= maxR + 1e-9; r += step) {
+    let best: XZ | null = null, bd = Infinity;
+    const n = Math.max(8, Math.ceil(2 * Math.PI * r / step));
+    for (let k = 0; k < n; k++) {
+      const a = 2 * Math.PI * k / n, p: XZ = [pos[0] + r * Math.cos(a), pos[1] + r * Math.sin(a)];
+      if (legal(p)) { const d = Math.hypot(p[0] - pos[0], p[1] - pos[1]); if (d < bd) { bd = d; best = p; } }
+    }
+    if (best) return { pos: best, moved: Math.round(bd / A.S), ok: true, lot: onLot(best) };
+  }
+  return { pos, moved: 0, ok: false };
 }

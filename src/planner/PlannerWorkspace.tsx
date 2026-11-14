@@ -9,7 +9,7 @@ import type { Computed } from '../components/Panels';
 import { send, useWorkerMessages } from '../hooks/useTraffic';
 import { CCOL, TODAY_I, fmt, hourLabel, pct } from '../ui';
 import './planner.css';
-import type { SuggestState } from './suggest';
+import { snapSite, type SuggestState } from './suggest';
 import { GHOST_TYPES, KINDS, YEARS, ghostActive, ghostPlans, ghostSupply, newGhost, type Ghost, type GhostKind } from './ghosts';
 
 export const tiOfYear = (y: number) => (y - 2024) * 4 + 3;  /* fall (Q4) of year y */
@@ -73,7 +73,10 @@ export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, se
   const kinds = KINDS.filter(k => A.CITY.collegeTown || (k !== 'student' && k !== 'parking'));
   const ty = GHOST_TYPES[kind];
   const patch = (id: string, p: Partial<Ghost>) => setGhosts(ghosts.map(g => g.id === id ? { ...g, ...p } : g));
-  const add = (pos: XZ) => { const g = newGhost(kind, pos, year); setGhosts(ghosts.concat([g])); setSel(g.id); };
+  const add = (pos: XZ) => {  /* placement rules: snap to the nearest legal spot */
+    const pl = snapSite(A, kind, pos, ghosts), g = { ...newGhost(kind, pl.pos, year), place: { moved: pl.moved, ok: pl.ok, lot: pl.lot } };
+    setGhosts(ghosts.concat([g])); setSel(g.id);
+  };
   const startPick = () => {
     if (picking) { pick(null); setPicking(false); return; }
     setPicking(true);
@@ -82,7 +85,7 @@ export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, se
   useEffect(() => () => pick(null), []);
   const sel = ghosts.find(g => g.id === selId) || null;
   return <div className="ghosttools">
-    <div className="zoning-banner" role="status"><b>ZONING DATA NOT LOADED</b> · placements are not checked against zoning or ownership yet.</div>
+    <div className="zoning-banner" role="status"><b>ZONING DATA NOT LOADED</b> · placements follow generic rules only (no buildings, parks or water; parking lots count as redevelopment; 30 m from your other projects; a street within 400 m). Zoning and ownership are not checked.</div>
     <p className="sec">Plan a project for a year</p>
     <div className="seg wrap" role="group" aria-label="Project type">
       {kinds.map(k => <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{GHOST_TYPES[k].label}</button>)}
@@ -102,10 +105,10 @@ export function GhostTools({ A, s, c, sc, dispatch, ghosts, setGhosts, selId, se
         <span className="stripe" style={{ background: g.status === 'suggested' ? '#ffcf7a' : '#f0a03a' }}></span>
         <div><b>{t.label} · {t.size}</b>
           <small>{g.status === 'suggested' ? 'Suggested' + (g.why ? ': ' + g.why : '') : act ? 'Counted in this year' : 'Ghost until fall ' + g.year + ', not counted yet'}</small>
-          <small>Zoning: not checked (no data)</small></div>
+          <small className={g.place && !g.place.ok ? 'warnline' : undefined}>{!g.place ? (g.status === 'suggested' ? 'Placement: on open land' : 'Placement: not checked') : !g.place.ok ? 'Placement: no open land within 1 km. Check this site' : (g.place.moved ? 'Placement: moved ' + g.place.moved + ' m to ' : 'Placement: on ') + (g.place.lot ? 'a parking lot (redevelopment)' : 'open land')} · zoning not checked</small></div>
         <span style={{ display: 'grid', gap: 4 }}>
           <select className="mini" value={g.year} aria-label="Opening year" onClick={e => e.stopPropagation()} onChange={e => patch(g.id, { year: +e.target.value })}>{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select>
-          {g.status === 'suggested' && <button className="mini" onClick={e => { e.stopPropagation(); patch(g.id, { status: 'planned' }); }}>Accept</button>}
+          {g.status === 'suggested' && <button className="mini" onClick={e => { e.stopPropagation(); patch(g.id, { status: 'planned', place: g.place || { moved: 0, ok: true } }); }}>Accept</button>}
           <button className="mini" onClick={e => { e.stopPropagation(); setSel(g.id); flyTo(g.pos); }}>Find</button>
           <button className="mini" onClick={e => { e.stopPropagation(); if (selId === g.id) setSel(null); setGhosts(ghosts.filter(x => x.id !== g.id)); }}>Remove</button>
         </span></div>;

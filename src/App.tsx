@@ -18,7 +18,7 @@ import { ProblemCards } from './components/ProblemCards';
 import { DemoViews, Placement } from './components/Placement';
 import { GhostTools, YearStrip } from './planner/PlannerWorkspace';
 import { GHOST_TYPES, ghostActive, ghostPlans, ghostSupply, loadGhosts, saveGhosts, type Ghost } from './planner/ghosts';
-import { useSuggest } from './planner/suggest';
+import { snapSite, useSuggest } from './planner/suggest';
 
 type Lay = { ctl: boolean; pan: boolean; left: boolean };
 function loadLayout(): Lay {
@@ -92,7 +92,10 @@ export function App({ city, projects, metas, cal, zones }: { city: OsmCity; proj
   useEffect(() => {
     view.current?.onGhost(e => {
       setGhostSel(e.id);
-      if (e.type === 'move') setGhosts(ghostsRef.current.map(g => g.id === e.id ? { ...g, pos: e.pos } : g));
+      if (e.type !== 'move') return;
+      const list = ghostsRef.current, me = list.find(g => g.id === e.id); if (!me) return;
+      const pl = snapSite(A, me.kind, e.pos, list.filter(g => g.id !== e.id));  /* placement rules */
+      setGhosts(list.map(g => g.id === e.id ? { ...g, pos: pl.pos, place: { moved: pl.moved, ok: pl.ok, lot: pl.lot } } : g));
     });
   }, [A]);
 
