@@ -48,6 +48,7 @@ export type BlockGroup = {
 export type BlockGroupsFile = { meta: Meta; notes: string; groups: BlockGroup[] };
 export type ProjectsFile ={ meta: Meta; projects: Project[]; unmapped: { name: string; note: string; source: Source }[]; context: { name: string; note: string; source: Source }[] };
 
-export type Params = { enroll: number; stay: number; bedsPerYear: number; unitsPerYear: number; carShare: number };
+export type Params = { enroll: number; stay: number; bedsPerYear: number; unitsPerYear: number; carShare: number;
+  S0: number; R0: number; resGrowth: number };  /* fall 2026 students and other residents, and residents' yearly growth: the planner can change them */
 export type Fix = { road: string; at: XZ; factor: number; label: string };
 export type SegResult = { vol: number; cap: number; vc: number; tti?: number };

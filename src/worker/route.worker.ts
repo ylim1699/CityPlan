@@ -10,7 +10,7 @@ import { applyZones, type ModelEdits } from '../model/datafile';
 
 export type Req =
   | { type: 'init'; base: string }
-  | { type: 'projects'; extra: any[] }
+  | { type: 'projects'; extra: any[]; removed?: string[] }
   | { type: 'data'; edits: ModelEdits | null }
   | { type: 'run'; key: string; sc: Scenario; hours?: boolean }
   | { type: 'hours'; key: string; sc: Scenario }
@@ -32,9 +32,9 @@ type Jump = { pts: number; name: string; vc: number };
 type Worst = { vc: number; name: string };
 
 let R: Router | null = null, A: ReturnType<typeof createAtlas> | null = null;
-let files: any = null, extra: any[] = [], edits: ModelEdits | null = null;
+let files: any = null, extra: any[] = [], removed: string[] = [], edits: ModelEdits | null = null;
 function build() {
-  const [city, projects, graph, zones, cal, hourly] = files, ids = new Set(extra.map(p => p.id));
+  const [city, projects, graph, zones, cal, hourly] = files, ids = new Set(extra.map(p => p.id).concat(removed));
   A = createAtlas(city, { ...projects, projects: projects.projects.filter((p: any) => !ids.has(p.id)).concat(extra) });
   R = createRouter(A, graph, applyZones(zones, edits), cal.calib, hourly);
   cache.clear();
@@ -142,7 +142,7 @@ self.onmessage = async (e: MessageEvent<Req>) => {
     } catch (err) { post({ type: 'error', error: String(err) }); }
     return;
   }
-  if (m.type === 'projects') { extra = m.extra; if (files) build(); return; }
+  if (m.type === 'projects') { extra = m.extra; removed = m.removed || []; if (files) build(); return; }
   if (m.type === 'data') { edits = m.edits; if (files) build(); return; }
   pending.set(m.type === 'judge' ? 'judge:' + m.key : m.type, m);
   setTimeout(pump, 0);

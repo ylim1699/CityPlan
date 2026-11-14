@@ -21,8 +21,8 @@ function getWorker() {
   return worker;
 }
 export function send(m: Req) { getWorker().postMessage(m); }
-/* projects confirmed from the AI agent: the worker rebuilds its model with them */
-export function setExtraProjects(list: unknown[]) { send({ type: 'projects', extra: list } as Req); }
+/* projects confirmed from the AI agent or edited by a person, and the ones a person removed: the worker rebuilds its model with them */
+export function setExtraProjects(list: unknown[], removed: string[] = []) { send({ type: 'projects', extra: list, removed } as Req); }
 /* the open data file's numbers: the worker rebuilds its router with them (send before the run that needs them) */
 export function setDataEdits(edits: ModelEdits | null) { send({ type: 'data', edits }); }
 export function useWorkerMessages(fn: (m: Res) => void) {

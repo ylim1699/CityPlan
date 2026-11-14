@@ -21,12 +21,13 @@ export function daylight(h: number) { function ss(a: number, b: number, x: numbe
 export type PStatus = { key: 'done' | 'construction' | 'approved' | 'planned'; label: string; progress: number };
 export function pStatus(A: Atlas, p: Project, tp: number): PStatus {
   const s = A.projState(p, tp);
-  if (s.phase === 'done') return { key: 'done', label: 'Finished', progress: 1 };
+  /* a project that ends after today is only expected done when the slider is moved past its end, not known done */
+  if (s.phase === 'done') return { key: 'done', label: p.end > A.TODAY ? (p.unconfirmed ? 'Expected done, timing assumed' : 'Expected done') : 'Finished', progress: 1 };
   if (s.phase === 'active') return { key: 'construction', label: p.unconfirmed ? 'Under way, timing assumed' : 'Under construction', progress: s.progress };
   return { key: p.status === 'planned' ? 'planned' : 'approved', label: p.status === 'planned' ? 'Planned' : 'Approved, not started', progress: 0 };
 }
 export function when(p: Project, st: PStatus) {
-  if (st.key === 'done') return 'Finished ' + qLabel(p.end);
+  if (st.key === 'done') return (st.label === 'Finished' ? 'Finished ' : 'Expected by ') + qLabel(p.end);
   if (st.key === 'construction') return 'Target ' + qLabel(p.end);
   return 'Starts ' + qLabel(p.start);
 }

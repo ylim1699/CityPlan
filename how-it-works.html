@@ -1,0 +1,1140 @@
+<title>Growth Atlas Field Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a reference manual. Sticky part-grouped index on the left, one reading column on the right;
+   each model step is a "spec sheet": plain words, the equation, the real numbers, the file it lives in. */
+:root{
+  --paper:#eef1ed; --panel:#fbfcfa; --ink:#1c2a2d; --muted:#56666a; --line:#d3dbd6; --code:#e4eae5;
+  --accent:#0d6767; --accent-soft:#dcecea; --accent-ink:#ffffff;
+  --blue:#2e6bc9; --amber:#c27a12; --warn:#b5541f; --warn-soft:#fbeee4;
+  /* the app's own road-load scale (src/ui.ts CCOL): light, steady, busy, heavy, over */
+  --c0:#d8c49a; --c1:#e8b65a; --c2:#e88e3a; --c3:#cf552d; --c4:#8f1f2a;
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#131a1b; --panel:#1b2425; --ink:#e3ebe8; --muted:#9db0ab; --line:#2f3c3d; --code:#222d2e;
+    --accent:#5cc2b6; --accent-soft:#1d3735; --accent-ink:#0f1516;
+    --blue:#7fa8ec; --amber:#e6a64a; --warn:#f0a070; --warn-soft:#3a2a20; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#131a1b; --panel:#1b2425; --ink:#e3ebe8; --muted:#9db0ab; --line:#2f3c3d; --code:#222d2e;
+  --accent:#5cc2b6; --accent-soft:#1d3735; --accent-ink:#0f1516;
+  --blue:#7fa8ec; --amber:#e6a64a; --warn:#f0a070; --warn-soft:#3a2a20; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{background:var(--paper);color:var(--ink);font:15.5px/1.62 var(--body)}
+h1,h2,h3,h4{font-family:var(--display);line-height:1.2;text-wrap:balance;margin:0;font-weight:700}
+h1{font-size:clamp(30px,5.2vw,46px);letter-spacing:-.01em}
+h2{font-size:clamp(22px,3vw,27px);margin:0 0 6px}
+h3{font-size:18px;margin:26px 0 8px}
+h4{font-size:15px;margin:18px 0 6px;font-family:var(--body);font-weight:600}
+p{margin:0 0 12px;max-width:72ch}
+ul,ol{margin:0 0 12px;padding-left:22px;max-width:72ch}
+li{margin:3px 0}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+code,.num,kbd{font-family:var(--mono);font-size:.86em}
+code{background:var(--code);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.num{font-variant-numeric:tabular-nums}
+b,strong{font-weight:600}
+
+.wrap{max-width:1240px;margin:0 auto;padding-block:36px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:232px minmax(0,1fr);gap:48px}
+nav.toc{position:sticky;top:max(16px,env(safe-area-inset-top,0px));align-self:start;max-height:calc(100vh - 32px);overflow:auto;font-size:13.5px;padding-right:4px}
+nav.toc .part{font:600 11px/1 var(--body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:18px 0 6px 12px}
+nav.toc .part:first-child{margin-top:0}
+nav.toc ol{list-style:none;margin:0;padding:0;border-left:2px solid var(--line);max-width:none}
+nav.toc li{margin:0}
+nav.toc a{display:block;padding:3px 12px;color:var(--muted);text-decoration:none;margin-left:-2px;border-left:2px solid transparent}
+nav.toc a:hover{color:var(--ink)}
+nav.toc a.on{color:var(--accent);border-left-color:var(--accent);font-weight:500}
+main{min-width:0}
+main>section{margin:0 0 56px;scroll-margin-top:16px}
+.eyebrow{font:600 11.5px/1 var(--body);text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin:0 0 10px}
+.partbreak{border-top:2px solid var(--ink);padding-top:14px;margin:0 0 30px}
+.partbreak h2{font-size:clamp(26px,3.6vw,34px)}
+.partbreak p{color:var(--muted)}
+.lede{font-size:17.5px;color:var(--muted);max-width:66ch}
+.meta{color:var(--muted);font-size:13px;margin:14px 0 0}
+.where{font:12.5px/1.4 var(--mono);color:var(--muted);margin:-2px 0 14px}
+.where a{color:var(--muted)}
+
+/* key facts */
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:24px 0 0}
+.facts div{background:var(--panel);padding:12px 14px}
+.facts b{display:block;font:500 22px/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.facts span{display:block;color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:3px}
+
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:0 0 14px;max-width:76ch}
+.note p:last-child,.note ul:last-child{margin-bottom:0}
+.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.say{display:grid;gap:4px}
+.say b{font-family:var(--display)}
+
+/* equations */
+.eq{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin:0 0 12px;font:15px/1.7 var(--mono);overflow-x:auto;white-space:nowrap;max-width:76ch}
+.eq var{font-style:italic;font-family:var(--mono)}
+.eq .c{color:var(--muted);font-size:13px;white-space:normal;display:block;font-family:var(--body);margin-top:4px}
+dl.vars{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:0 0 14px;font-size:14px;max-width:76ch}
+dl.vars dt{font-family:var(--mono);font-size:13px;color:var(--accent);padding-top:1px}
+dl.vars dd{margin:0}
+
+/* tables */
+.tablewrap{overflow-x:auto;margin:0 0 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.tag{display:inline-block;font:600 10.5px/1 var(--body);text-transform:uppercase;letter-spacing:.06em;padding:4px 6px;border-radius:4px;white-space:nowrap}
+.tag.real{background:var(--accent);color:var(--accent-ink)}
+.tag.nat{background:var(--blue);color:var(--accent-ink)}
+.tag.est{background:var(--amber);color:#1b1305}
+.tag.ai{background:var(--ink);color:var(--paper)}
+
+/* pipeline */
+.flow{list-style:none;padding:0;margin:18px 0 8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;max-width:none;counter-reset:f}
+.flow li{margin:0;position:relative}
+.flow a{display:grid;gap:4px;height:100%;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);color:var(--ink);text-decoration:none;counter-increment:f}
+.flow a:hover{border-color:var(--accent)}
+.flow a::before{content:counter(f);font:500 12px/1 var(--mono);color:var(--accent)}
+.flow b{font-family:var(--display);font-size:16px}
+.flow small{color:var(--muted);font-size:12.5px;line-height:1.4}
+.flow .out a{background:var(--accent-soft);border-color:var(--accent)}
+
+/* load scale */
+.scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:6px 0 14px;max-width:640px}
+.scale div{padding:8px 8px 7px;border-radius:6px;font-size:12px;line-height:1.3}
+.scale b{display:block;font:500 13px var(--mono)}
+
+/* charts */
+figure{margin:6px 0 18px;max-width:760px}
+figure .plot{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 8px 4px;overflow-x:auto}
+figure svg{display:block;width:100%;height:auto;min-width:420px}
+figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted);margin:0 0 4px 6px}
+.legend i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+svg .ax{fill:var(--muted);font:11px var(--mono)}
+svg .grid{stroke:var(--line);stroke-width:1}
+svg .base{stroke:var(--muted);stroke-width:1}
+
+/* features */
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:0 0 16px}
+.feat>div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;min-width:0}
+.feat h4{margin:0 0 6px;font-family:var(--display);font-size:16px}
+.feat p{font-size:14px;margin:0 0 8px}
+.feat p:last-child{margin:0}
+.feat .src{font:12px/1.4 var(--mono);color:var(--muted)}
+
+/* steps (ordered process) */
+ol.steps{counter-reset:s;list-style:none;padding:0;max-width:76ch}
+ol.steps>li{counter-increment:s;position:relative;padding:0 0 12px 40px;margin:0}
+ol.steps>li::before{content:counter(s);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font:500 13px/26px var(--mono);text-align:center}
+
+/* Q&A */
+.qa-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.qa-tools input{flex:1 1 260px;font:15px var(--body);padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:0}
+.qa-tools small{color:var(--muted)}
+details.qa{border:1px solid var(--line);border-radius:8px;background:var(--panel);margin:0 0 8px;max-width:80ch}
+details.qa summary{cursor:pointer;padding:11px 14px;font-weight:600;list-style:none;display:flex;gap:10px}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"+";font:500 15px/1.4 var(--mono);color:var(--accent);flex:none}
+details.qa[open] summary::before{content:"−"}
+details.qa>div{padding:0 14px 12px 38px;font-size:14.5px}
+details.qa>div p{margin-bottom:8px}
+.qa-cat{font:600 11.5px/1 var(--body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:22px 0 8px}
+
+.theme{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));font:500 12px var(--body);padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;z-index:5}
+
+@media (max-width:900px){
+  .wrap{grid-template-columns:1fr;gap:24px;padding-top:56px}
+  nav.toc{position:static;max-height:none}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:4px;border:0}
+  nav.toc a{padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:var(--panel);margin:0}
+  nav.toc .part{margin:12px 0 6px}
+}
+@media (max-width:520px){
+  .scale{grid-template-columns:repeat(3,minmax(0,1fr))}
+  dl.vars{grid-template-columns:1fr}
+  dl.vars dd{margin-bottom:6px}
+}
+</style>
+
+<button class="theme" id="theme" type="button">Theme</button>
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <div class="part">Start</div>
+  <ol>
+    <li><a href="#short">The 60-second version</a></li>
+    <li><a href="#pipeline">How the pieces connect</a></li>
+    <li><a href="#check">Before you present</a></li>
+  </ol>
+  <div class="part">A · Data</div>
+  <ol>
+    <li><a href="#sources">Data sources</a></li>
+    <li><a href="#estimates">Every assumed number</a></li>
+  </ol>
+  <div class="part">B · The model</div>
+  <ol>
+    <li><a href="#roads">1 · Streets and capacity</a></li>
+    <li><a href="#population">2 · Population</a></li>
+    <li><a href="#projects">3 · Projects</a></li>
+    <li><a href="#zones">4 · Zones</a></li>
+    <li><a href="#trips">5 · Car trips</a></li>
+    <li><a href="#destinations">6 · Destinations</a></li>
+    <li><a href="#outside">7 · Outside traffic</a></li>
+    <li><a href="#hours">8 · Hours of the day</a></li>
+    <li><a href="#routing">9 · Routing</a></li>
+    <li><a href="#measures">10 · Congestion measures</a></li>
+    <li><a href="#countbased">The count-based fallback</a></li>
+  </ol>
+  <div class="part">C · Features</div>
+  <ol>
+    <li><a href="#f-start">Start screen and records check</a></li>
+    <li><a href="#f-map">Map, time and filters</a></li>
+    <li><a href="#f-overview">Overview dashboard</a></li>
+    <li><a href="#f-problems">Problem cards and fixes</a></li>
+    <li><a href="#f-gaps">Beds, homes and parking</a></li>
+    <li><a href="#f-build">Build: your own projects</a></li>
+    <li><a href="#f-sites">Alternate sites and AI picks</a></li>
+    <li><a href="#f-roads">Access roads (slime mold)</a></li>
+    <li><a href="#f-agent">AI agent for city records</a></li>
+    <li><a href="#f-data">Census data files</a></li>
+    <li><a href="#f-shop">Shopping trips</a></li>
+    <li><a href="#f-search">Map search</a></li>
+  </ol>
+  <div class="part">D · Trust</div>
+  <ol>
+    <li><a href="#accuracy">Accuracy against counts</a></li>
+    <li><a href="#limits">Limits</a></li>
+  </ol>
+  <div class="part">E · Answers</div>
+  <ol>
+    <li><a href="#qa">Likely questions</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+    <li><a href="#codemap">Where it lives in code</a></li>
+  </ol>
+</nav>
+
+<main>
+<header style="margin:0 0 48px">
+  <p class="eyebrow">Rexburg Growth Atlas · team reference</p>
+  <h1>How the Growth Atlas works</h1>
+  <p class="lede" style="margin-top:14px">Every feature, every number behind it, where that number comes from, and the equation that turns it into a street color. Read top to bottom once; after that, use the index to jump to whatever someone asks about.</p>
+  <p class="meta">Numbers are from the current build: <code>public/data/*.json</code> and the model in <code>src/model/</code>, run with default settings on Nov 14, 2026. If the data or calibration is rebuilt, re-check the figures marked with file names.</p>
+  <div class="facts" role="list">
+    <div role="listitem"><b>44,129</b><span>people in town, fall 2026 (21,955 students + 22,174 residents)</span></div>
+    <div role="listitem"><b>~171,000</b><span>car trips a day, both directions, routed through the network</span></div>
+    <div role="listitem"><b>143</b><span>traffic zones: 127 town, 4 campus, 12 gateways</span></div>
+    <div role="listitem"><b>1,106 / 1,426</b><span>road graph intersections / links from OpenStreetMap</span></div>
+    <div role="listitem"><b>89</b><span>city traffic counts used to calibrate and test</span></div>
+    <div role="listitem"><b>~0.1 s</b><span>to route one hour of trips (in a Web Worker)</span></div>
+  </div>
+</header>
+
+<!-- ======================= START ======================= -->
+<section id="short">
+  <h2>The 60-second version</h2>
+  <p>The Growth Atlas is a 3D map of Rexburg that shows how growth and approved projects change traffic, by hour and by year (2024 to 2034). It answers one planner question: <b>if we approve this project here, which streets get worse, and is there a better spot or road fix?</b></p>
+  <p>Under the map is a small version of the <b>four-step travel model</b> that state DOTs and planning agencies use:</p>
+  <ol>
+    <li><b>Trip generation.</b> Every resident and student in each zone makes car trips (Census commute data, national trip rates, campus rules).</li>
+    <li><b>Trip distribution.</b> Work trips follow real Census home-to-job pairs (LODES); other trips go to stores and jobs by a gravity rule (closer and bigger wins).</li>
+    <li><b>Mode.</b> The share who drive comes from the Census commute survey for each neighborhood; students in the walk district drive far less.</li>
+    <li><b>Assignment.</b> Each hour's trips are routed on the real street network in four batches; streets that fill up slow down (BPR curve), so later trips avoid them.</li>
+  </ol>
+  <p>The result is cars per hour on every street, divided by what that street can carry. That ratio (V/C) colors the street. We then checked it against 89 city traffic counts: it ranks streets in roughly the right order (correlation 0.78) but misses many single streets, so <b>it is for comparing options, not quoting exact volumes.</b></p>
+  <p>On top of that model sit the features: problem cards, fix comparisons, an overview dashboard, a Build mode for placing your own projects, alternate-site and road suggestions, and an AI agent that reads council and P&amp;Z minutes to find approved projects (a person confirms each one).</p>
+</section>
+
+<section id="pipeline">
+  <h2>How the pieces connect</h2>
+  <p>Data flows left to right. Each box links to its section. The features at the end all call the same model, so anything you change upstream (a population number, a project, a fix) changes every view.</p>
+  <ol class="flow">
+    <li><a href="#sources"><b>Raw data</b><small>OpenStreetMap, city GIS, Census LODES and ACS, ITD counter, city minutes</small></a></li>
+    <li><a href="#roads"><b>Street network</b><small>Lanes × per-lane capacity; length ÷ speed</small></a></li>
+    <li><a href="#population"><b>Population</b><small>Students and residents per year, capped by beds</small></a></li>
+    <li><a href="#projects"><b>Projects</b><small>Housing adds people; stores add visits; road work changes capacity</small></a></li>
+    <li><a href="#zones"><b>Zones</b><small>143 places where trips start and end</small></a></li>
+    <li><a href="#trips"><b>Car trips</b><small>Work, other, not-home-based, student</small></a></li>
+    <li><a href="#destinations"><b>Destinations</b><small>LODES pairs, gravity, campus, Walmart</small></a></li>
+    <li><a href="#outside"><b>Outside traffic</b><small>Through traffic and visitors at 12 gateways</small></a></li>
+    <li><a href="#hours"><b>Hour share</b><small>ITD counter 059: 9.7% of the day at 5 pm</small></a></li>
+    <li><a href="#routing"><b>Routing</b><small>4 batches, fastest paths, BPR slowdown</small></a></li>
+    <li><a href="#measures"><b>V/C and delay</b><small>Colors, delay, over-capacity miles</small></a></li>
+    <li class="out"><a href="#f-map"><b>Features</b><small>Map, overview, problems, Build, AI agent</small></a></li>
+  </ol>
+  <p style="font-size:14px;color:var(--muted)">Two traffic methods exist. <b>Routed trips</b> (the steps above) is the default. The older <a href="#countbased">count-based estimate</a> paints the map instantly while routing runs and takes over if routing fails.</p>
+</section>
+
+<section id="check">
+  <div class="note warn">
+    <p><b>Before you present: two documents have stale numbers.</b> <code>demo-script.md</code> and <code>plan.html</code> still quote an earlier calibration (α 3, β 0.08, 70% through traffic, about 30% passing GEH, 10–15% held-out, correlation about 0.8, 122 zones). The current <code>calibration.json</code> says:</p>
+    <ul>
+      <li>α 2, β 0.05 per minute, 3 student trips a day, 30% of highway traffic passing through</li>
+      <li>35% of tuning counts under GEH 5 (24 of 69); <b>0% of the 20 held-out counts</b>; 12% of 2023 counts (3 of 26); correlation 0.78</li>
+      <li>143 zones (127 town including 22 store zones, 4 campus, 12 gateways)</li>
+    </ul>
+    <p>Quote the numbers on this page, or rerun <code>pnpm tsx scripts/calibrate.ts</code> and update both documents.</p>
+    <p><b>The demo script also clicks two things that are no longer on screen:</b> the "Demo views" buttons and "Where should 500 new student beds go? → Compare three sites". Both components still exist in code (<code>Placement.tsx</code>) but nothing renders them. Use the time dock and the Build panel's Alternate sites instead, or put them back.</p>
+  </div>
+</section>
+
+<!-- ======================= PART A: DATA ======================= -->
+<div class="partbreak"><p class="eyebrow">Part A</p><h2>Data: where every input comes from</h2><p>Real local data where it exists, national averages where it doesn't, and a few labeled estimates tuned against counts.</p></div>
+
+<section id="sources">
+  <h2>Data sources</h2>
+  <p class="where">raw files: data/raw/ · what the app loads: public/data/ (each file carries a meta block with source, URL, date, type)</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Data</th><th>Source</th><th>What we use it for</th><th>Type</th></tr></thead>
+    <tbody>
+      <tr><td>Streets, lanes, speed limits, 5,179 buildings, 307 parking lots, parks, water, rail, campus outline</td><td>OpenStreetMap via Overpass Turbo (Nov 2026)</td><td>3D city, road graph, capacity, building floor area for placing people, open-land checks</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>Traffic counts: 317 records, 89 used (2015 and later, two-way street totals)</td><td>Madison County / Rexburg GIS TrafficCount layer</td><td>Calibration and accuracy; count-based fallback volumes</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>26 intersection approach counts from 2023</td><td>Same GIS layer</td><td>A recent check, never used for tuning</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>Home-to-work pairs (4,108 zone pairs), 12,161 workers by home, 14,778 jobs by industry</td><td>Census LODES 2023 (OD main + aux, RAC, WAC)</td><td>Where work trips go; how much each zone attracts</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>Population, commute mode, carpooling, work from home, cars per household, college enrollment, homes, median age</td><td>Census ACS 5-year 2020–2024 by block group (B01003, B08301, B25044, B25001, B01002, B14007); 2020 Census P1</td><td>People per zone; drive share and occupancy per zone; Census blocks layer</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>Hourly and day-of-week shape</td><td>ITD permanent counter 059 on SH-33 (Nov 2023 hourly; 2022 day-of-week)</td><td>Share of a day's trips in each hour</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>Approved projects (Madison Commons, WinCo, temple, etc.)</td><td>News, ITD, BYU-I, church pages, city bid listing (each project links its source)</td><td>Projects on the timeline</td><td><span class="tag real">Real</span> locations approximate</td></tr>
+      <tr><td>Five-year street plan (5 projects), developer widenings with no date (10)</td><td>City Road Improvement Projects map; Project Details layer</td><td>Road work on the timeline; "Build" options in fix comparison</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>Pedestrian Emphasis District (walk district)</td><td>City GIS PED layer</td><td>Student housing placement; fewer student car trips</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>Enrollment: 24,111 campus-based students, 90.7% living in town</td><td>East Idaho News, BYU-I pages</td><td>Starting student count 21,900</td><td><span class="tag real">Real</span></td></tr>
+      <tr><td>Council and P&amp;Z minutes and agendas</td><td>City Laserfiche archive (laserfiche.rexburg.org)</td><td>AI agent finds approved projects</td><td><span class="tag ai">AI + person</span></td></tr>
+      <tr><td>Person trips per resident, non-work car share, people per car, not-home-based share</td><td>NHTS 2022 national averages</td><td>Non-work trip rates</td><td><span class="tag nat">National avg</span></td></tr>
+      <tr><td>Project trip rates (per unit, bed, 1,000 sq ft)</td><td>ITE-style textbook rates</td><td>Trips from new projects</td><td><span class="tag est">Estimate</span></td></tr>
+      <tr><td>Terrain around town</td><td>AWS Terrain Tiles</td><td>Scenery only</td><td><span class="tag real">Real</span></td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Why these sources:</b> OpenStreetMap covers every street and can be edited to test new roads. The city's counts are the best local truth. ACS and LODES exist for every U.S. city, so the method transfers. NHTS is the federal fallback when a town has no travel survey, which is what NCHRP Report 716 tells small towns to do.</p>
+  <p><b>Data age:</b> most counts are 2015–2020, before the 2024 US-20 interchange rebuild and the 2nd East widening, so they are grown 2.5% a year to 2026. ACS is a 5-year average and LODES lags about two years, so recent growth comes from city records.</p>
+</section>
+
+<section id="estimates">
+  <h2>Every assumed number</h2>
+  <p>These cannot come from local data. Each is labeled ASSUMED or ESTIMATE in the code. The four marked <b>tuned</b> are set by calibration against counts; the rest are fixed planning values.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Setting</th><th class="n">Value</th><th>Why this value</th><th>Code</th></tr></thead>
+    <tbody>
+      <tr><td><b>Trip scale α</b> (tuned)</td><td class="n">2</td><td>Multiplies all in-town car trips; national rates under-produce traffic on Rexburg's counted streets</td><td><code>calibration.json</code></td></tr>
+      <tr><td><b>Distance preference β</b> (tuned)</td><td class="n">0.05 /min</td><td>How fast attraction fades with drive time in the gravity rule</td><td><code>calibration.json</code></td></tr>
+      <tr><td><b>Student trips a day</b> (tuned)</td><td class="n">3</td><td>No public BYU-I travel data</td><td><code>calibration.json</code></td></tr>
+      <tr><td><b>Through share on highways</b> (tuned)</td><td class="n">30%</td><td>Share of outside highway traffic that passes straight through</td><td><code>calibration.json</code></td></tr>
+      <tr><td>Capacity per lane</td><td class="n">450–1,800</td><td>Standard planning values by road type (table in step 1)</td><td><code>atlas.ts CLS</code></td></tr>
+      <tr><td>Speeds where OSM has none</td><td class="n">25–65 mph</td><td>645 of 731 roads have no maxspeed tag</td><td><code>build_city.py SPEED</code></td></tr>
+      <tr><td>Person trips per resident</td><td class="n">3.0 /day</td><td>NHTS 2022 average</td><td><code>routing.ts RATES</code></td></tr>
+      <tr><td>Non-work trips by car / people per car</td><td class="n">60% / 1.5</td><td>NHTS; ACS covers only commuting</td><td><code>RATES</code></td></tr>
+      <tr><td>Not-home-based share</td><td class="n">25%</td><td>NHTS</td><td><code>RATES</code></td></tr>
+      <tr><td>Student people per car / share to campus</td><td class="n">1.3 / 70%</td><td>Assumed; students carpool and most trips are class</td><td><code>RATES</code></td></tr>
+      <tr><td>Student car share (planner setting)</td><td class="n">55%</td><td>Share of students with a car</td><td><code>atlas.ts DEFAULTS</code></td></tr>
+      <tr><td>Shopping share / Walmart share</td><td class="n">40% / 60%</td><td>NHTS puts shopping and errands near 40%; most of town shops at Walmart</td><td><code>RATES</code></td></tr>
+      <tr><td>People per resident household</td><td class="n">3.3</td><td>Madison County household size</td><td><code>POP.hh</code></td></tr>
+      <tr><td>Student turnover / graduates who stay</td><td class="n">25% / 6%</td><td>Assumed; drives resident growth</td><td><code>POP, DEFAULTS</code></td></tr>
+      <tr><td>Enrollment growth / resident growth</td><td class="n">2% / 1.2%</td><td>Planner can change both</td><td><code>DEFAULTS</code></td></tr>
+      <tr><td>New student beds / new homes per year</td><td class="n">300 / 120</td><td>Background supply growth</td><td><code>DEFAULTS</code></td></tr>
+      <tr><td>Resident housing supply in 2026</td><td class="n">98% of need</td><td>Assumed tight market</td><td><code>POP.resSupply0</code></td></tr>
+      <tr><td>Count growth to 2026</td><td class="n">2.5% /yr</td><td>Counts are 2015–2020</td><td><code>build_city.py GROW</code></td></tr>
+      <tr><td>Student housing in the walk district</td><td class="n">by building type</td><td>Apartments and large untagged buildings inside the walk district hold students</td><td><code>build_zones.py</code></td></tr>
+      <tr><td>Parking spaces per lot</td><td class="n">1 per 30 m²</td><td>OSM lot area; not counted, not official</td><td><code>build_city.py</code></td></tr>
+      <tr><td>Spaces that come with each new bed</td><td class="n">0.6</td><td>Assumed</td><td><code>CITY.spacesPerNewBed</code></td></tr>
+      <tr><td>Widening factor (undated developer widenings)</td><td class="n">×1.8 capacity</td><td>Assumed effect of adding lanes</td><td><code>WIDEN.factor</code></td></tr>
+      <tr><td>Fix effects</td><td class="n">+15% / +8% / +25%</td><td>Turn lanes / signal timing / roundabout: rough capacity gains</td><td><code>ui.ts FIXES</code></td></tr>
+      <tr><td>Employed residents in a new neighborhood</td><td class="n">0.48 per person</td><td>No LODES rows exist for a place not built yet</td><td><code>WORKER_SHARE</code></td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Why estimates are acceptable:</b> every professional model has settings like these. The rule we follow is to tune only the labeled, model-wide estimates against counts and never hand-adjust a single street to make it match.</p>
+</section>
+
+<!-- ======================= PART B: MODEL ======================= -->
+<div class="partbreak"><p class="eyebrow">Part B</p><h2>The model, step by step</h2><p>Each step: what it does in plain words, the equation, the real numbers, and the file it lives in.</p></div>
+
+<section id="roads">
+  <p class="eyebrow">Step 1</p>
+  <h2>Streets, capacity and travel time</h2>
+  <p class="where">scripts/build_city.py → public/data/city-rexburg.json, graph-rexburg.json · src/model/atlas.ts (CLS, SEGS)</p>
+  <p>OpenStreetMap streets are split at intersections (any coordinate shared by two or more streets). That gives <b>731 roads, 3,647 drawn segments</b>, and a routing graph of <b>1,106 nodes and 1,426 links</b>, 99% connected.</p>
+  <h3>Capacity</h3>
+  <p>Capacity is the most cars that can pass a point in one hour before traffic backs up.</p>
+  <div class="eq"><var>C</var> = through lanes × per-lane rate for the road type<span class="c">Per direction on a two-way street: half of that (the router uses C × 0.5 for each direction).</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Road type (OSM tag)</th><th class="n">Cars / lane / hour</th><th class="n">Default speed</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Highway (motorway: US-20)</td><td class="n">1,800</td><td class="n">65 mph</td><td>No stops; about one car every 2 seconds per lane</td></tr>
+      <tr><td>Ramp</td><td class="n">1,400</td><td class="n">35 mph</td><td>Merging</td></tr>
+      <tr><td>Arterial (trunk, primary: 2nd East, Main St)</td><td class="n">900</td><td class="n">35 mph</td><td>Signals give green about half the time</td></tr>
+      <tr><td>Minor (secondary)</td><td class="n">850</td><td class="n">35 mph</td><td>Signals and more turns</td></tr>
+      <tr><td>Collector (tertiary)</td><td class="n">700</td><td class="n">30 mph</td><td>Stop signs and turning cars</td></tr>
+      <tr><td>Local (residential)</td><td class="n">450</td><td class="n">25 mph</td><td>Stop signs, parked cars, driveways</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Lanes:</b> from the OSM <code>lanes</code> tag when present; otherwise untagged arterials get 4 through lanes and other roads get a type default. North 2nd East is set to 4 through lanes because it was widened in 2024–25. <b>Lanes drive everything:</b> a wrong lane count pushes traffic onto the wrong streets, so check lanes first when a street looks wrong.</p>
+  <p><b>Example:</b> 2nd East, 4 through lanes × 900 = 3,600 cars an hour both ways, 1,800 each way.</p>
+  <h3>Free-flow travel time</h3>
+  <div class="eq"><var>t</var><sub>0</sub> = length ÷ speed<span class="c">Speed is the posted limit from OSM (86 roads have one) or the road-type default above (645 roads).</span></div>
+  <p><b>Example:</b> half a mile at 35 mph takes 0.5 ÷ 35 × 60 = 0.86 min, about <b>51 seconds</b>.</p>
+  <h3>What can change capacity</h3>
+  <ul>
+    <li><b>Road work</b> on the timeline: each project lists a factor during and after work (2nd East sewer: ×0.5 during; Main Street resurfacing: ×0.9; 2nd West / 2nd South signal: ×0.9 during, ×1.08 after), applied to its named streets within a radius.</li>
+    <li><b>Undated developer widenings</b> (10 on the city's map): ×1.8 on main-street segments inside the widening outline, off unless a planner picks it.</li>
+    <li><b>Tested fixes</b>: turn lanes ×1.15, signal timing ×1.08, roundabout ×1.25, on that street within about 320 m of the problem point.</li>
+  </ul>
+</section>
+
+<section id="population">
+  <p class="eyebrow">Step 2</p>
+  <h2>Population, year by year</h2>
+  <p class="where">src/model/atlas.ts · POP, DEFAULTS, popSeries()</p>
+  <p>Students and other residents are tracked separately because they live, drive and travel differently. Each year steps forward from fall 2026.</p>
+  <div class="eq">
+    <var>S</var><sub>y+1</sub> = min( <var>S</var><sub>y</sub> × (1 + enroll), beds<sub>y+1</sub> )<br>
+    <var>R</var><sub>y+1</sub> = <var>R</var><sub>y</sub> × (1 + g) + stay × (0.25 × <var>S</var><sub>y</sub>)<br>
+    beds<sub>y</sub> = 22,350 + 300 × (y − 2026)
+    <span class="c">Students grow with enrollment until beds run out (then beds cap them). Residents grow by background growth plus the graduates who stay (6% of the 25% who leave each year).</span>
+  </div>
+  <dl class="vars">
+    <dt>S₀ = 21,900</dt><dd>Students living in town, fall 2026: 24,111 campus-based × 0.907 living in Rexburg</dd>
+    <dt>R₀ = 22,100</dt><dd>Other residents: total about 44,000, between the Census (~40k) and the city's estimate (~45k)</dd>
+    <dt>beds₀ = 22,350</dt><dd>Student beds, fall 2026, assumed 98% full</dd>
+    <dt>enroll = 2%</dt><dd>Enrollment growth per year (planner setting)</dd>
+    <dt>g = 1.2%</dt><dd>Ordinary resident growth per year (planner setting)</dd>
+    <dt>stay = 6%</dt><dd>Share of leaving students who stay in town</dd>
+  </dl>
+  <p>"Students wanting to enroll" (<var>S</var><sub>u</sub>) grows at the enrollment rate with no cap. The gap between it and beds is the student-bed shortfall. Years switch in the fall (the timeline interpolates between falls), and 2024 and 2025 are back-cast from published enrollment.</p>
+  <figure>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Students wanting to enroll</span><span><i style="background:var(--amber)"></i>Student beds</span><span><i style="background:var(--blue)"></i>Other residents</span></div>
+    <div class="plot"><svg id="ch-pop" viewBox="0 0 640 230" role="img" aria-label="Students wanting to enroll pass student beds in fall 2030; residents grow from 21,611 in 2024 to 27,311 in 2034."></svg></div>
+    <figcaption>Default settings, fall of each year. Demand passes beds in <b>fall 2030</b> (the "cap year"); after that beds cap enrollment, and with it student traffic growth. Total people: 44,129 (2026), 48,227 (2030), 52,099 (2034).</figcaption>
+  </figure>
+</section>
+
+<section id="projects">
+  <p class="eyebrow">Step 3</p>
+  <h2>Projects on the timeline</h2>
+  <p class="where">public/data/projects.json · atlas.ts projState(), projTrips() · candidates.ts PLACE_TYPES</p>
+  <p>Each project has a status (construction, approved, planned), start and end dates as decimal years, a size, a source link, a confidence level and flags for what to check.</p>
+  <div class="eq">progress = (t − start) ÷ (end − start), clamped to 0…1<span class="c">Before start: future. Between: under construction. After end: done. Phased projects (Madison Commons) count trips in proportion to progress; others count only when done.</span></div>
+  <h3>How a project reaches the traffic model</h3>
+  <ul>
+    <li><b>Housing with units</b> adds people to its zone: units × 3.3 people (or 1 per unit for senior housing). Those people then make trips like everyone else.</li>
+    <li><b>Student housing with beds</b> adds students to its zone; they follow the student rules (fewer car trips in the walk district).</li>
+    <li><b>Everything else with trips</b> (stores, temple, offices) adds its daily car trips as visits to and from homes, by the gravity rule, and adds attraction to its zone.</li>
+    <li><b>Road work</b> changes capacity (step 1), not trips.</li>
+  </ul>
+  <p>The "trips a day" shown on a housing project's card is a display figure; the routed model builds that traffic from the added people instead.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Project</th><th>Status</th><th class="n">Trips/day</th><th>Basis</th><th>Confidence</th></tr></thead>
+    <tbody>
+      <tr><td>WinCo Foods</td><td>construction, to 2027</td><td class="n">5,130</td><td>84,000 sq ft × 94 per 1,000, less 35% pass-by</td><td>low</td></tr>
+      <tr><td>Madison Commons</td><td>construction, phased to 2034</td><td class="n">1,675</td><td>250 homes × 6.7; commercial not counted (tenants not announced)</td><td>medium</td></tr>
+      <tr><td>Sundance student housing addition</td><td>construction, to fall 2026</td><td class="n">550</td><td>220 units × 2.5 (low rate in walk district)</td><td>medium</td></tr>
+      <tr><td>Teton River Idaho Temple</td><td>construction, to mid-2027</td><td class="n">500</td><td>Assumed; no standard rate fits</td><td>medium</td></tr>
+      <tr><td>White Owl Business Park and Homestead Assisted Living</td><td>construction, to mid-2028</td><td class="n">260</td><td>Assumed 100 beds × 2.6</td><td>low</td></tr>
+      <tr><td>University Support Services Building</td><td>construction, to 2027</td><td class="n">150</td><td>Assumed staff and deliveries</td><td>medium</td></tr>
+      <tr><td>McKay Library remodel</td><td>construction</td><td class="n">0</td><td>Remodel of an existing building</td><td>high</td></tr>
+      <tr><td>2nd West and 2nd South signal upgrade</td><td>approved</td><td class="n">0</td><td>Capacity ×0.9 during, ×1.08 after</td><td>medium</td></tr>
+      <tr><td>Main Street resurfacing (ITD)</td><td>construction</td><td class="n">0</td><td>Capacity ×0.9 during work</td><td>high</td></tr>
+      <tr><td>2nd East sewer line</td><td>construction</td><td class="n">0</td><td>Capacity ×0.5 during work</td><td>high</td></tr>
+      <tr><td>North Yellowstone sewer line</td><td>construction</td><td class="n">0</td><td>No traffic effect modeled</td><td>high</td></tr>
+      <tr><td>5 street-plan reconstructions</td><td>2026–2030</td><td class="n">0</td><td>Local streets; months assumed June–October</td><td>high</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Trip rates for new projects</h3>
+  <p>Projects a person confirms from the AI agent use these rates (<code>PLACE_TYPES</code>); planner "ghost" projects use the ones in <a href="#f-build">Build</a>.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Type</th><th>Size measure</th><th class="n">Trips a day</th></tr></thead>
+    <tbody>
+      <tr><td>Student housing</td><td>beds</td><td class="n">2.5 per bed</td></tr>
+      <tr><td>Apartments or townhomes</td><td>units</td><td class="n">6.7 per unit</td></tr>
+      <tr><td>Single-family homes</td><td>units</td><td class="n">9.4 per unit</td></tr>
+      <tr><td>Store or restaurant</td><td>sq ft</td><td class="n">61 per 1,000 sq ft</td></tr>
+      <tr><td>Office or clinic</td><td>sq ft</td><td class="n">11 per 1,000 sq ft</td></tr>
+      <tr><td>School, church or public building</td><td>sq ft</td><td class="n">10 per 1,000 sq ft</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Avoiding double counting:</b> background growth (the population model) is the "growth only" scenario. Known projects come on top of it. The "Already planned" switch turns them on and off.</p>
+</section>
+
+<section id="zones">
+  <p class="eyebrow">Step 4</p>
+  <h2>Zones: where trips start and end</h2>
+  <p class="where">scripts/build_zones.py → public/data/zones.json</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Kind</th><th class="n">Count</th><th>How it's made</th></tr></thead>
+    <tbody>
+      <tr><td>Town zones</td><td class="n">105</td><td>Census blocks grouped by block group, then cut by a 1.2 km grid</td></tr>
+      <tr><td>Store zones</td><td class="n">22</td><td>Any Census block with 40+ store and restaurant jobs (LODES CNS07 + CNS18) is its own zone, placed at its stores' floor area, so shoppers arrive at the stores, not the middle of a big zone</td></tr>
+      <tr><td>Campus</td><td class="n">4</td><td>Split by parking lot area per side: east 32.9%, south 28.4%, north 23.1%, west 15.6%; each connects to the nearest main street, so campus traffic enters from several sides</td></tr>
+      <tr><td>Gateways</td><td class="n">12</td><td>Where main roads leave the map, each with its daily count: US-20 north and southwest 21,500; West Highway 33 12,000; three at 7,000; six at 4,000</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Putting people in zones</h3>
+  <ol class="steps">
+    <li>Each Census block group's ACS population is spread over its zones by <b>building floor area</b> (footprint × floors, floors = height ÷ 3.3 m).</li>
+    <li>Students vs residents comes from building type: apartments and large untagged buildings inside the walk district are student housing (an estimate; BYU-I bed counts per complex are not published).</li>
+    <li>Totals are scaled so zones add up exactly to 22,100 residents and 21,900 students, then scaled again by the population model each year.</li>
+    <li>Workers (12,161) and jobs (14,778, split into retail, food, education and other) are LODES counts per Census block.</li>
+    <li>Each zone connects to up to 3 nearby street points within 700 m, so its trips can leave by more than one street.</li>
+  </ol>
+  <h3>Commute mode per zone</h3>
+  <p>From ACS B08301 for the zone's block group, blended toward the county value when the sample is small:</p>
+  <div class="eq">value = <var>w</var> × block group + (1 − <var>w</var>) × county,  <var>w</var> = n ÷ (n + 300)<span class="c">n = workers surveyed in the block group. A block group with 300 workers gets half its own value, half the county's.</span></div>
+  <p>County values: <b>81.3%</b> of commuters who travel drive, <b>1.106</b> people per car, <b>13.3%</b> work from home, <b>13.9%</b> walk.</p>
+</section>
+
+<section id="trips">
+  <p class="eyebrow">Step 5</p>
+  <h2>Car trips from every zone</h2>
+  <p class="where">src/model/routing.ts · tripTable()</p>
+  <p>For each town zone <var>i</var>, a day of person trips, then the share by car. Every trip is a round trip: half goes out, half comes back.</p>
+  <h3>Residents</h3>
+  <div class="eq">
+    W = 2 × workers × grow × (1 − wfh)          <span style="color:var(--muted)">work person-trips</span><br>
+    PT = R × 3.0                                 <span style="color:var(--muted)">all person-trips</span><br>
+    NHB = 0.25 × PT                              <span style="color:var(--muted)">not-home-based</span><br>
+    HBO = PT − W − NHB                           <span style="color:var(--muted)">home-based other</span><br><br>
+    work car trips = W × drive ÷ occ<br>
+    other car trips = (HBO or NHB) × 0.6 ÷ 1.5 × clamp(drive<sub>zone</sub> ÷ drive<sub>county</sub>, 0.6, 1.2)
+    <span class="c">grow = this year's residents ÷ 2026 residents in the zone. drive, occ and wfh are the zone's ACS values. The last factor assumes neighborhoods where people walk to work also walk more for errands.</span>
+  </div>
+  <h3>Students</h3>
+  <div class="eq">student car trips = S × 3 × carShare × m ÷ 1.3<span class="c">3 = student trips a day (tuned); carShare = 55% (students with a car); 1.3 people per car; m = 0.25 inside the walk district, 0.5 within 2.5 km of campus, 0.7 farther out. 70% go to campus (split by the campus lot shares), 30% by the gravity rule.</span></div>
+  <p><b>Worked example</b> (before the α scale below): a walk-district zone with 1,000 students: 1,000 × 3 × 0.55 × 0.25 ÷ 1.3 = <b>317 car trips a day</b>. The same students 3 km out: 1,000 × 3 × 0.55 × 0.7 ÷ 1.3 = <b>888</b>. That gap is why the walk-district site wins the placement test.</p>
+  <h3>Then everything is scaled</h3>
+  <div class="eq">every in-town trip × α  (α = 2)<span class="c">α is the single trip-scale factor tuned against counts. It is applied before outside traffic is worked out.</span></div>
+  <p>With default settings this gives <b>about 171,000 car trips a day</b> in fall 2026 (both legs counted), rising to about 187,000 by fall 2034 with growth alone and 201,000 with the planned projects.</p>
+</section>
+
+<section id="destinations">
+  <p class="eyebrow">Step 6</p>
+  <h2>Where each trip goes</h2>
+  <p class="where">src/model/routing.ts · tripTable(), gravity()</p>
+  <h3>Work trips: real Census pairs</h3>
+  <p>LODES lists how many people live in each Census block and work in each other block. Work car trips from a zone are split over its job zones in proportion to those counts. Workers who live outside town enter through the gateway in their direction.</p>
+  <h3>Other trips: the gravity rule</h3>
+  <div class="eq">share to zone <var>j</var> = <var>A</var><sub>j</sub> e<sup>−β t<sub>ij</sub></sup> ÷ Σ<sub>k</sub> <var>A</var><sub>k</sub> e<sup>−β t<sub>ik</sub></sup><span class="c">Bigger places pull more trips; farther places pull fewer. t = free-flow drive time in minutes + 1 minute to park (1.5 minutes within a zone). β = 0.05 per minute (tuned).</span></div>
+  <div class="eq"><var>A</var><sub>j</sub> = 4 × retail jobs + 4 × food jobs + 1 × other jobs + 1 × education jobs + 0.5 × households + project visits</div>
+  <p><b>Example:</b> with β = 0.05, a store 10 minutes away keeps e<sup>−0.5</sup> = 61% of its pull; 20 minutes away keeps 37%.</p>
+  <h3>Special rules</h3>
+  <ul>
+    <li><b>Walmart:</b> 40% of home-based other trips are shopping, and 60% of those go to the Walmart zone from every part of town (assumed).</li>
+    <li><b>Campus:</b> 70% of student car trips go to the 4 campus zones by their lot shares.</li>
+    <li><b>Not-home-based trips</b> (work to lunch, store to store) start where retail, food and other jobs are, and spread by gravity.</li>
+    <li><b>Project visits</b> (WinCo, temple, offices) go to and from homes by gravity.</li>
+  </ul>
+</section>
+
+<section id="outside">
+  <p class="eyebrow">Step 7</p>
+  <h2>Outside traffic: visitors and through trips</h2>
+  <p class="where">src/model/routing.ts · end of tripTable()</p>
+  <p>The highways carry people who don't live in town. Each gateway has a real daily count; whatever the model's own trips don't explain is outside traffic.</p>
+  <div class="eq">
+    outside<sub>g</sub> = max(0, count<sub>g</sub> − model's local trips at <var>g</var>)<br>
+    through on highway gateways = outside<sub>g</sub> × 30%<br>
+    trips from <var>a</var> to <var>b</var> = through<sub>a</sub> × through<sub>b</sub> ÷ Σ through ÷ 2
+    <span class="c">Highway gateways are those with 10,000+ a day: US-20 north, US-20 southwest, West Highway 33. The other 70% there, and all outside traffic on smaller roads, are visitors coming in to shop, study or work, spread by gravity.</span>
+  </div>
+  <p>Today that is about <b>2,500 through trips a day</b>. Without this step the highways would look too empty.</p>
+</section>
+
+<section id="hours">
+  <p class="eyebrow">Step 8</p>
+  <h2>Hours of the day</h2>
+  <p class="where">scripts/build_hourly.py → public/data/hourly.json · routing.ts shareAt()</p>
+  <div class="eq">trips in hour <var>h</var> = daily trips × share<sub>h</sub> × day factor</div>
+  <p>The shares come from ITD's permanent counter 059 on SH-33, 5.3 miles east of Main Street (November 2023 weekday average). It is a highway counter outside town, so it captures commute timing well and campus timing less well.</p>
+  <figure>
+    <div class="plot"><svg id="ch-hour" viewBox="0 0 640 210" role="img" aria-label="Share of a weekday's traffic by hour. Peak 9.7% at 5 pm, 6.8% at 8 am."></svg></div>
+    <figcaption>Share of a weekday's traffic in each hour. <b>5 pm = 9.72%</b> (the peak), 8 am = 6.76%, noon = 5.79%. Saturday is 0.954 of a weekday and Sunday 0.626; the model supports both, but the app has no day switch yet, so everything shown is a weekday.</figcaption>
+  </figure>
+</section>
+
+<section id="routing">
+  <p class="eyebrow">Step 9</p>
+  <h2>Routing: trips choose streets</h2>
+  <p class="where">src/model/routing.ts · assign() · runs in src/worker/route.worker.ts</p>
+  <ol class="steps">
+    <li>Take the hour's zone-to-zone trip table.</li>
+    <li><b>Batch 1 (40%):</b> each zone's trips take the fastest path (Dijkstra) from all of the zone's street points, on current travel times.</li>
+    <li>Update every link's time with the BPR curve using the volume loaded so far.</li>
+    <li><b>Batches 2, 3, 4 (30%, 20%, 10%)</b> route on the slower times, updating after each. Later trips avoid streets that filled up, the way drivers learn to avoid jams.</li>
+    <li>Add each link's volume to the street segments it covers, so the 3D view can color them.</li>
+  </ol>
+  <h3>The BPR curve</h3>
+  <div class="eq"><var>t</var> = <var>t</var><sub>0</sub> × [ 1 + 0.15 × (V ÷ C)<sup>4</sup> ]<span class="c">From the federal Bureau of Public Roads. A road barely slows until it is nearly full, then slows fast.</span></div>
+  <figure>
+    <div class="plot"><svg id="ch-bpr" viewBox="0 0 640 210" role="img" aria-label="BPR slowdown curve: 1% at V/C 0.5, 10% at 0.9, 15% at 1.0, 31% at 1.2."></svg></div>
+    <figcaption>On the 51-second stretch from step 1: V/C 0.5 → 52 s (+1%); 0.9 → 56 s (+10%); 1.0 → 59 s (+15%); 1.2 → 67 s (+31%).</figcaption>
+  </figure>
+  <h3>Outputs of one run</h3>
+  <ul>
+    <li><b>Volume</b> on every segment (both directions added), compared with total capacity for V/C.</li>
+    <li><b>Travel time index</b> per segment: final time ÷ free-flow time.</li>
+    <li><b>Vehicle-hours traveled (VHT)</b>: Σ volume × time over all links. The difference in VHT between two scenarios is the "delay added" or "delay saved" the comparison features report.</li>
+  </ul>
+  <p><b>Speed:</b> one hour takes about 0.1 s. The worker always runs the newest request first, caches up to 300 results, and fills the hour bar, the year scan and the overview after the main run.</p>
+  <div class="note"><p><b>Noise:</b> batch routing is not a perfect equilibrium, so two nearly identical scenarios can differ by about 1–2 vehicle-hours. The four-way project mix treats differences under 2 veh-h or 5% as noise. Treat very small "saved" numbers the same way.</p></div>
+</section>
+
+<section id="measures">
+  <p class="eyebrow">Step 10</p>
+  <h2>Congestion measures</h2>
+  <p class="where">src/model/atlas.ts level() · src/model/overview.ts measures()</p>
+  <div class="eq">V/C = cars on the street this hour ÷ what it can carry per hour</div>
+  <div class="scale" aria-label="Road load levels">
+    <div style="background:var(--c0);color:#2a2306"><b>&lt; 50%</b>Light</div>
+    <div style="background:var(--c1);color:#2a2306"><b>50–70%</b>Steady</div>
+    <div style="background:var(--c2);color:#2a1406"><b>70–85%</b>Busy</div>
+    <div style="background:var(--c3);color:#fff"><b>85–100%</b>Heavy</div>
+    <div style="background:var(--c4);color:#fff"><b>≥ 100%</b>Over capacity</div>
+  </div>
+  <p>The Filter's congestion buttons group these as Flowing (under 70%), Busy (70–85%) and Heavy (85%+). <b>Problem cards flag 90% and up</b>: near 90% one braking car or a long red light starts a backup that snowballs. These cutoffs roughly match Highway Capacity Manual level of service E (0.9–1.0) and F (over 1.0); Rexburg and ITD may use their own standard.</p>
+  <h3>The overview's numbers</h3>
+  <div class="eq">
+    delay = Σ volume × (<var>t</var> − <var>t</var><sub>0</sub>),  <var>t</var> = <var>t</var><sub>0</sub>(1 + 0.15 (V/C)<sup>4</sup>)<br>
+    trips take longer by = Σ volume × <var>t</var> ÷ Σ volume × <var>t</var><sub>0</sub> − 1<br>
+    over capacity = miles of main street with V/C ≥ 1<br>
+    heavy share = share of main-street miles with V/C ≥ 0.85<br>
+    vehicle-miles = Σ volume × length
+    <span class="c">Free-flow speeds here are assumed by road type (highway 65, arterial 40, minor 35, collector 30, ramp 35, local 25 mph). Main streets = everything except local streets.</span>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>5 pm, default settings</th><th class="n">Delay</th><th class="n">Over capacity</th><th class="n">Trips take longer</th><th class="n">Vehicle-miles</th></tr></thead>
+    <tbody>
+      <tr><td>Fall 2026 (today)</td><td class="n">47 veh-h</td><td class="n">2.1 mi</td><td class="n">+3%</td><td class="n">52,759</td></tr>
+      <tr><td>Fall 2034, growth only</td><td class="n">64 veh-h</td><td class="n">2.5 mi</td><td class="n">+4%</td><td class="n">56,462</td></tr>
+      <tr><td>Fall 2034, with planned projects</td><td class="n">106 veh-h</td><td class="n">2.5 mi</td><td class="n">+6%</td><td class="n">61,035</td></tr>
+    </tbody>
+  </table></div>
+  <p>Busiest streets at 5 pm today: North 12th West 125%, North 2nd West 119%, West Main Street 119%, South 2nd West 108%.</p>
+</section>
+
+<section id="countbased">
+  <h2>The count-based fallback</h2>
+  <p class="where">src/model/atlas.ts · traffic() when no routed volumes are given</p>
+  <p>The original atlas method. It needs no routing, so it paints the map instantly while the worker routes, and it is what you see if routing fails. It starts from a count and scales it.</p>
+  <div class="eq">
+    volume = daily count × share<sub>h</sub> × activity(place, h) ÷ day-average activity × popF + project trips nearby<br>
+    popF = (R + S) ÷ (22,100 + 21,900)<br>
+    activity = 0.72 + 0.55 × max over centers of e<sup>−d²/2r²</sup> × center multiplier
+    <span class="c">Daily count: the street's city count grown 2.5% a year (halved on one-way streets), else a road-type default (12,000 arterial, 7,000 minor, 4,000 collector, 500 local). Centers: campus (busier mornings ×1.3), Walmart retail (evenings ×1.3), downtown. Project trips are spread over main streets within 900 m, weighted by road type and distance.</span>
+  </div>
+  <p>The hourly shape here is the older assumed profile (7.5% at 8 am, 9.5% at 5 pm). Once routing finishes, the routed volumes replace all of this, and the city counts become the test instead of the input.</p>
+</section>
+
+<!-- ======================= PART C: FEATURES ======================= -->
+<div class="partbreak"><p class="eyebrow">Part C</p><h2>Features: what people see, and what drives each one</h2><p>Two modes share one map. <b>Resident</b> is a read-only view of what is changing. <b>Planner</b> (the default) adds the tools to test projects and fixes.</p></div>
+
+<section id="f-start">
+  <h2>Start screen and records check</h2>
+  <p class="where">src/components/StartScreen.tsx · src/hooks/useRecords.ts · api/records.ts · agent/laserfiche.ts</p>
+  <p>The front door states the job: <i>"See what a project does to traffic before you approve it."</i> The city loads behind it. It shows how current the city records are (latest council minutes, P&amp;Z minutes and P&amp;Z agendas already read).</p>
+  <p><b>Check for new records</b> lists the newest records in the city's Laserfiche archive, reads up to <b>6 unseen ones</b> (newest first) with the AI agent, and puts what it finds in the planner's review list. You can enter the city while it reads. <b>Nothing reaches the map until a person confirms it.</b></p>
+  <div class="note"><p><b>Being a good neighbor to the archive:</b> the city's archive allows only a few public sessions at once. The server uses one session per check, signs out 20 seconds after its last request, and reports "the archive is at its limit" instead of retrying in a loop.</p></div>
+</section>
+
+<section id="f-map">
+  <h2>Map, time and filters</h2>
+  <div class="feat">
+    <div><h4>3D city</h4><p>OSM buildings drawn 2.5× taller so they read from above (heights mostly estimated from type and area), terrain, trees placed procedurally along streets and parks, both temples modeled, day and night lighting that follows the hour.</p><p class="src">src/scene/*</p></div>
+    <div><h4>Road load colors</h4><p>Each segment colored by V/C on the five-step scale. Colors ease to new values instead of snapping. Hover a street for its name and load.</p><p class="src">view.ts · ui.ts CCOL</p></div>
+    <div><h4>Moving traffic</h4><p>Small cars drive the street network for a sense of life. Cosmetic: they are not the model's trips.</p><p class="src">view.ts</p></div>
+    <div><h4>Time dock</h4><p>Year 2024–2034 by quarter (today is Q4 2026; years switch in the fall, matching enrollment). Hour of day with a bar per hour: height = average load, color = busiest street. Play buttons for both; 5 speeds.</p><p class="src">TimeDock.tsx</p></div>
+    <div><h4>Filter: Traffic</h4><p>"Already planned" (city projects) and "New projects" (yours) switches; road load, moving traffic, signals; hide streets by congestion color. In Planner it also shows the <a href="#f-build">four-way mix</a>.</p><p class="src">LeftControls.tsx</p></div>
+    <div><h4>Filter: Places and People</h4><p>Projects, stores and restaurants, walk district, city lights. Census blocks shaded by people per km² (5 classes from under 100 to 8,000+); click one to see or <a href="#f-data">edit</a> its numbers.</p><p class="src">blockLayer.ts · zoneLayer.ts</p></div>
+  </div>
+  <p><b>Scenario switches:</b> "Already planned" off = growth only (projects frozen at today). Most comparison views always show both scenarios side by side.</p>
+</section>
+
+<section id="f-overview">
+  <h2>Overview dashboard</h2>
+  <p class="where">src/components/Overview.tsx · src/model/overview.ts</p>
+  <p>A strip in the top bar shows people, miles over capacity, delay at the selected hour and how much longer trips take. Clicking it opens the dashboard:</p>
+  <ul>
+    <li><b>Tiles:</b> delay on all streets (hero), people in town, main roads over capacity, main roads heavy (85%+), trips take longer by, vehicle-miles that hour, busiest main street, student beds vs need, homes vs need. Each shows its change since today.</li>
+    <li><b>Delay by year</b> and <b>over-capacity miles by year</b>, growth only (dashed) vs with planned projects (solid), shaded difference.</li>
+    <li><b>Delay through the day</b>, today vs the selected quarter: shows how long the rush lasts, not just how bad it peaks.</li>
+    <li><b>Busiest main streets</b> as bars with today's load as a tick; <b>students vs beds</b>; <b>projects adding the most trips</b>.</li>
+    <li>A table view of all of the above.</li>
+  </ul>
+  <figure>
+    <div class="legend"><span><i style="background:var(--blue)"></i>Growth only</span><span><i style="background:var(--amber)"></i>With planned projects</span></div>
+    <div class="plot"><svg id="ch-delay" viewBox="0 0 640 220" role="img" aria-label="Delay at 5 pm by year. Growth only rises from 43 to 64 vehicle-hours; with planned projects it jumps to 77 in 2027 and reaches 106 in 2034."></svg></div>
+    <figcaption>Routed delay at 5 pm, fall of each year. The jump in 2027 is WinCo (5,130 trips a day) and the temple opening; Madison Commons adds steadily to 2034.</figcaption>
+  </figure>
+  <p>In routed mode the worker routes every year 2024–2034 in both scenarios plus 24 hours today and in the selected quarter (about 70 runs, a few seconds).</p>
+</section>
+
+<section id="f-problems">
+  <h2>Problem cards and Compare fixes</h2>
+  <p class="where">src/components/ProblemCards.tsx</p>
+  <p>Every named main street with a segment at <b>90% of capacity or more</b> at the selected hour becomes a card (top 3 in Resident view). Each card answers three questions:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Line</th><th>How it's worked out</th></tr></thead>
+    <tbody>
+      <tr><td><b>When</b></td><td>The worker routes fall 2026 through fall 2034 at this hour; the first year any of the street's segments reaches 90%</td></tr>
+      <tr><td><b>Why</b></td><td>Growth adds = V/C now − V/C from projects − V/C today. Projects add = V/C with projects − V/C growth only. Shown in percentage points</td></tr>
+      <tr><td><b>How bad</b></td><td>"Trips take N% longer than on an empty road" from the travel time index</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Compare fixes (Planner)</h3>
+  <p>For one problem street, the worker re-routes the whole network once per option and ranks them by <b>vehicle-hours saved</b> in that hour:</p>
+  <ul>
+    <li>Turn lanes: capacity ×1.15 on that street near the problem point</li>
+    <li>Signal timing: ×1.08</li>
+    <li>Roundabout: ×1.25</li>
+    <li>Build any undated developer widening that touches the street: ×1.8</li>
+  </ul>
+  <p>"This street" shows its busiest point with each option. <b>Apply</b> adds the fix to the scenario so every view uses it. Cost, land and safety are outside the model.</p>
+  <div class="note"><p><b>Expect small numbers on a network-wide total.</b> A 15% capacity bump on one street often saves only a few vehicle-hours in the whole network, because traffic re-routes either way. On North 12th West at 5 pm in 2034 the three fixes come out within ±1.5 veh-h of each other, which is inside the routing noise. Say "these fixes barely help; this street needs a structural change" rather than ranking them.</p></div>
+</section>
+
+<section id="f-gaps">
+  <h2>Beds, homes and parking gaps</h2>
+  <p class="where">src/model/atlas.ts · gaps()</p>
+  <div class="eq">
+    beds ratio = beds ÷ students wanting to enroll<br>
+    homes need = R ÷ 3.3<br>
+    homes supply = (22,100 ÷ 3.3) × 0.98 + Madison Commons units × progress + 120 × years since today<br>
+    parking need = S × 0.55 (student cars)<br>
+    parking supply = 6,218 + 0.6 × new beds since 2026
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Default settings</th><th class="n">Beds vs need</th><th class="n">Homes vs need</th><th class="n">Campus parking vs need</th></tr></thead>
+    <tbody>
+      <tr><td>Fall 2026</td><td class="n">102%</td><td class="n">98% (138 short)</td><td class="n">52%</td></tr>
+      <tr><td>Fall 2034</td><td class="n">96% (936 short)</td><td class="n">94% (503 short)</td><td class="n">56%</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Parking is rough:</b> 6,218 is OSM lot area in the walk district ÷ 30 m², across 68 lots, many of them church or business lots. BYU-I Parking Services does not publish per-lot counts. The app labels it "rough" everywhere.</p>
+  <p>In Planner, each shortfall card has <b>Suggest sites</b>: it asks for ⌈shortfall ÷ 500⌉ student-housing sites, ⌈shortfall ÷ 250⌉ neighborhoods, or ⌈shortfall ÷ 600⌉ parking structures (1 to 3), found by the <a href="#f-sites">site search</a>. Your own placed projects count against the shortfalls.</p>
+  <p>Project detail panels also show <b>parking required by city code</b>: 2 spaces per unit plus 10% for visitors (Rexburg Development Code Table 3), or 1 per unit for senior housing. That is a code minimum, not observed supply.</p>
+</section>
+
+<section id="f-build">
+  <h2>Build: place your own projects</h2>
+  <p class="where">src/planner/PlannerWorkspace.tsx · ghosts.ts · suggest.ts</p>
+  <p>The Build panel is the planner's main flow: <b>1 Place → 2 Impact → 3 Alternate site or road fix → 4 Decide.</b> Placed projects are "ghosts", saved in this browser only.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Type</th><th>Size</th><th>What it adds to the model</th></tr></thead>
+    <tbody>
+      <tr><td>Student housing</td><td>500 beds</td><td>500 students at the site; walk-district rules apply within about 1.2 km of campus</td></tr>
+      <tr><td>Neighborhood</td><td>250 homes</td><td>825 residents (3.3 per home); 0.48 workers per resident, sent to jobs by gravity</td></tr>
+      <tr><td>Grocery store</td><td>50,000 sq ft</td><td>3,055 car trips a day: 50 × 94 per 1,000 sq ft, less 35% pass-by</td></tr>
+      <tr><td>Office or clinic</td><td>60,000 sq ft</td><td>660 car trips a day: 60 × 11 per 1,000 sq ft</td></tr>
+      <tr><td>Parking structure</td><td>600 spaces</td><td>Spaces only; its trips are already counted by the uses it serves</td></tr>
+    </tbody>
+  </table></div>
+  <h3>How a ghost enters the router</h3>
+  <p>Each counted ghost becomes <b>its own small zone at its exact site</b>, with a driveway (900 cars/hour each way, 9 m/s) to the nearest street node, so its trips leave from where it sits. It counts from fall of its opening year. Drafts count only while selected; Suggested ones are drawn dashed and don't count until added to the plan.</p>
+  <h3>Placement rules</h3>
+  <ul>
+    <li>Open land: no mapped building, park or water under the footprint (parking lots are allowed as redevelopment sites)</li>
+    <li>No street through it, and a street within about 400 m</li>
+    <li>At least 30 m from your other projects</li>
+    <li>A drop that breaks a rule snaps to the nearest legal spot, searching in 30 m rings out to 1 km</li>
+    <li><b>Not checked:</b> zoning, ownership, utilities, cost</li>
+  </ul>
+  <h3>Impact tab</h3>
+  <p>Routes the opening year twice at the selected hour, with and without this project (everything else the same), and shows: change in network delay (veh-h and %), the worst main street within 2 km before → after, car trips to and from the site, the 5 streets it loads most (+points), and approved city projects already coming within 2 km. On the map, streets gaining 2+ points within 2 km glow with "+N pts" labels.</p>
+  <h3>Four-way mix (Filter → Traffic)</h3>
+  <p>Routes the hour four ways: neither, city projects only, your projects only, both. If both together add more than the two separately (beyond noise: 2 veh-h or 5%), they load the same streets, and the panel says so.</p>
+  <h3>Year line</h3>
+  <p>The top of the Build panel always shows the year and hour on the map, student beds vs need and homes vs need (both counting your projects), and how many main streets are over capacity.</p>
+</section>
+
+<section id="f-sites">
+  <h2>Alternate sites, AI recommendations and Suggest sites</h2>
+  <p class="where">src/planner/suggest.ts candidates(), screen() · PlannerWorkspace.tsx BetterSpot, AiRec</p>
+  <p>All three use the same two-stage search: a fast screen of open land, then the router judges the best few.</p>
+  <h3>Stage 1: screen open land (instant)</h3>
+  <p>A grid of points across town (about 9,000 cells) keeps the ones that pass the placement rules. Each gets a score; <b>lower is better</b>:</p>
+  <div class="eq">
+    access = km to the nearest main street (must be ≤ 1.2)<br>
+    score = 3 × max(0, access − 0.4) + 4 × max(0, nearby load − 0.7) + type rule
+    <span class="c">nearby load = worst V/C on main streets within 300 m right now. Type rules (km = distance to campus): student housing + 2.2 × max(0, km − 0.8); neighborhood + 1.5 if within 0.6 km of campus + 0.25 × km; grocery + 1.5 if within 0.6 km + 0.15 × km; office + 0.1 × km; parking = 3 × km + access.</span>
+  </div>
+  <p>The best 8 sites, at least 800 m apart, go to stage 2.</p>
+  <h3>Stage 2: the router judges (a few seconds)</h3>
+  <p>The worker routes the selected year and hour once per site, with your other planned projects in place, and ranks by <b>vehicle-hours added</b>. Each site also shows the worst main street near it and the <b>biggest jump</b> any one main street takes, because a lower total can still overload one street (a jump of 20+ points is flagged).</p>
+  <ul>
+    <li><b>Alternate sites tab:</b> your spot against the 3 best others, plus each site "today alone" on today's streets. The best gets ★ AI recommendation.</li>
+    <li><b>✦ AI recommendations:</b> before placing, walks you through the top 5 sites one at a time.</li>
+    <li><b>Suggest sites</b> (from a shortfall card): adds the n best as Suggested ghosts.</li>
+    <li><b>Parking</b> adds no trips, so the router can't rank it; it keeps the screen's order (walking distance to campus).</li>
+  </ul>
+  <h3>The fixed placement test (in code, not on screen)</h3>
+  <p>"Where should 500 new student beds go?" compares the same 500 students at three preset sites. Rerun with the current calibration at 5 pm today: <b>next to campus in the walk district +1.1 veh-h</b>, west of US-20 by Madison Commons +4.3, north end by the new temple +10.8. The walk-district site wins because those students make about a third of the car trips (m = 0.25 vs 0.7). The component (<code>Placement.tsx</code>) is not rendered in the current build.</p>
+</section>
+
+<section id="f-roads">
+  <h2>Access roads: the slime-mold search</h2>
+  <p class="where">src/model/physarum.ts · PlannerWorkspace.tsx AccessRoads</p>
+  <p>For a placed project, "Suggest access roads" proposes new connecting roads. A slime mold (<i>Physarum</i>) grows tubes between food sources and thickens the ones that carry flow; Tero et al. (2010, <i>Science</i>) showed it rebuilds a network like the Tokyo rail system. We use that rule to propose roads, then the router decides.</p>
+  <ol class="steps">
+    <li><b>Food sources:</b> the nearest street node in each of 8 compass directions within 2.8 km, preferring bigger streets (score = distance ÷ (1 + 0.35 × road rank)).</li>
+    <li><b>Cost grid</b> (about 2,400 cells): open land 1, along existing streets 1.8, parking lot 2.5, park 4, building 14, water 60.</li>
+    <li><b>36 iterations:</b> push flow from the site to one random food source; solve pressures with conjugate gradients; each tube's conductance moves toward a sigmoid of its flow: D ← D + 0.6 × (2 f(Q) − D), f(Q) = Q<sup>1.6</sup> ÷ (1 + Q<sup>1.6</sup>). Strong tubes win, the rest wither.</li>
+    <li><b>Read off</b> the strongest tube to each food source, simplify it, drop any that cross a building, keep the top 5.</li>
+    <li><b>The router judges</b> each as a two-lane collector (700 cars/hour each way, 35 mph) and keeps those that cut total delay, ranked by saving per meter, top 3. A saving over 20 veh-h is flagged: it is probably a shortcut for through traffic.</li>
+  </ol>
+  <p>Cost, right-of-way and grades are not checked. Moving the project clears its roads.</p>
+</section>
+
+<section id="f-agent">
+  <h2>AI agent for city records</h2>
+  <p class="where">agent/extract.ts, gemini.ts, pdftext.ts · api/agent.ts · src/model/review.ts, candidates.ts, geocode.ts · AgentPanel.tsx</p>
+  <p>The part no competitor does: read council and P&amp;Z minutes and find approved projects, each with a quote you can check. A person confirms every one before it counts.</p>
+  <ol class="steps">
+    <li><b>Input:</b> upload minutes (PDF or text), paste a Laserfiche link, or use the start screen's records check.</li>
+    <li><b>Text layer:</b> the server pulls the PDF's text (the city's PDFs carry OCR) so quotes can be checked later.</li>
+    <li><b>Extraction:</b> Gemini reads the record with a fixed instruction and a strict JSON schema (name, type, category, status, stage, worth, where, units, beds, sq ft, acres, years, plain sentence, <b>verbatim quote</b>, page, confidence, flags). Fallback chain: gemini-3.5-flash-lite → 3.6-flash → 3.1-flash-lite → 4-hydrogen; any failure or malformed answer moves to the next. Claude is optional (<code>AGENT_PROVIDER=claude</code>).</li>
+    <li><b>No quote, no entry:</b> items with a quote of 20 characters or less are dropped.</li>
+    <li><b>Quote check</b> (by the server, not the AI): each part of the quote must appear in the record. Exact match = <i>found word for word</i>; a same-length window sharing 80%+ of words = <i>close</i> (allows OCR slips like "Term River"); otherwise <i>NOT found: check by hand</i>.</li>
+    <li><b>Screen:</b> only items that put something new at a place are reviewed (buildings, new or widened roads, rezoning a parcel). Things already built, votes that build nothing (naming, bonds, budgets), studies and utilities are set aside but can be brought back.</li>
+    <li><b>Merge:</b> the same project in several records becomes one card (name tokens overlap, or the same street address). The most advanced record leads; blanks are filled from the others; conflicting addresses are flagged.</li>
+    <li><b>Map spot:</b> addresses on Rexburg's grid ("1600 N 2nd E", "620 S 2530 W") get a suggested spot from the street grid. City streets count blocks (2nd East = 200 East); county roads count 1,000 to the mile.</li>
+    <li><b>A person places it:</b> checks the quote, clicks the map, picks type, size and opening year (defaults from the record), then confirms. Trips come from the rate table in <a href="#projects">step 3</a>; anything the reviewer chose is flagged.</li>
+    <li><b>It joins the model</b> in this browser and is marked "Found by the AI agent, confirmed by a person".</li>
+  </ol>
+  <p><b>Status so far:</b> <code>projects.candidates.json</code> holds 21 items found from the minutes (Home Depot Subdivision, Moody Townhomes PUD, Summerfield Division 14, University Towne Center Plat and others). Say "our AI read the records" on stage only for projects that are confirmed.</p>
+  <p><b>Security:</b> API keys stay on the server. If <code>AGENT_TOKEN</code> is set, callers need the passcode, so strangers can't spend the quota.</p>
+</section>
+
+<section id="f-data">
+  <h2>Census data files</h2>
+  <p class="where">src/model/datafile.ts · DataFiles.tsx · BlockPanel.tsx</p>
+  <p>Click a Census block group to see its figures: population (with the 2020 count), people per km², college students, median age, homes, commute mode (drive, walk, bike, transit, work from home) and cars per household. In edit mode you can change them and save named "data files" in this browser.</p>
+  <ul>
+    <li><b>Population</b> scales the residents and workers of every zone in that block group (new ÷ old).</li>
+    <li><b>College students</b> scales its students the same way.</li>
+    <li><b>Drive share</b> replaces the zones' commute drive share.</li>
+    <li>Homes, median age and cars per household are kept with the file but don't change traffic.</li>
+  </ul>
+  <p>The map shows 31 block groups (52,730 people by ACS; the map extends past city limits).</p>
+</section>
+
+<section id="f-shop">
+  <h2>Shopping trips</h2>
+  <p class="where">src/model/flows.ts · LeftControls.tsx ShoppingTab</p>
+  <p>Pick a store zone (Walmart by default; 22 store zones with names from OpenStreetMap) to see arcs from the 40 areas sending it the most car trips, thickness by trips. The list shows daily car trips by area.</p>
+  <p>You can type a store's daily arrivals (scales every trip to it) or the trips from one area (replaces that number); the return trips change by the same amount, and the router reruns. These edits last only for the visit. Starting numbers are model estimates, not tracked trips, and include the store's workers.</p>
+</section>
+
+<section id="f-search">
+  <h2>Map search</h2>
+  <p class="where">src/components/MapSearch.tsx · src/model/geocode.ts</p>
+  <p>Search a Rexburg grid address ("1450 N 2nd E"), a store or restaurant (87 named in OSM), a project or a street. The grid geocoder fits street numbers to mapped positions with a piecewise line through the named grid streets (outliers beyond 4× the median error dropped), then snaps to the named street within 250 m.</p>
+</section>
+
+<!-- ======================= PART D: TRUST ======================= -->
+<div class="partbreak"><p class="eyebrow">Part D</p><h2>Trust: how well it matches reality</h2><p>Four checks: standard method, matches counts, holds up on counts it never saw, and results make sense. It passes the first and last; the middle two are where the work is.</p></div>
+
+<section id="accuracy">
+  <h2>Accuracy against city counts</h2>
+  <p class="where">scripts/calibrate.ts → public/data/calibration.json · AccuracyPanel.tsx</p>
+  <h3>The GEH test</h3>
+  <div class="eq">GEH = √( 2 (M − C)² ÷ (M + C) )<span class="c">M = model's cars that hour; C = the count grown to 2026 × the hour's share (halved on one-way streets). Fair to busy and quiet roads alike. Under 5 is a good match; agencies aim for about 85% of counts under 5.</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Example</th><th class="n">Count</th><th class="n">Model</th><th class="n">Off by</th><th class="n">GEH</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Busy road</td><td class="n">1,000</td><td class="n">1,100</td><td class="n">10%</td><td class="n">3.1</td><td>Pass</td></tr>
+      <tr><td>Busy road</td><td class="n">1,000</td><td class="n">1,300</td><td class="n">30%</td><td class="n">8.8</td><td>Fail</td></tr>
+      <tr><td>Small street</td><td class="n">80</td><td class="n">120</td><td class="n">50%</td><td class="n">4.0</td><td>Pass</td></tr>
+    </tbody>
+  </table></div>
+  <h3>How it was tuned</h3>
+  <ol class="steps">
+    <li>20 of the 89 counts are held out by a fixed random shuffle (seed 7) and never used for tuning.</li>
+    <li>288 combinations are tried: α ∈ {1.5 … 3.5} (8 values) × β ∈ {0.05, 0.08, 0.1, 0.14} × student trips ∈ {2.5, 3, 3.5} × through share ∈ {30%, 50%, 70%}.</li>
+    <li>Each is routed at 5 pm today and scored; the winner has the most tuning counts under GEH 5 (ties: lowest mean GEH).</li>
+    <li>The winner is then scored on the 20 held-out counts and on 26 intersection approach counts from 2023 (two-way leg volume read as 2 × approach).</li>
+  </ol>
+  <div class="facts" style="margin:0 0 16px">
+    <div><b>35%</b><span>tuning counts under GEH 5 (24 of 69); 14% before tuning</span></div>
+    <div><b>0%</b><span>held-out counts under GEH 5 (0 of 20); 15% before tuning</span></div>
+    <div><b>12%</b><span>2023 intersection counts under GEH 5 (3 of 26)</span></div>
+    <div><b>0.78</b><span>correlation between counts and model, all 89</span></div>
+  </div>
+  <figure>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Used for tuning</span><span><i style="background:var(--amber)"></i>Held out</span><span><i style="background:var(--blue)"></i>2023 intersection counts</span></div>
+    <div class="plot"><svg id="ch-cal" viewBox="0 0 640 400" role="img" aria-label="Scatter of city counts against model volumes at 5 pm. Points cluster along the diagonal with wide spread; several streets are modeled near zero."></svg></div>
+    <figcaption>Cars per hour at 5 pm. Dashed line = perfect match. Hover a point for the street. Points on the floor are streets the model sends almost no traffic to (University Boulevard, South Center Street, West 4th South); points high above the line are overloaded (West Main Street, North 12th West).</figcaption>
+  </figure>
+  <h3>What the numbers mean</h3>
+  <p><b>The model ranks streets in roughly the right order but misses many single streets.</b> Busy streets come out busy and quiet ones quiet (correlation 0.78), which is what comparisons need. Exact volumes on one street are often off by a lot. Adding ACS, the 2023 counts and the ITD hourly shape did not move the score, so the limit is structural:</p>
+  <ul>
+    <li><b>Zones are coarse</b> (1.2 km), so trips load onto a few connector streets; streets next to a connector get too much, parallel streets get none.</li>
+    <li><b>Batch assignment is not full equilibrium.</b></li>
+    <li><b>Lane counts</b> are mostly OSM defaults; a wrong lane count shifts traffic between parallel streets.</li>
+    <li><b>The counts are old</b> (2015–2020, grown 2.5%/yr) and predate the US-20 interchange and 2nd East widening.</li>
+  </ul>
+  <p><b>How to say it:</b> "It ranks streets in roughly the right order, correlation about 0.8. About a third of counts pass the strict GEH test, and agencies aim for 85%. So use it to compare options, not to quote exact numbers."</p>
+</section>
+
+<section id="limits">
+  <h2>Limits</h2>
+  <ul>
+    <li><b>Future years are what-ifs</b> from the growth settings; projects and counts are real and sourced.</li>
+    <li><b>Weekday, fall semester only</b> in the app. The model has Saturday, Sunday and a spring-semester factor (17,326 ÷ 24,111 students), but there is no switch for them yet.</li>
+    <li><b>Students are placed by building floor area</b>, not by BYU-I bed counts per complex (not published).</li>
+    <li><b>No local travel survey:</b> non-work trip rates are national averages scaled by one factor (α = 2).</li>
+    <li><b>Not an intersection or signal-timing study.</b> No turning movements, queues or special events. Fixes are preset capacity changes.</li>
+    <li><b>Zoning, ownership, utilities and cost are not checked</b> for placed projects or suggested roads.</li>
+    <li><b>Parking supply is very rough</b> (lot area ÷ 30 m²).</li>
+    <li><b>Confirmed AI projects and planner ghosts live in one browser</b>; nothing is written back to projects.json from the app.</li>
+  </ul>
+  <p>The one-line close: <b>"It doesn't replace an engineering study. It tells a city which options are worth one."</b></p>
+</section>
+
+<!-- ======================= PART E: ANSWERS ======================= -->
+<div class="partbreak"><p class="eyebrow">Part E</p><h2>Answers</h2><p>Questions judges, city staff and engineers are likely to ask, with answers grounded in the sections above.</p></div>
+
+<section id="qa">
+  <h2>Likely questions</h2>
+  <div class="qa-tools"><input id="qa-filter" type="search" placeholder="Filter questions, e.g. GEH, students, Walmart" aria-label="Filter questions"><small id="qa-count"></small></div>
+  <div id="qa-list">
+    <p class="qa-cat">The method</p>
+    <details class="qa"><summary>Is this a real traffic model or a visualization?</summary><div><p>A real one, small but standard: the four-step model (trip generation, distribution, mode, assignment) with BPR slowdown, the same structure planning agencies use. It routes about 171,000 car trips a day through 1,426 street links, hour by hour. It is roughly 85–90% of a professional model's structure; the main gaps are a local travel survey and a full mode-choice model.</p></div></details>
+    <details class="qa"><summary>How is this different from Google Maps traffic?</summary><div><p>Google shows today's measured speeds. We forecast: what happens in 2030 if a grocery store opens at a given spot, before anyone builds it. Google can't run a "what if"; we can't measure today as precisely as Google.</p></div></details>
+    <details class="qa"><summary>What's the BPR formula and why use it?</summary><div><p>t = t₀ × (1 + 0.15 × (V/C)⁴), from the federal Bureau of Public Roads. Roads barely slow until nearly full, then slow sharply: +1% at half full, +10% at 90%, +31% at 120%. It is the default in almost every travel model. See <a href="#routing">step 9</a>.</p></div></details>
+    <details class="qa"><summary>Why route in four batches instead of all at once?</summary><div><p>If everyone took the empty-road fastest path, one street would get everything. Loading 40%, then 30%, 20%, 10%, and slowing streets between batches, lets later trips avoid full streets. It approximates equilibrium at a fraction of the cost (0.1 s an hour), which is what makes dragging the timeline interactive.</p></div></details>
+    <details class="qa"><summary>What is the gravity model?</summary><div><p>Trips to a place are proportional to its size and fall off with drive time: share ∝ A × e^(−β t). With β = 0.05 per minute, a place 10 minutes away keeps 61% of its pull and one 20 minutes away keeps 37%. Size A counts retail and food jobs ×4, other and education jobs ×1, households ×0.5. See <a href="#destinations">step 6</a>.</p></div></details>
+    <details class="qa"><summary>Where do work trips go?</summary><div><p>Real Census pairs: LODES 2023 lists how many people live in each block and work in each other block. That is 4,108 zone pairs. Out-of-town commuters enter through the gateway in their direction.</p></div></details>
+    <details class="qa"><summary>What is α and why is it 2? Doesn't doubling trips look like a fudge?</summary><div><p>α is the one trip-scale factor every small-town model has, set by matching counts. It says national trip rates under-produce traffic on Rexburg's counted streets. Likely reasons: visitors and students' non-campus trips we don't model separately, short trips within coarse zones that we don't route, and counts that skew toward busy streets. It is applied evenly to every zone, never to single streets, so comparisons between options stay fair.</p></div></details>
+
+    <p class="qa-cat">The data</p>
+    <details class="qa"><summary>Where does the data come from? Is any of it made up?</summary><div><p>Streets and buildings from OpenStreetMap; 89 traffic counts, project and street-plan layers from Madison County / Rexburg GIS; work trips and jobs from Census LODES 2023; population and commute mode from Census ACS 2020–2024; hourly shape from ITD counter 059; projects from city records and news, each linked to its source. National averages (NHTS) fill non-work trip rates. About two dozen assumed values are listed with their reasons in <a href="#estimates">Every assumed number</a>; four of them are tuned against counts. Nothing is invented without a label.</p></div></details>
+    <details class="qa"><summary>Your counts are from 2015–2020. Isn't that too old?</summary><div><p>Yes, it's the biggest data weakness. We grow them 2.5% a year to 2026, and 84 of 89 predate the 2024 US-20 interchange and the 2nd East widening. Newer street-total counts from the city or ITD District 6 are the single most useful thing we could get.</p></div></details>
+    <details class="qa"><summary>How do you know how many students live where?</summary><div><p>We don't, exactly. Each block group's Census population is spread over buildings by floor area, and apartments in the walk district are treated as student housing. Totals are scaled to 21,900 students (24,111 campus-based × 90.7% living in town). BYU-I approved-housing bed counts per complex would replace this estimate.</p></div></details>
+    <details class="qa"><summary>Why 44,000 people when the Census says about 40,000?</summary><div><p>The Census undercounts students who list a home address elsewhere. 21,900 students + 22,100 residents = 44,000 sits between the Census estimate (~40k) and the city's own figure (~45k). Both starting numbers are editable in Planner → Numbers and assumptions.</p></div></details>
+    <details class="qa"><summary>Where do the hourly patterns come from?</summary><div><p>ITD's permanent counter 059 on SH-33, November 2023 weekday average: 9.72% of the day's traffic at 5 pm, 6.76% at 8 am. It's a highway counter outside town, so it shows commute timing well and campus timing less well.</p></div></details>
+    <details class="qa"><summary>Where does the parking number come from?</summary><div><p>Mapped parking lot area in the walk district ÷ 30 m² per space: about 6,218 spaces in 68 lots, many of them church or business lots. Need = students × 55% with a car. It's labeled "rough" everywhere because BYU-I doesn't publish per-lot counts.</p></div></details>
+
+    <p class="qa-cat">Accuracy</p>
+    <details class="qa"><summary>How do you know it's right?</summary><div><p>We checked it against the city's 89 traffic counts. It ranks streets roughly right (correlation 0.78), but only 35% of tuning counts pass the strict GEH test, none of the 20 held-out counts do, and 12% of the 2023 counts do. Agencies aim for 85%. So it's good for comparing options, not for quoting exact volumes yet. See <a href="#accuracy">Accuracy</a>.</p></div></details>
+    <details class="qa"><summary>What is GEH?</summary><div><p>The standard calibration score: GEH = √(2(M − C)² ÷ (M + C)). It's fair to big and small roads: being off by 100 cars matters more on a quiet street. Under 5 is a good match.</p></div></details>
+    <details class="qa"><summary>0% on held-out counts. Doesn't that mean it doesn't work?</summary><div><p>It means it doesn't predict single-street volumes well. The held-out streets still fall in the right range of the scatter, and the correlation across all counts is 0.78, so the order of busy to quiet is mostly right. For "which of these options is better," the same errors appear in both runs and largely cancel. We'd never use it to say "2nd East will carry 1,640 cars at 5 pm."</p></div></details>
+    <details class="qa"><summary>What would improve accuracy?</summary><div><p>In order: newer street counts; checking lane counts on the worst-matching streets (Street View); smaller zones with more street connectors; true equilibrium assignment; BYU-I bed counts per complex; separate hourly shapes for work, class and shopping trips; a 2019 back-cast so we don't need the 2.5% growth guess.</p></div></details>
+    <details class="qa"><summary>Which streets are worst?</summary><div><p>Overloaded in the model: West Main Street, North 12th West, East 1st North, North 2nd West. Too empty: University Boulevard, South Center Street, West 4th South, South 1st West. The empty ones are mostly next to zones whose trips leave by a different connector; the overloaded ones are on connector paths. Both point at zone size and lane counts.</p></div></details>
+
+    <p class="qa-cat">Features</p>
+    <details class="qa"><summary>What does "vehicle-hours of delay" mean?</summary><div><p>Time lost to slow traffic, added up over every car on the road in that hour. 47 veh-h at 5 pm today is like 2,820 drivers each losing one minute. "Delay added" for a project is the difference in total vehicle-hours between routing the hour with and without it.</p></div></details>
+    <details class="qa"><summary>How does it decide when a problem starts?</summary><div><p>The worker routes each fall from 2026 to 2034 at the selected hour and reports the first year any part of the street reaches 90% of capacity.</p></div></details>
+    <details class="qa"><summary>How does it split growth vs projects as the cause?</summary><div><p>Projects add = V/C with projects − V/C growth only. Growth adds = V/C now − projects' part − V/C today. Both in percentage points.</p></div></details>
+    <details class="qa"><summary>How does it pick the best site for a project?</summary><div><p>Two stages. A fast screen scores open land by street access, how loaded nearby streets already are, and where the type belongs (student housing near campus, homes and stores not right next to it). The best 8 are routed, each with the project in place, and ranked by delay added. It also reports the biggest single-street jump, because a lower total can still overload one street. Zoning and ownership are not checked. See <a href="#f-sites">Alternate sites</a>.</p></div></details>
+    <details class="qa"><summary>Is the "AI recommendation" actually AI?</summary><div><p>The site recommendation is a search plus a traffic simulation, not a language model: screen open land, then route each candidate and rank by delay. The language-model AI is the records agent that reads minutes. Be precise about which is which.</p></div></details>
+    <details class="qa"><summary>What's the slime-mold thing?</summary><div><p>A network-growing rule from real biology: <i>Physarum</i> slime mold thickens tubes that carry flow and lets others wither; Tero et al. (Science, 2010) showed it rebuilds an efficient network like Tokyo's rail lines. We use it only to propose access roads that bend around buildings and water. The router then keeps only roads that actually reduce delay.</p></div></details>
+    <details class="qa"><summary>Why do the fix savings look so small?</summary><div><p>They're measured across the whole network for one hour, and traffic re-routes either way, so a 15% capacity bump on one street often saves a few vehicle-hours. Differences under about 2 veh-h are routing noise. Small savings mean the fix barely helps, which is itself a useful answer.</p></div></details>
+
+    <p class="qa-cat">The AI agent</p>
+    <details class="qa"><summary>Did the AI really read the city records?</summary><div><p>Yes: the agent has read P&amp;Z and council minutes and found 21 items (Home Depot Subdivision, Moody Townhomes PUD, Summerfield Division 14 and others), each with a quote. Only say "found by our AI" for projects a person has confirmed on the map, marked "Found by the AI agent".</p></div></details>
+    <details class="qa"><summary>How do you stop the AI from making things up?</summary><div><p>Four guards. Every item must carry a verbatim quote, or it's dropped. The server (not the AI) checks the quote against the record's own text: word for word, close (80%+ of words, for OCR errors), or not found. Items about things already built or votes that build nothing are screened out. And nothing reaches the model until a person reads the quote and places it on the map.</p></div></details>
+    <details class="qa"><summary>Which AI model?</summary><div><p>Google Gemini by default with a four-model fallback chain (3.5 Flash-Lite, 3.6 Flash, 3.1 Flash-Lite, 4 Hydrogen), because the free tier can rate-limit. Claude can be swapped in with one setting. Both use the same output schema.</p></div></details>
+    <details class="qa"><summary>Does it watch the city website automatically?</summary><div><p>No. It reads what you upload or link, or what the start screen's "Check for new records" finds when someone clicks it (up to 6 new records per check). There is no background watcher.</p></div></details>
+
+    <p class="qa-cat">Big picture</p>
+    <details class="qa"><summary>Can this work for other cities?</summary><div><p>The data is national: OpenStreetMap, LODES and ACS cover every U.S. city, and the agent's instructions name Rexburg only in one line. A new city needs its map export, its counts, the build scripts rerun, and a new archive reader if it wants the automatic records check (the Laserfiche folders are Rexburg's). College towns get the student modules; others switch them off.</p></div></details>
+    <details class="qa"><summary>Who would use it, and what does it replace?</summary><div><p>City planners and P&amp;Z commissioners screening projects before approval, and residents seeing what's coming. It doesn't replace a traffic impact study; it tells a city which of many options are worth one.</p></div></details>
+    <details class="qa"><summary>What about PTV, Aimsun, StreetLight, Replica, ArcGIS Urban?</summary><div><p>They are stronger models or richer data, but cost money and staff time a 30,000-person city rarely has. What's new here: AI that reads city records to find approved projects, and a fast what-if from free public data. A partnership pitch fits: "We turn city records into growth forecasts you can plug into your models."</p></div></details>
+    <p id="qa-none" class="note" hidden>No question matches. Try a shorter word.</p>
+  </div>
+</section>
+
+<section id="glossary">
+  <h2>Glossary</h2>
+  <dl class="vars">
+    <dt>ACS</dt><dd>American Community Survey: the Census Bureau's yearly sample survey; we use the 2020–2024 5-year estimates by block group.</dd>
+    <dt>LODES</dt><dd>LEHD Origin-Destination Employment Statistics: Census counts of where people live and work, by block.</dd>
+    <dt>AADT / ADT</dt><dd>(Annual) average daily traffic, both directions.</dd>
+    <dt>V/C</dt><dd>Volume over capacity: share of a street's hourly capacity in use.</dd>
+    <dt>BPR</dt><dd>Bureau of Public Roads travel-time curve: t = t₀(1 + 0.15(V/C)⁴).</dd>
+    <dt>TTI</dt><dd>Travel time index: actual time ÷ empty-road time. 1.3 = trips take 30% longer.</dd>
+    <dt>VHT / veh-h</dt><dd>Vehicle-hours traveled; differences between scenarios are delay added or saved.</dd>
+    <dt>VMT</dt><dd>Vehicle-miles traveled.</dd>
+    <dt>GEH</dt><dd>Calibration score comparing model and count; under 5 is a good match.</dd>
+    <dt>Gateway</dt><dd>A zone where a main road leaves the map; carries outside traffic.</dd>
+    <dt>Zone</dt><dd>A place trips start and end: town, store, campus or gateway.</dd>
+    <dt>Ghost</dt><dd>A project a planner places in Build mode (draft, in plan, or suggested).</dd>
+    <dt>HBO / NHB</dt><dd>Home-based other trips (errands from home); not-home-based trips (between two non-home places).</dd>
+    <dt>Walk district</dt><dd>The city's Pedestrian Emphasis District around campus.</dd>
+    <dt>Skim</dt><dd>The table of free-flow drive times between every pair of zones.</dd>
+    <dt>α, β</dt><dd>Trip scale factor and distance preference: the main tuned settings.</dd>
+  </dl>
+</section>
+
+<section id="codemap">
+  <h2>Where it lives in code</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Question</th><th>File</th></tr></thead>
+    <tbody>
+      <tr><td>Capacities, population, projects, count-based method, gaps, levels</td><td><code>src/model/atlas.ts</code></td></tr>
+      <tr><td>Trip table, gravity, outside traffic, routing, GEH score</td><td><code>src/model/routing.ts</code></td></tr>
+      <tr><td>Overview measures (delay, TTI, over-capacity miles)</td><td><code>src/model/overview.ts</code></td></tr>
+      <tr><td>Slime-mold road search</td><td><code>src/model/physarum.ts</code></td></tr>
+      <tr><td>Quote check, categories, screening, merging records</td><td><code>src/model/review.ts</code></td></tr>
+      <tr><td>Agent output schema, place types and trip rates</td><td><code>src/model/candidates.ts</code></td></tr>
+      <tr><td>Street-grid geocoder</td><td><code>src/model/geocode.ts</code></td></tr>
+      <tr><td>Census data-file edits → model</td><td><code>src/model/datafile.ts</code></td></tr>
+      <tr><td>Ghost types; site screen and placement rules</td><td><code>src/planner/ghosts.ts</code>, <code>suggest.ts</code></td></tr>
+      <tr><td>Build panel: Impact, Alternate sites, AI picks, Roads</td><td><code>src/planner/PlannerWorkspace.tsx</code></td></tr>
+      <tr><td>Background worker: queue, cache, year and hour scans</td><td><code>src/worker/route.worker.ts</code></td></tr>
+      <tr><td>AI agent (Gemini, Claude), PDF text, Laserfiche</td><td><code>agent/*.ts</code>, <code>api/agent.ts</code>, <code>api/records.ts</code></td></tr>
+      <tr><td>Building the data</td><td><code>scripts/build_city.py</code>, <code>build_zones.py</code>, <code>build_hourly.py</code>, <code>build_blockgroups.py</code>, <code>fetch_census.py</code></td></tr>
+      <tr><td>Calibration</td><td><code>scripts/calibrate.ts</code> → <code>public/data/calibration.json</code></td></tr>
+      <tr><td>3D scene</td><td><code>src/scene/view.ts</code> and neighbors</td></tr>
+    </tbody>
+  </table></div>
+  <p style="color:var(--muted);font-size:13.5px">Tests: <code>pnpm test:run</code> covers the model (capacity, BPR, GEH, population, routing, planner additions), the golden port against the legacy model, the agent, data files, block groups, records and review logic.</p>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, parent, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
+
+  /* population and delay by year: [year, S, R, Su, beds, delayGrow, delayPlans, overGrow, overPlans, trips] */
+  var YR = [[2024,20988,21611,20988,22350,43,43,1.91,1.91,165861],[2025,22169,21871,22169,22350,45,45,2.05,2.05,168806],[2026,21955,22174,21955,22388,47,47,2.05,2.05,170953],[2027,22394,22770,22394,22688,49,77,2.05,2.05,184783],[2028,22842,23379,22842,22988,50,81,2.19,2.05,187103],[2029,23279,24002,23299,23288,52,85,2.19,2.17,189447],[2030,23588,24639,23765,23588,54,89,2.19,2.21,191741],[2031,23888,25289,24240,23888,57,94,2.19,2.32,194063],[2032,24188,25950,24725,24188,59,99,2.19,2.46,196420],[2033,24488,26625,25219,24488,62,101,2.31,2.46,198810],[2034,24788,27311,25723,24788,64,106,2.45,2.46,200984]];
+  var HOUR = [0.0034,0.0016,0.0011,0.0017,0.0054,0.0257,0.0468,0.0667,0.0676,0.0666,0.063,0.0578,0.0579,0.0601,0.0641,0.0717,0.0809,0.0972,0.0667,0.0385,0.0233,0.0177,0.0095,0.0049];
+  /* calibration points: [count, model, holdout, road, geh] and 2023 approach counts [count, model, road, geh] */
+  var CAL = [[468,484,0,"East 2nd South",0.73],[737,482,1,"East 2nd South",10.35],[230,2,1,"South 1st East",21.14],[378,0,0,"South 1st East",27.51],[1210,1295,0,"South 2nd East",2.42],[1118,822,0,"South 2nd East",9.5],[425,480,0,"East 2nd South",2.56],[329,638,0,"East 2nd South",14.07],[397,92,0,"South 1st West",19.5],[506,22,0,"West 4th South",29.81],[222,0,0,"West Viking Street",21.07],[2374,2230,0,"North 2nd East",3.01],[2455,2323,0,"North 2nd East",2.69],[158,0,1,"East 7th North",17.79],[208,118,1,"East 7th North",7.03],[466,0,0,"South Center Street",30.52],[1745,1203,0,"East 7th South",14.11],[1608,928,1,"East 7th South",19.1],[140,0,1,"(unnamed)",16.74],[607,89,0,"South 1st West",27.8],[1096,592,1,"South 2nd East",17.36],[1134,592,0,"South 2nd East",18.46],[678,57,0,"University Boulevard",32.44],[535,543,0,"South 2nd West",0.36],[850,649,0,"West 7th South",7.32],[1592,1131,0,"West 7th South",12.49],[1189,649,1,"West 7th South",17.81],[1852,1131,1,"West 7th South",18.67],[649,57,0,"University Boulevard",31.55],[554,543,0,"South 2nd West",0.47],[2148,1484,1,"West Main Street",15.57],[592,1030,0,"West Highway 33",15.4],[720,2123,1,"North 12th West",37.21],[462,484,0,"South 12th West",1.04],[2351,2841,0,"West Main Street",9.62],[2104,2897,1,"West Main Street",15.86],[928,2025,0,"North 2nd West",28.54],[1589,1293,0,"South 2nd West",7.82],[1304,3337,0,"West Main Street",42.21],[675,1,0,"University Boulevard",36.65],[1248,700,1,"University Boulevard",17.56],[638,169,0,"South 12th West",23.39],[362,534,1,"South 12th West",8.1],[1244,1533,0,"West Main Street",7.76],[362,24,1,"North 1500 West",24.33],[1050,919,0,"Pioneer Road",4.18],[832,2137,0,"East 1st North",33.85],[1573,1549,0,"North 2nd East",0.59],[338,55,0,"University Boulevard",20.16],[371,769,1,"Pioneer Road",16.67],[260,169,0,"South 12th West",6.27],[192,484,0,"South 12th West",15.9],[168,118,0,"East 7th North",4.2],[2427,2328,0,"North 2nd East",2.02],[512,264,0,"South 2nd West",12.6],[330,25,0,"West 4th South",22.96],[99,88,0,"East 2nd North",1.16],[160,191,0,"Barney Dairy Road",2.34],[482,947,0,"South 2000 West",17.4],[68,164,1,"Park Street",8.92],[2400,2230,0,"North 2nd East",3.54],[1999,957,1,"North 2nd East",27.11],[166,12,0,"South 3rd West",16.3],[307,9,0,"North 5th West",23.75],[370,1692,0,"North 12th West",41.15],[143,119,0,"South Yellowstone Highway",2.07],[107,0,0,"East 3rd North Street",14.65],[1661,1222,0,"University Boulevard",11.55],[871,258,1,"University Boulevard",25.8],[1053,1521,1,"South Yellowstone Highway",13.03],[803,1073,0,"South Yellowstone Highway",8.82],[80,220,0,"Pinehaven Street",11.44],[99,220,0,"Pinehaven Street",9.55],[1614,994,0,"North 2nd East",17.17],[231,634,0,"East 2000 North",19.39],[122,586,0,"South Millhollow Road",24.61],[67,98,0,"Johnson Street",3.38],[54,98,0,"Johnson Street",4.96],[99,135,0,"Barney Dairy Road",3.25],[111,56,0,"(unnamed)",5.96],[2401,2230,0,"North 2nd East",3.54],[339,649,0,"West 7th South",13.97],[1010,1143,0,"West 4th South",4.07],[1269,1143,0,"West 4th South",3.61],[123,12,0,"South 3rd West",13.5],[164,12,0,"South 3rd West",16.16],[313,405,0,"West 2nd South",4.9],[324,405,0,"West 2nd South",4.27],[1198,928,0,"East 7th South",8.26]];
+  var REC = [[69,3,"North 2nd West",11.05],[105,2,"North 2nd West",14.05],[287,164,"West 2nd North",8.22],[557,163,"West 2nd North",20.78],[877,822,"South 2nd East",1.88],[810,1295,"South 2nd East",14.95],[293,480,"East 2nd South",9.49],[260,638,"East 2nd South",17.86],[19,0,"South Center Street",6.14],[262,0,"South Center Street",22.88],[446,22,"West 4th South",27.72],[471,89,"South 1st West",22.85],[117,0,"West Viking Street",15.31],[339,92,"South 1st West",16.83],[161,15,"North 1st East",15.62],[149,189,"North 1st East",3.09],[965,2137,"East 1st North",29.75],[854,1948,"East 1st North",29.23],[109,189,"North 1st East",6.55],[383,0,"North 1st East",27.68],[458,180,"East 2nd North",15.59],[433,301,"East 2nd North",6.88],[446,213,"South 2nd East",12.85],[1017,591,"South 2nd East",15.02],[1185,928,"East 7th South",7.89],[479,415,"East 7th South",3.02]];
+
+  /* a frame with y gridlines; returns scale functions */
+  function frame(svg, W, H, L, R, T, B, x0, x1, y0, y1, yTicks, yFmt) {
+    var X = function (v) { return L + (W - L - R) * (v - x0) / (x1 - x0); };
+    var Y = function (v) { return T + (H - T - B) * (1 - (v - y0) / (y1 - y0)); };
+    yTicks.forEach(function (v) {
+      el('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), 'class': 'grid' }, svg);
+      el('text', { x: L - 6, y: Y(v) + 4, 'text-anchor': 'end', 'class': 'ax' }, svg, yFmt(v));
+    });
+    return { X: X, Y: Y };
+  }
+  function line(svg, pts, color, dash, width) {
+    el('path', { d: pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(''), fill: 'none', stroke: color, 'stroke-width': width || 2.2, 'stroke-dasharray': dash || '', 'stroke-linejoin': 'round' }, svg);
+  }
+  function dots(svg, pts, color, labels) {
+    pts.forEach(function (p, i) { var c = el('circle', { cx: p[0], cy: p[1], r: 3.2, fill: color }, svg); if (labels) el('title', {}, c, labels[i]); });
+  }
+
+  /* population */
+  (function () {
+    var s = document.getElementById('ch-pop'), W = 640, H = 230;
+    var f = frame(s, W, H, 54, 16, 12, 26, 2024, 2034, 20000, 28000, [20000, 22000, 24000, 26000, 28000], function (v) { return (v / 1000) + 'k'; });
+    YR.forEach(function (r) { el('text', { x: f.X(r[0]), y: H - 8, 'text-anchor': 'middle', 'class': 'ax' }, s, String(r[0])); });
+    var cap = f.X(2030);
+    el('line', { x1: cap, x2: cap, y1: 12, y2: H - 26, stroke: 'var(--muted)', 'stroke-dasharray': '3 3' }, s);
+    el('text', { x: cap + 5, y: 24, 'class': 'ax' }, s, 'beds run out, fall 2030');
+    var su = YR.map(function (r) { return [f.X(r[0]), f.Y(r[3])]; }), bd = YR.map(function (r) { return [f.X(r[0]), f.Y(r[4])]; }), rs = YR.map(function (r) { return [f.X(r[0]), f.Y(r[2])]; });
+    line(s, rs, 'var(--blue)'); line(s, bd, 'var(--amber)', '6 4'); line(s, su, 'var(--accent)');
+    dots(s, su, 'var(--accent)', YR.map(function (r) { return r[0] + ': ' + fmt(r[3]) + ' students want to enroll'; }));
+    dots(s, bd, 'var(--amber)', YR.map(function (r) { return r[0] + ': ' + fmt(r[4]) + ' beds'; }));
+    dots(s, rs, 'var(--blue)', YR.map(function (r) { return r[0] + ': ' + fmt(r[2]) + ' other residents'; }));
+  })();
+
+  /* hourly share */
+  (function () {
+    var s = document.getElementById('ch-hour'), W = 640, H = 210;
+    var f = frame(s, W, H, 44, 10, 12, 26, 0, 24, 0, 0.1, [0, 0.025, 0.05, 0.075, 0.1], function (v) { return (v * 100).toFixed(v ? 1 : 0) + '%'; });
+    var bw = (W - 54) / 24;
+    HOUR.forEach(function (v, h) {
+      var x = 44 + h * bw + 2, hi = h === 8 || h === 17;
+      var r = el('rect', { x: x, y: f.Y(v), width: bw - 4, height: f.Y(0) - f.Y(v), rx: 2, fill: hi ? 'var(--accent)' : 'var(--line)', stroke: hi ? 'none' : 'var(--muted)', 'stroke-opacity': .35 }, s);
+      el('title', {}, r, (h === 0 ? '12 am' : h < 12 ? h + ' am' : h === 12 ? 'noon' : (h - 12) + ' pm') + ': ' + (v * 100).toFixed(2) + '% of the day');
+      if (h % 3 === 0) el('text', { x: x + (bw - 4) / 2, y: H - 8, 'text-anchor': 'middle', 'class': 'ax' }, s, h === 0 ? '12a' : h < 12 ? h + 'a' : h === 12 ? 'noon' : (h - 12) + 'p');
+    });
+    el('text', { x: 44 + 17 * bw + (bw - 4) / 2 + 2, y: f.Y(0.0972) - 6, 'text-anchor': 'middle', 'class': 'ax', style: 'fill:var(--ink)' }, s, '9.7%');
+    el('text', { x: 44 + 8 * bw + (bw - 4) / 2 + 2, y: f.Y(0.0676) - 6, 'text-anchor': 'middle', 'class': 'ax', style: 'fill:var(--ink)' }, s, '6.8%');
+  })();
+
+  /* BPR curve */
+  (function () {
+    var s = document.getElementById('ch-bpr'), W = 640, H = 210;
+    var f = frame(s, W, H, 48, 16, 12, 30, 0, 1.4, 0, 0.6, [0, 0.15, 0.3, 0.45, 0.6], function (v) { return '+' + Math.round(v * 100) + '%'; });
+    [0, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4].forEach(function (v) { el('text', { x: f.X(v), y: H - 12, 'text-anchor': 'middle', 'class': 'ax' }, s, v.toFixed(1)); });
+    el('text', { x: W - 16, y: H - 0, 'text-anchor': 'end', 'class': 'ax' }, s, 'V/C');
+    [[0, .7, 'var(--c0)'], [.7, .85, 'var(--c2)'], [.85, 1, 'var(--c3)'], [1, 1.4, 'var(--c4)']].forEach(function (b) {
+      el('rect', { x: f.X(b[0]), y: H - 30, width: f.X(b[1]) - f.X(b[0]), height: 4, fill: b[2] }, s);
+    });
+    var pts = []; for (var x = 0; x <= 1.4001; x += 0.02) pts.push([f.X(x), f.Y(0.15 * Math.pow(x, 4))]);
+    line(s, pts, 'var(--accent)', '', 2.5);
+    [[0.5, '52 s'], [0.9, '56 s'], [1.0, '59 s'], [1.2, '67 s']].forEach(function (m) {
+      var y = 0.15 * Math.pow(m[0], 4), cx = f.X(m[0]), cy = f.Y(y);
+      el('circle', { cx: cx, cy: cy, r: 4, fill: 'var(--panel)', stroke: 'var(--accent)', 'stroke-width': 2 }, s);
+      el('text', { x: cx - 6, y: cy - 8, 'text-anchor': 'end', 'class': 'ax', style: 'fill:var(--ink)' }, s, m[1]);
+    });
+  })();
+
+  /* delay by year */
+  (function () {
+    var s = document.getElementById('ch-delay'), W = 640, H = 220;
+    var f = frame(s, W, H, 48, 16, 12, 26, 2024, 2034, 0, 120, [0, 30, 60, 90, 120], function (v) { return String(v); });
+    YR.forEach(function (r) { el('text', { x: f.X(r[0]), y: H - 8, 'text-anchor': 'middle', 'class': 'ax' }, s, String(r[0])); });
+    var g = YR.map(function (r) { return [f.X(r[0]), f.Y(r[5])]; }), p = YR.map(function (r) { return [f.X(r[0]), f.Y(r[6])]; });
+    el('path', { d: p.map(function (q, i) { return (i ? 'L' : 'M') + q[0] + ',' + q[1]; }).join('') + g.slice().reverse().map(function (q) { return 'L' + q[0] + ',' + q[1]; }).join('') + 'Z', fill: 'var(--amber)', opacity: .18 }, s);
+    line(s, g, 'var(--blue)', '6 4'); line(s, p, 'var(--amber)');
+    dots(s, g, 'var(--blue)', YR.map(function (r) { return r[0] + ' growth only: ' + r[5] + ' veh-h'; }));
+    dots(s, p, 'var(--amber)', YR.map(function (r) { return r[0] + ' with projects: ' + r[6] + ' veh-h'; }));
+    el('text', { x: f.X(2034) - 4, y: f.Y(106) - 10, 'text-anchor': 'end', 'class': 'ax', style: 'fill:var(--ink)' }, s, '106');
+    el('text', { x: f.X(2034) - 4, y: f.Y(64) + 18, 'text-anchor': 'end', 'class': 'ax', style: 'fill:var(--ink)' }, s, '64');
+    el('text', { x: 52, y: 22, 'class': 'ax' }, s, 'vehicle-hours at 5 pm');
+  })();
+
+  /* calibration scatter */
+  (function () {
+    var s = document.getElementById('ch-cal'), W = 640, H = 400, mx = 3400;
+    var f = frame(s, W, H, 54, 16, 14, 36, 0, mx, 0, mx, [0, 1000, 2000, 3000], fmt);
+    [0, 1000, 2000, 3000].forEach(function (v) { el('text', { x: f.X(v), y: H - 18, 'text-anchor': 'middle', 'class': 'ax' }, s, fmt(v)); });
+    el('text', { x: W - 16, y: H - 2, 'text-anchor': 'end', 'class': 'ax' }, s, 'city count, cars per hour');
+    el('text', { x: 58, y: 26, 'class': 'ax' }, s, 'model');
+    el('line', { x1: f.X(0), y1: f.Y(0), x2: f.X(mx), y2: f.Y(mx), stroke: 'var(--muted)', 'stroke-dasharray': '4 4' }, s);
+    REC.forEach(function (q) { var r = el('rect', { x: f.X(q[0]) - 3, y: f.Y(q[1]) - 3, width: 6, height: 6, fill: 'var(--blue)', 'fill-opacity': .85 }, s); el('title', {}, r, q[2] + ' (2023 approach): count ' + fmt(q[0]) + ', model ' + fmt(q[1]) + ', GEH ' + q[3]); });
+    CAL.forEach(function (q) { var c = el('circle', { cx: f.X(q[0]), cy: f.Y(q[1]), r: 3.6, fill: q[2] ? 'var(--amber)' : 'var(--accent)', 'fill-opacity': .85 }, s); el('title', {}, c, q[3] + (q[2] ? ' (held out)' : '') + ': count ' + fmt(q[0]) + ', model ' + fmt(q[1]) + ', GEH ' + q[4]); });
+  })();
+
+  /* Q&A filter */
+  var inp = document.getElementById('qa-filter'), list = document.getElementById('qa-list'), count = document.getElementById('qa-count'), none = document.getElementById('qa-none');
+  var items = Array.prototype.slice.call(list.querySelectorAll('details.qa')), cats = Array.prototype.slice.call(list.querySelectorAll('.qa-cat'));
+  function filter() {
+    var q = inp.value.trim().toLowerCase(), shown = 0;
+    items.forEach(function (d) { var hit = !q || d.textContent.toLowerCase().indexOf(q) >= 0; d.hidden = !hit; if (hit) shown++; if (q && hit) d.open = true; });
+    cats.forEach(function (c) { var n = c.nextElementSibling, any = false; while (n && !n.classList.contains('qa-cat') && n.tagName !== 'P') { if (!n.hidden) any = true; n = n.nextElementSibling; } c.hidden = !any; });
+    none.hidden = shown > 0; count.textContent = shown + ' of ' + items.length + ' questions';
+  }
+  inp.addEventListener('input', filter); filter();
+
+  /* index highlights the section in view */
+  var links = {}; Array.prototype.forEach.call(document.querySelectorAll('nav.toc a'), function (a) { links[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window) {
+    var cur = null;
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting && links[e.target.id]) { if (cur) cur.classList.remove('on'); cur = links[e.target.id]; cur.classList.add('on'); } });
+    }, { rootMargin: '-10% 0px -80% 0px' });
+    Array.prototype.forEach.call(document.querySelectorAll('main section[id]'), function (s) { io.observe(s); });
+  }
+
+  /* theme toggle */
+  var root = document.documentElement;
+  document.getElementById('theme').addEventListener('click', function () {
+    var dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+})();
+</script>

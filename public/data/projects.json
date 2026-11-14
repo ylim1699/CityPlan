@@ -23,7 +23,7 @@
    "tripBasis": "250 homes x 6.7 trips a day. Commercial space not counted: tenants not announced.",
    "where": "West of US-20 at Exit 333 (Main St), toward 12th West",
    "plain": "A new neighborhood of homes, restaurants and shops by the Main Street exit, built in phases.",
-   "evidence": "Developer Trellis plans about 250 medium-density homes with restaurant and retail space. First-phase roads and utilities come first; full build-out is expected to take seven to ten years.",
+   "evidence": "Developer Trellis plans about 250 medium-density homes with restaurant and office/retail space. In February 2026 work had not started: site work and new roads come first, and a restaurant by the exit was to start that summer. Building the whole project is expected to take seven to ten years.",
    "source": {
     "label": "East Idaho News, Feb 11 2026",
     "url": "https://www.eastidahonews.com/2026/02/restaurants-retailers-and-housing-coming-to-new-rexburg-development/"
@@ -31,8 +31,8 @@
    "confidence": "medium",
    "flags": [
     "Footprint placed between US-20 and 12th West from the article; exact parcel not mapped",
-    "End date is our reading of \"seven to ten years\"",
-    "A hotel and a rec center are under discussion, not confirmed"
+    "Start date is assumed; end date is our reading of \"seven to ten years\"",
+    "A hotel \"may be coming\" and a rec center is in early talks with the city; neither is included"
    ],
    "foundBy": "person",
    "reviewed": true
@@ -54,8 +54,8 @@
    "trips": 260,
    "tripBasis": "Assumed 100 beds x 2.6 trips a day. Bed count is not in the source.",
    "where": "West of Walmart on North 2nd East, next to the new temple",
-   "plain": "An assisted living campus with apartments and condos, with offices or medical space around it.",
-   "evidence": "A 26-acre business park anchored by an assisted living campus with a pool, pickleball courts and a walking trail. Described as already underway.",
+   "plain": "An assisted living campus with condos, a pool and pickleball courts; offices or medical space may follow around it.",
+   "evidence": "A 26-acre business park anchored by an 11-acre assisted living campus with a pool, pickleball courts, a walking trail and individual condos. A photo caption describes it as currently underway.",
    "source": {
     "label": "East Idaho News, Feb 2026",
     "url": "https://www.eastidahonews.com/2026/02/development-near-new-rexburg-temple-to-include-the-homestead-assisted-living-facility/"
@@ -79,19 +79,19 @@
    "n": 1,
    "start": 2024.42,
    "end": 2027.5,
-   "size": "About 130,000 sq ft, three stories",
+   "size": "About 100,000 sq ft, three stories",
    "trips": 500,
    "tripBasis": "Assumed 500 trips a day once open. No standard rate fits; replace with a local count.",
    "where": "111 Teton River Temple St, north Rexburg",
    "plain": "A second Latter-day Saint temple for Rexburg, on the north end of town.",
-   "evidence": "Ground was broken June 1 2024 and construction was expected to take up to three years. Open house and dedication dates have not been announced.",
+   "evidence": "Ground was broken June 1 2024. The source lists it under construction (exterior cladding, parking lot paving, landscaping and interior work). Open house and dedication dates have not been announced.",
    "source": {
     "label": "churchofjesuschristtemples.org",
     "url": "https://churchofjesuschristtemples.org/teton-river-idaho-temple/"
    },
    "confidence": "medium",
    "flags": [
-    "Opening date not announced; mid-2027 is estimated from the groundbreaking"
+    "Opening date not announced; mid-2027 is our estimate"
    ],
    "foundBy": "person",
    "reviewed": true
@@ -112,15 +112,14 @@
    "tripBasis": "84,000 sq ft x 94 trips per 1,000 sq ft, less 35% assumed pass-by traffic.",
    "where": "North 2nd East at East Moody Rd",
    "plain": "A fourth large grocery store, on the north end of 2nd East.",
-   "evidence": "City documents describe an 84,000-square-foot single-story store on an 11-acre lot at North 2nd East and East Moody Road.",
+   "evidence": "WinCo submitted plans in January 2025 for an 84,000-square-foot single-story store on an 11-acre lot at North 2nd East and East Moody Road (Squires subdivision), across from Walmart.",
    "source": {
-    "label": "East Idaho News, Jan 2025",
+    "label": "East Idaho News, Jan 21 2025",
     "url": "https://www.eastidahonews.com/?p=723620"
    },
    "confidence": "low",
    "flags": [
-    "Opening status not confirmed. A 2026 land listing already calls it \"the new WinCo Foods store\", so it may be open",
-    "Dates are assumed",
+    "The source gives no dates: \"It's not clear when construction will get underway or be completed.\" Start and end are assumed",
     "Placed on the northeast side of North 2nd East near 1256 N; exact lot not mapped"
    ],
    "foundBy": "person",
@@ -264,8 +263,8 @@
    "status": "construction",
    "sid": "mainst",
    "start": 2026.45,
-   "end": 2026.7,
-   "size": "SH-33 Business Spur, Exit 333 to 2nd East",
+   "end": 2026.6,
+   "size": "Main St from 2nd East to Pioneer Rd, and from Exit 333 to 12th West",
    "trips": 0,
    "tripBasis": "No new trips. Mostly night work, so the model takes 10% off daytime capacity.",
    "effects": [
@@ -283,16 +282,16 @@
      "after": 1
     }
    ],
-   "where": "Main St from the US-20 interchange to 2nd East",
+   "where": "Main St, 2nd East to Pioneer Rd and Exit 333 to 12th West (the interchange itself unchanged)",
    "plain": "Main Street was repaved in summer 2026, mostly at night.",
-   "evidence": "Work began June 15 2026, mostly overnight, with street parking removed where crews were working between 2nd East and 4th West.",
+   "evidence": "Work began June 15 2026; night work (7 pm to 7 am) from June 22, with street parking removed between 2nd East and 4th West. ITD expected it done by early August.",
    "source": {
     "label": "Idaho Transportation Department, June 12 2026",
     "url": "https://itd.idaho.gov/news/resurfacing-to-begin-monday-on-sh-33-business-spur-in-rexburg/"
    },
    "confidence": "high",
    "flags": [
-    "End date is assumed"
+    "Finish date is ITD's estimate (early August); not confirmed finished"
    ],
    "foundBy": "person",
    "reviewed": true
@@ -363,7 +362,7 @@
  "unmapped": [
   {
    "name": "The Home Depot",
-   "note": "Planning and Zoning recommended approval of a roughly 40-acre plat in July 2026, with Home Depot buying 10 acres. The source does not say where, so it is not on the map or in the traffic model.",
+   "note": "Planning and Zoning recommended approval of a roughly 40-acre plat in July 2026, with Home Depot buying 10 acres. The source does not say where, so it is not on the map or in the traffic model. The source page blocks automated reading, so this could not be rechecked; the mayor's State of the City also named Home Depot as coming.",
    "source": {
     "label": "GatherGov meeting summary, July 2026",
     "url": "https://gathergov.com/municipalities/rexburg-id/development-news"

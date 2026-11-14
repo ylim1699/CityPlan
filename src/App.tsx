@@ -8,6 +8,7 @@ import { useShopEdits } from './hooks/useShopEdits';
 import { applyBlocks, editsKey, modelEdits } from './model/datafile';
 import { AgentPanel, REVIEW_CHANGED, waiting } from './components/AgentPanel';
 import { setDataEdits, setExtraProjects } from './hooks/useTraffic';
+import { applyProjectEdits, useProjectEdits } from './hooks/useProjectEdits';
 import type { Scenario, ZonesFile } from './model/routing';
 import { initialState, reducer } from './state';
 import { LAST_I, TODAY_I, tOf } from './ui';
@@ -47,11 +48,14 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   /* Projects a person confirmed from the AI agent's findings (this browser), on top of projects.json */
   const [confirmed, setConfirmed] = useState<Project[]>(loadConfirmed);
   const saveConfirmed = (list: Project[]) => { setConfirmed(list); try { localStorage.setItem('atlas-agent-projects', JSON.stringify(list)); } catch (e) {} };
-  const A = useMemo(() => {
+  /* and a person's edits and removals of the pulled records (this browser), on top of both */
+  const pe = useProjectEdits();
+  const merged = useMemo(() => {
     const ids = new Set(confirmed.map(p => p.id));
-    return createAtlas(city, { ...projects, projects: projects.projects.filter(p => !ids.has(p.id)).concat(confirmed) });
-  }, [city, projects, confirmed]);
-  const rev = confirmed.map(p => p.id).join(',');
+    return applyProjectEdits(projects.projects.filter(p => !ids.has(p.id)).concat(confirmed), pe.edits);
+  }, [projects, confirmed, pe.edits]);
+  const A = useMemo(() => createAtlas(city, { ...projects, projects: merged }), [city, projects, merged]);
+  const rev = confirmed.map(p => p.id).join(',') + JSON.stringify(pe.edits);
   /* "N to review" counts what the last check found that is still waiting: confirmed, hidden and screened-out items drop out */
   const [reviewTick, setReviewTick] = useState(0);
   useEffect(() => {
@@ -65,7 +69,10 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   /* Planner ghosts: projects a planner places for a year (this browser). Only counted in Planner mode. */
   const [ghosts, setGhostsRaw] = useState<Ghost[]>(loadGhosts), [ghostSel, setGhostSel] = useState<string | null>(null);
   const setGhosts = (g: Ghost[]) => { setGhostsRaw(g); saveGhosts(g); };
-  useEffect(() => { setExtraProjects(confirmed); }, [rev]);
+  useEffect(() => {
+    const ids = new Set(confirmed.map(p => p.id));  /* the worker gets the edited copies and the removed ids */
+    setExtraProjects(merged.filter(p => ids.has(p.id) || pe.edits[p.id]), Object.keys(pe.edits).filter(id => pe.edits[id].removed));
+  }, [rev]);
   const sRef = useRef(s); sRef.current = s;
   const getState = useCallback(() => sRef.current, []);
   const appRef = useRef<HTMLDivElement>(null), view = useRef<View | null>(null), body = useRef<HTMLDivElement>(null);
@@ -208,7 +215,7 @@ export function App({ city, projects, cal, zones, blocks = null }: { city: OsmCi
   const g = A.gaps(c.t, s.prm, c.pop);
   const title = s.sel ? A.byId(s.sel)!.name : block ? block.name : s.mode === 'resident' ? 'What is changing in Rexburg' : 'Planner view';
   const sub = s.sel ? A.byId(s.sel)!.where : block ? blockSub(block) : s.mode === 'resident' ? residentSub(A, c) : qLabel2(c, s.withProjects);
-  const props = { A, s, c, dispatch, select };
+  const props = { A, s, c, dispatch, select, pe };
   const fly = (pos: [number, number]) => view.current?.flyTo(pos);
   const methodNote = <p className="note" style={{ margin: 0 }}>{routing ? (tr.status === 'ready' ? 'Street loads come from routing every trip in town through the street network.' : tr.status === 'error' ? 'Routing failed to start; showing the count-based estimate.' : 'Routing trips… showing the count-based estimate until it finishes.') : 'Showing the count-based estimate (city counts plus nearby project trips), not routed trips.'}</p>;
   const residentExtra = routing ? <><ProblemCards A={A} s={s} c={c} sc={sc} tti={tti} cal={cal} n={3} onFly={fly} />{methodNote}</> : undefined;

@@ -37,7 +37,7 @@ export const POP = {
   back: { 2025: 24450 / 24111, 2024: (24450 / 1.067) / 24111 } as Record<number, number>,
   springFactor: 17326 / 24111
 };
-export const DEFAULTS: Params = { enroll: 0.02, stay: 0.06, bedsPerYear: 300, unitsPerYear: 120, carShare: 0.55 };
+export const DEFAULTS: Params = { enroll: 0.02, stay: 0.06, bedsPerYear: 300, unitsPerYear: 120, carShare: 0.55, S0: POP.S0, R0: POP.R0, resGrowth: POP.g };
 
 export type PopYear = { S: number; R: number; Su: number; beds: number; cap: boolean };
 export type PopAt = { S: number; R: number; Su: number; beds: number; total: number };
@@ -45,20 +45,21 @@ export type PopSeries = { at: (t: number) => PopAt; years: Record<number, PopYea
 
 export function popSeries(prm: Params): PopSeries {
   const yrs: Record<number, PopYear> = {};
-  let S_ = POP.S0, R = POP.R0, Su = POP.S0, y: number;
-  yrs[2026] = { S: S_, R, Su, beds: POP.beds0, cap: false };
+  const beds0 = POP.beds0 * prm.S0 / POP.S0;  // beds scale with the students who live in them (same 98% full)
+  let S_ = prm.S0, R = prm.R0, Su = prm.S0, y: number;
+  yrs[2026] = { S: S_, R, Su, beds: beds0, cap: false };
   for (y = 2026; y < 2036; y++) {
-    const beds = POP.beds0 + prm.bedsPerYear * (y + 1 - 2026);
+    const beds = beds0 + prm.bedsPerYear * (y + 1 - 2026);
     let Sn = S_ * (1 + prm.enroll), cap = false;
     Su = Su * (1 + prm.enroll);
     if (Sn > beds) { Sn = beds; cap = true; }
     const L = S_ * POP.turnover;
-    const Rn = R * (1 + POP.g) + prm.stay * L;
+    const Rn = R * (1 + prm.resGrowth) + prm.stay * L;
     yrs[y + 1] = { S: Sn, R: Rn, Su, beds, cap };
     S_ = Sn; R = Rn;
   }
-  yrs[2025] = { S: POP.S0 * POP.back[2025], R: POP.R0 / (1 + POP.g), Su: POP.S0 * POP.back[2025], beds: POP.beds0, cap: false };
-  yrs[2024] = { S: POP.S0 * POP.back[2024], R: POP.R0 / Math.pow(1 + POP.g, 2), Su: POP.S0 * POP.back[2024], beds: POP.beds0, cap: false };
+  yrs[2025] = { S: prm.S0 * POP.back[2025], R: prm.R0 / (1 + prm.resGrowth), Su: prm.S0 * POP.back[2025], beds: beds0, cap: false };
+  yrs[2024] = { S: prm.S0 * POP.back[2024], R: prm.R0 / Math.pow(1 + prm.resGrowth, 2), Su: prm.S0 * POP.back[2024], beds: beds0, cap: false };
   yrs[2023] = yrs[2024];
   let capYear: number | null = null;
   for (y = 2027; y <= 2036; y++) { if (yrs[y].cap) { capYear = y; break; } }
@@ -287,7 +288,7 @@ export function createAtlas(C: OsmCity, PF: ProjectsFile) {
       beds: { supply: p.beds, need: p.Su, ratio: p.beds / p.Su, short: Math.max(0, p.Su - p.beds) },
       homes: { supply, need, ratio: supply / need, short: Math.max(0, need - supply) },
       parking: CITY.collegeTown ? (() => {
-        const pn = p.S * prm.carShare, ps = CITY.parkSpaces0 + Math.max(0, p.beds - POP.beds0) * CITY.spacesPerNewBed;
+        const pn = p.S * prm.carShare, ps = CITY.parkSpaces0 + Math.max(0, p.beds - pop!.years[2026].beds) * CITY.spacesPerNewBed;
         return { supply: ps, need: pn, ratio: ps / pn, short: Math.max(0, pn - ps) };
       })() : null
     };

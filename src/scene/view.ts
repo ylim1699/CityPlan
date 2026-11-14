@@ -210,7 +210,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
       line('Per day: ' + fmtN(z.trips.out) + ' leaving · ' + fmtN(z.trips.inn) + ' arriving');
     } else line('Car trips: waiting for the routed run');
     if (z.a.kind === 'town') line('People are estimated from building floor area, scaled to the city totals');
-    tip.style.display = 'block'; tip.style.left = hover.x + 'px'; tip.style.top = hover.y + 'px';
+    placeTip();
   }
   function showBlockTip() {
     const b = blockHover >= 0 ? bl.get(blockHover) : null;
@@ -221,7 +221,7 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     (tip.querySelector('i') as HTMLElement).style.background = k >= 0 ? DENSITY[k].color : '#9aa3ad';
     tip.querySelector('span')!.append(b.pop == null ? 'Population not published' : fmtN(b.pop) + ' people' + (d != null ? ' · ' + fmtN(d) + ' per km²' : ''));
     tip.querySelector('small')!.textContent = (b.pop2020 != null ? '2020 Census count: ' + fmtN(b.pop2020) + ' · ' : '') + 'Click for details';
-    tip.style.display = 'block'; tip.style.left = hover.x + 'px'; tip.style.top = hover.y + 'px';
+    placeTip();
   }
   function setHover(seg: number) {
     const key = seg < 0 ? '' : A.SEGS[seg].road.name || '#' + A.SEGS[seg].road.id;
@@ -244,6 +244,12 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     hover.segs.forEach((i, k) => { const f = A.SEGS[i].road.cls === 'local' ? 1 / 0.62 : 1; for (let v = 0; v < 18; v++) d[k * 18 + v] = Math.min(1, src[i * 18 + v] * f); });
     dst.needsUpdate = true;
   }
+  function placeTip() {  /* beside the pointer, flipped or nudged so it stays on screen (phones are narrow) */
+    tip.style.display = 'block';
+    const w = tip.offsetWidth, cw = canvas.clientWidth;
+    let x = hover.x + 14; if (x + w > cw - 8) x = hover.x - 14 - w; x = Math.max(8, Math.min(cw - 8 - w, x));
+    tip.style.left = x + 'px'; tip.style.top = hover.y + 'px'; tip.style.transform = 'translateY(-50%)';
+  }
   function showTip() {
     if (hover.seg < 0) { if (zoneHover >= 0) showZoneTip(); else showBlockTip(); return; }
     if (!lastRes) { tip.style.display = 'none'; return; }
@@ -258,13 +264,13 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     (tip.querySelector('i') as HTMLElement).style.background = CCOL[lv.key];
     tip.querySelector('span')!.append(Math.round(r.vc * 100) + '% of capacity here · ' + lv.label);
     tip.querySelector('small')!.textContent = hover.segs.length > 1 ? 'Busiest stretch ' + Math.round(worst * 100) + '%' : '';
-    tip.style.display = 'block'; tip.style.left = hover.x + 'px'; tip.style.top = hover.y + 'px';
+    placeTip();
   }
   const hRay = new T.Raycaster(), hNdc = new T.Vector2(), hPlane = new T.Plane(new T.Vector3(0, 1, 0), 0), hHit = new T.Vector3();
   function pickRoad() {  /* nearest street segment to the pointer on the ground, within about 7 px */
     hRay.setFromCamera(hNdc, camera);
     if (!hRay.ray.intersectPlane(hPlane, hHit)) return -1;
-    const px = hHit.x, pz = hHit.z, lim = Math.max(0.02, PXU.uPx.value * 7);
+    const px = hHit.x, pz = hHit.z, lim = Math.max(0.02, PXU.uPx.value * tapPx);
     let best = -1, bd = lim * lim;
     A.SEGS.forEach((s, i) => {
       const ax = s.a[0], az = s.a[1], dx = s.b[0] - ax, dz = s.b[1] - az, L = dx * dx + dz * dz || 1e-9;
@@ -274,13 +280,17 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     });
     return best;
   }
+  let tapPx = 7;  /* how near the pointer must be to a street: a finger gets more room than a mouse */
   const onMove = (e: PointerEvent) => {
+    if (e.pointerType === 'touch' && !e.buttons) return;
+    tapPx = 7;
     if (e.buttons) { if (hover.seg >= 0) setHover(-1); setBlockHover(-1); setZoneHover(-1); return; }  /* dragging the map: no hover */
     const r = canvas.getBoundingClientRect();
     hover.x = e.clientX - r.left; hover.y = e.clientY - r.top; hover.inside = true;
     hNdc.set(hover.x / r.width * 2 - 1, -(hover.y / r.height) * 2 + 1); hover.dirty = true;
   };
-  const onLeave = () => { hover.inside = false; hover.dirty = false; setHover(-1); setBlockHover(-1); setZoneHover(-1); };
+  const onLeave = (e: PointerEvent) => { if (e.pointerType === 'touch') return;  /* a finger lifting keeps the tapped details up */
+    hover.inside = false; hover.dirty = false; setHover(-1); setBlockHover(-1); setZoneHover(-1); };
   canvas.addEventListener('pointermove', onMove); canvas.addEventListener('pointerleave', onLeave);
   /* road colors fade to new loads instead of snapping (apply() sets the goal, frame() eases toward it) */
   const roadGoal = new Float32Array(roadCol.array.length); let roadFade = false, roadInit = false;
@@ -762,13 +772,38 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     fly = null;
   };
   canvas.addEventListener('wheel', onWheel, { passive: false });
+  /* Phone pinch: two fingers spreading or closing zoom toward the point between them (MapControls keeps the
+     two-finger turn, since its own zoom is off) */
+  let pinch = 0;
+  const pinchDist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const onTouch = (e: TouchEvent) => {
+    if (e.touches.length !== 2) { pinch = 0; return; }
+    const dist = pinchDist(e.touches);
+    if (pinch > 0 && dist > 0) {
+      zoomVel += Math.log(pinch / dist);
+      const r = canvas.getBoundingClientRect(), mx = (e.touches[0].clientX + e.touches[1].clientX) / 2, my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      wNdc.set((mx - r.left) / r.width * 2 - 1, -((my - r.top) / r.height) * 2 + 1); wRay.setFromCamera(wNdc, camera);
+      const d = camera.position.distanceTo(controls.target);
+      zoomAt = wRay.ray.intersectPlane(wPlane, wHit) && wHit.distanceTo(controls.target) < d * 6 ? wHit.clone() : controls.target.clone();
+      fly = null;
+    }
+    pinch = dist;
+  };
+  const onTouchEnd = (e: TouchEvent) => { if (e.touches.length !== 2) pinch = 0; };
+  canvas.addEventListener('touchstart', onTouch, { passive: true }); canvas.addEventListener('touchmove', onTouch, { passive: true });
+  canvas.addEventListener('touchend', onTouchEnd); canvas.addEventListener('touchcancel', onTouchEnd);
 
   /* Pick mode: the next click (not a drag) on the ground reports its position */
   let picker: ((pos: XZ) => void) | null = null, down: [number, number] | null = null;
   const ray = new T.Raycaster(), ground0 = new T.Plane(new T.Vector3(0, 1, 0), 0), hit = new T.Vector3();
   const onDown = (e: PointerEvent) => { down = [e.clientX, e.clientY]; };
   const onUp = (e: PointerEvent) => {
-    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > (e.pointerType === 'touch' ? 10 : 5)) return;
+    if (e.pointerType === 'touch' && !picker) {  /* phones have no hover: a tap shows the street (or block, zone) details there */
+      const r = canvas.getBoundingClientRect();
+      hover.x = e.clientX - r.left; hover.y = e.clientY - r.top; hover.inside = true; tapPx = 18;
+      hNdc.set(hover.x / r.width * 2 - 1, -(hover.y / r.height) * 2 + 1); hover.dirty = true;
+    }
     if (!picker) {  /* a plain click with the blocks layer on opens that block group (or closes it, off the blocks) */
       if (getState().layers.blocks && e.button === 0) { const i = blockHover >= 0 ? blockHover : pickBlock(); onBlock(i >= 0 ? bl.get(i)!.id : null); }
       return;
@@ -839,6 +874,6 @@ export function createView(els: ViewEls, A: Atlas, getState: () => State, onSele
     getCam() { return { p: camera.position.toArray(), t: controls.target.toArray() }; },
     setCam(c) { camera.position.fromArray(c.p); controls.target.fromArray(c.t); controls.update(); },
     setZoneStats(z) { zl.setStats(z); if (zoneHover >= 0) showTip(); },
-    dispose() { disposed = true; bl.dispose(); zl.dispose(); setFlows(null); flowMat.dispose(); dotMat.dispose(); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('pointermove', onMove); canvas.removeEventListener('pointerleave', onLeave); ghosts.dispose(); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); overlay.innerHTML = ''; }
+    dispose() { disposed = true; bl.dispose(); zl.dispose(); setFlows(null); flowMat.dispose(); dotMat.dispose(); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('touchstart', onTouch); canvas.removeEventListener('touchmove', onTouch); canvas.removeEventListener('touchend', onTouchEnd); canvas.removeEventListener('touchcancel', onTouchEnd); canvas.removeEventListener('pointermove', onMove); canvas.removeEventListener('pointerleave', onLeave); ghosts.dispose(); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); overlay.innerHTML = ''; }
   };
 }
