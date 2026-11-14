@@ -158,7 +158,7 @@ The app runs without any keys; only the agent upload and <code>fetch_census.py</
 <tr><td>Demo views</td><td>One-click: 5 pm today, 5 pm 2034 with / without projects, 8 am today</td><td>Planner panel</td></tr>
 <tr><td>Accuracy panel</td><td>Counts vs. model scatter, GEH pass rates (tuning, held-out, 2023 counts), correlation</td><td><code>src/components/AccuracyPanel.tsx</code></td></tr>
 <tr><td>AI agent</td><td>Upload minutes (PDF or text) → Gemini lists development projects with verbatim quotes → a person checks the quote and clicks the map to place it → it joins the model. Fallback chain of 4 Gemini models; Claude optional. Also a command-line version</td><td><code>agent/</code>, <code>api/agent.ts</code>, <code>src/components/AgentPanel.tsx</code>, <code>scripts/run_agent.ts</code></td></tr>
-<tr><td>City minutes</td><td>Text of 5 P&amp;Z minutes (Jul 16, Aug 6, Aug 20, Oct 8, Oct 22, 2026) saved from the city archive. The agent's first run (Jul 16) found the Home Depot subdivision at ~1600 N 2nd E, Moody Townhomes PUD and Summerfield plat 14; all quotes verbatim; not yet confirmed on the map</td><td><code>data/raw/minutes/</code>, <code>public/data/projects.candidates.json</code></td></tr>
+<tr><td>City minutes</td><td>Text of 5 P&amp;Z minutes (Jul 16, Aug 6, Aug 20, Oct 8, Oct 22, 2026) and 6 City Council minutes (Jul 1, Aug 5, Aug 19, Sep 2, Sep 16, Oct 21, 2026) saved from the city archive (<code>pz-*.txt</code>, <code>cc-*.txt</code>). The agent has only been run on Jul 16 P&amp;Z so far. The agent's first run (Jul 16) found the Home Depot subdivision at ~1600 N 2nd E, Moody Townhomes PUD and Summerfield plat 14; all quotes verbatim; not yet confirmed on the map</td><td><code>data/raw/minutes/</code>, <code>public/data/projects.candidates.json</code></td></tr>
 <tr><td>Data</td><td>LODES 2023, ACS 2020–2024 by block group (commute mode, carpooling, work from home, population), ITD counter 059 hourly and day-of-week shape, 26 intersection counts from 2023 matched by GPS position</td><td><code>data/raw/</code> → <code>public/data/</code></td></tr>
 <tr><td>Demo script</td><td>3-minute script with the real numbers, limits slide, likely questions</td><td><code>demo-script.md</code></td></tr>
 </tbody></table></div>
@@ -171,12 +171,11 @@ The app runs without any keys; only the agent upload and <code>fetch_census.py</
 <div class="tablewrap"><table>
 <thead><tr><th>#</th><th>Task</th><th>Why / notes</th></tr></thead>
 <tbody>
-<tr><td><span class="tag must">Must</span></td><td><b>Confirm the agent's projects.</b> Planner view → "AI agent" → check each quote → "Quote checked: place on map" (Home Depot: on 2nd East around 1600 N, north of Walmart). Upload the other 4 minutes files from <code>data/raw/minutes/</code>. Then "Download projects.json", replace <code>public/data/projects.json</code>, commit</td><td>Until at least one project is confirmed, don't say "our AI read the records" on stage. After Home Depot is confirmed, delete its "Not mapped" entry in the <code>unmapped</code> list of <code>projects.json</code></td></tr>
+<tr><td><span class="tag must">Must</span></td><td><b>Confirm the agent's projects.</b> Planner view → "AI agent" → check each quote → "Quote checked: place on map" (Home Depot: on 2nd East around 1600 N, north of Walmart). Upload the other 10 minutes files from <code>data/raw/minutes/</code> (4 P&amp;Z, 6 City Council). Then "Download projects.json", replace <code>public/data/projects.json</code>, commit</td><td>Until at least one project is confirmed, don't say "our AI read the records" on stage. After Home Depot is confirmed, delete its "Not mapped" entry in the <code>unmapped</code> list of <code>projects.json</code></td></tr>
 <tr><td><span class="tag must">Must</span></td><td><b>Deploy to Vercel</b> (section 7): import the repo, set <code>GEMINI_API_KEY</code>, <code>GEMINI_MODELS</code> and <code>AGENT_TOKEN</code> (any passcode) in Environment Variables, check the live URL on a phone</td><td>Not done yet. <code>api/agent.ts</code> has only run through the dev server, never on Vercel; test an upload on the live site. Vercel caps request bodies at about 4.5 MB, fine for minutes</td></tr>
 <tr><td><span class="tag must">Must</span></td><td><b>Rehearse <code>demo-script.md</code></b> twice; keep <code>pnpm build &amp;&amp; pnpm preview</code> ready offline</td><td>Routing takes a few seconds to fill the hour bar on a slow laptop; start the demo on the page early</td></tr>
 <tr><td><span class="tag should">Should</span></td><td><b>Check lane counts</b> on the 5 worst-matching streets in the accuracy scatter (hover the dots) using Google Street View; fix in <code>scripts/build_city.py</code> (see the North 2nd East override there), rebuild, recalibrate</td><td>Most lane counts are OpenStreetMap defaults; wrong lanes push traffic onto the wrong streets. ~20 min</td></tr>
 <tr><td><span class="tag should">Should</span></td><td><b>Weekday / Saturday / Sunday switch</b> in the left controls</td><td>The model already supports <code>day</code> (ITD shapes and factors in <code>hourly.json</code>); only the button is missing. ~10 min</td></tr>
-<tr><td><span class="tag should">Should</span></td><td><b>City Council minutes</b>: only P&amp;Z minutes were fetched. Find the council folder id in the city's Laserfiche archive and run <code>pnpm tsx scripts/fetch_minutes.ts &lt;id&gt;:&lt;name&gt;.txt</code></td><td>Council approvals and final plats</td></tr>
 <tr><td><span class="tag should">Should</span></td><td><b>Fix the "46 projects" line</b> in the plan doc and pitch (section 4)</td><td>The 46 are construction-map records, mostly finished sewer and paving work</td></tr>
 <tr><td><span class="tag cut">Later</span></td><td><b>Improve accuracy</b> (section 10): finer zones and more street connectors, true equilibrium assignment, newer counts from the city or ITD, BYU-I approved-housing bed counts, separate hourly shapes for work / class / shopping trips</td><td>Three data upgrades (ACS, 2023 counts, ITD hours) did not move the score, so the limit is the model's structure</td></tr>
 <tr><td><span class="tag cut">Later</span></td><td>Placement heat map, parking by zone, 2019 back-cast calibration, SUMO layer, other cities</td><td>Cut for time; good "next steps" slides</td></tr>
@@ -257,6 +256,7 @@ python -I scripts/build_hourly.py data/raw/itd public/data                     #
 pnpm tsx scripts/calibrate.ts                                                  # re-tune (~30 s), writes calibration.json</code></pre>
 <h3>AI agent</h3>
 <pre><code>pnpm tsx scripts/fetch_minutes.ts 716476:pz-2026-10-22.txt   # save minutes text from the city archive (Laserfiche doc id)
+                                                             # add :&lt;pages&gt; if the page count is misread, e.g. 715661:cc-2026-09-02.txt:36
 pnpm agent data/raw/minutes/pz-2026-10-22.txt "P&amp;Z minutes, Oct 22 2026"
 pnpm agent --list
 pnpm agent --confirm &lt;id&gt; &lt;lat&gt; &lt;lon&gt;                          # or confirm in the app (planner → AI agent)</code></pre>
@@ -291,7 +291,7 @@ pnpm agent --confirm &lt;id&gt; &lt;lat&gt; &lt;lon&gt;                         
 <tr><td>Population, commute mode, carpooling, work from home, cars per household</td><td>Census ACS 2020–2024, block groups</td><td>Zone population, car trips</td><td>In</td></tr>
 <tr><td>Hourly and day-of-week shape</td><td>ITD counter 059 (SH-33)</td><td>Hourly trips</td><td>In</td></tr>
 <tr><td>P&amp;Z minutes, Jul–Oct 2026</td><td>City Laserfiche archive</td><td>AI agent</td><td>In (text)</td></tr>
-<tr><td>City Council minutes</td><td>City Laserfiche archive</td><td>AI agent</td><td>Not fetched</td></tr>
+<tr><td>City Council minutes, Jul–Oct 2026</td><td>City Laserfiche archive (folder 688918; P&amp;Z is 688900)</td><td>AI agent</td><td>In (text)</td></tr>
 <tr><td>Student beds per complex</td><td>BYU-I approved housing</td><td>Student placement</td><td>Not available; floor-area estimate used</td></tr>
 <tr><td>Counts newer than 2019 (street totals)</td><td>City / ITD</td><td>Calibration</td><td>Ask (section 12)</td></tr>
 </tbody></table></div>
@@ -351,7 +351,7 @@ pnpm agent --confirm &lt;id&gt; &lt;lat&gt; &lt;lon&gt;                         
 <div class="phase"><header><span class="tag must">In progress</span><h3>Phase 5 · AI agent</h3></header>
 <div class="task"><input type="checkbox" id="t5.1" checked><label for="t5.1"><span class="t">Gemini agent with fallbacks, upload + confirm in the app, command line, minutes fetched</span></label></div>
 <div class="task"><input type="checkbox" id="t5.2"><label for="t5.2">Confirm real projects and commit <code>projects.json</code> <small>Section 3, first row</small></label></div>
-<div class="task"><input type="checkbox" id="t5.3"><label for="t5.3">Fetch City Council minutes</label></div>
+<div class="task"><input type="checkbox" id="t5.3" checked><label for="t5.3"><span class="t">Fetch City Council minutes (6, Jul–Oct 2026)</span></label></div>
 </div>
 <div class="phase"><header><span class="tag must">Must</span><h3>Phase 6–7 · Demo and deploy</h3></header>
 <div class="task"><input type="checkbox" id="t6.1" checked><label for="t6.1"><span class="t">Demo views and <code>demo-script.md</code> with real numbers</span></label></div>

@@ -1,6 +1,7 @@
 /* Save the text of a few Rexburg meeting minutes from the city's Laserfiche archive, using the viewer's
    "View plain text" mode in a headless browser (file downloads are blocked for scripts). Low volume, public records only.
-   Usage: pnpm tsx scripts/fetch_minutes.ts <laserfiche-doc-id>:<file-name.txt> ...   (saves to data/raw/minutes/)
+   Usage: pnpm tsx scripts/fetch_minutes.ts <laserfiche-doc-id>:<file-name.txt>[:<pages>] ...   (saves to data/raw/minutes/)
+   Give the page count when the viewer's page counter is misread (check that the saved file ends with the adjournment).
    Then: pnpm agent data/raw/minutes/<file>.txt "<label>" */
 import puppeteer from 'puppeteer-core';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -17,11 +18,11 @@ const clickText = (t: string) => page.evaluate((t: string) => {
 }, t);
 
 for (const arg of process.argv.slice(2)) {
-  const [id, name] = arg.split(':');
+  const [id, name, given] = arg.split(':');
   const url = B + 'DocView.aspx?id=' + id + '&dbid=0&repo=Rexburg';
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
   const title = await page.title();
-  const pages = await page.evaluate(() => { const m = document.body.innerText.match(/\/\s*(\d+)\s*\n/); return m ? +m[1] : 1; });
+  const pages = given ? +given : await page.evaluate(() => { const m = document.body.innerText.match(/\/\s*(\d+)\s*\n/); return m ? +m[1] : 1; });
   await sleep(2000); await clickText('View plain text'); await sleep(7000);
   /* the text panel adds each page as you step through, so the last snapshot holds the whole document */
   let body = '';
